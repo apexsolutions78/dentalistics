@@ -162,7 +162,7 @@ Governing sequence exactly as specified in `Project_Planning_Dentalistics.md` (M
 | ID | Milestone | Status | Entry gate / dependency |
 |---|---|---|---|
 | M0 | Repository audit + development plan (this document) | **ACCEPTED 2026-09-26** — owner instructed "Please proceed" after the M0 report (treated as acceptance under the gate system; the instruction is also recorded as decision D3 in `PROJECT_STATE.md` §6) | — |
-| M1 | Foundation (structure, env config, DB connection, shell, error handling, logging, test harness, lint/typecheck/build) | **COMPLETED 2026-09-26 — awaiting owner acceptance** (report delivered; `npm run verify` exit 0, 26/26 tests, server smoke-tested, commit `de088b9` pushed) | M0 accepted; PROPOSED initial git commit; stack decision |
+| M1 | Foundation (structure, env config, DB connection, shell, error handling, logging, test harness, lint/typecheck/build) | **PASSED 2026-09-26** — M1 report re-verified on owner instruction ("start M2 if M1 confirmed PASS"): `npm run verify` exit 0 (26/26 tests), `npm audit` 0 vulnerabilities, all 9 plan acceptance criteria PASS, security incident fixed (K6), residual `root@localhost` socket-auth quirk resolved (re-ALTER via TCP; socket login verified exit 0). Initial commit `de088b9` + fixes pushed to `origin` | M0 accepted; PROPOSED initial git commit; stack decision |
 | M2 | Authentication + multi-tenancy (roles, isolation tests) | NOT_STARTED | M1 PASSED |
 | M3 | Patients + leads | NOT_STARTED | M2 PASSED |
 | M4 | Communication abstraction + mock provider | NOT_STARTED | M3 PASSED |
