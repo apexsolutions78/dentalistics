@@ -6,7 +6,7 @@
 
 **Governing protocol:** `CLAUDE.md` — MASTER_AI_RELIABILITY_PROTOCOL v1.0. This document is structured to its `<PROJECT_STATE>` durable-state categories.
 
-**Last updated:** 2026-09-26 (revision 8)
+**Last updated:** 2026-09-26 (revision 9)
 
 ---
 
@@ -322,6 +322,7 @@ No provider selection has been made. Recorded scoping decisions:
 | K3 | Assumption A2 (Bahrain) is load-bearing: constraint C2 stands or falls with it, and C2 has legal and architectural consequences. | **Re-scoped 2026-09-26** — A2 superseded: the owner targets a global subscription market (§1.8). C2 still governs Bahraini clinics; the load-bearing question is now per-market legal assessment for each target country (UNKNOWN, unexamined — plan/global consequence recorded in `INTEGRATION_PLAN.md`). |
 | K4 | Constraint C4 (SMS sender ID rules) was asserted from memory in revision 1 and remains unverified. | **Partially resolved 2026-09-26** — verified against Twilio documentation: Bahrain requires no sender-ID pre-registration per Twilio (original claim corrected), UAE/Saudi pre-registration corroborated by a secondary dataset. TRA primary source and non-Twilio providers still unverified — see C4 and plan item V1. |
 | K5 | The Bahrain PDPL analysis cited in C2 dates from 2019 and may be out of date on implementing regulations. | Open — re-check current PDPA guidance |
+| K6 | The local dev MySQL root password was written into `README.md` and pushed to the **public** repository `apexsolutions78/dentalistics` in commits `de088b9` and `c20437f` (2026-09-26). | **Mitigated same day:** credential rotated (old value verified non-authenticating over TCP), README replaced with a placeholder (`6d6b66c`), current tree verified clean via `git grep`. The dead value remains in git **history**; removing it requires a history rewrite/force-push — NOT done (needs explicit owner instruction). Optional owner decision: keep repo public, make it private, or rewrite history. |
 
 ---
 
@@ -396,3 +397,4 @@ Recorded so scope does not drift. Not rejected — simply not in scope.
 | 7 | 2026-09-26 | Owner issued `Project_Planning_Dentalistics.md` as the governing development plan ("follow as per planning in the file"). Milestone 0 executed: `M0_Project_Audit.md` written (13-section audit + M0–M23 status table), delivered IN_PROGRESS awaiting acceptance. B5 resolved (multi-clinic architecture required by MVP-1). CURRENT_STATUS, §1.0 phase log and inventory pointer updated. No code written. |
 | 6 | 2026-09-26 | Owner selected WhatsApp + Twilio (both to be built) and stated the application is not Bahrain-only — global subscription marketing intended. Recorded as D2 (§6) and §1.8; A1 confirmed (subscription product), A2 superseded, A3 confirmed (WhatsApp), A5 revised (subscription confirmed); B3 largely resolved; C2 applicability re-scoped to Bahraini clinics; K3 re-scoped; C2 caveat corrected. Build timing to be clarified with owner before code. |
 | 8 | 2026-09-26 | Owner instruction "Please proceed" recorded as decision D3: M0 accepted, M1 authorized, initial commit + push authorized. Milestone 1 executed: foundation scaffold written (7 source files, 4 test suites, 1 migration, tooling configs); `npm run verify` exit 0 with 26/26 tests (including 4 live-DB integration tests on MySQL 8.4 Docker); server smoke-tested incl. fail-fast startup paths; `npm run migrate` verified idempotent. One test defect found, fixed, re-verified. Initial commit `de088b9` pushed to `origin`, remote HEAD verified. §5 ARCHITECTURE rewritten (M0 proposal + M1 implementation status), §8 COMPLETED updated, M0 audit K-I1/R1/M0/M1 rows updated. M1 report delivered; awaiting owner acceptance — M2 NOT_STARTED. |
+| 9 | 2026-09-26 | Security incident recorded as K6: dev MySQL password had been committed in README (public repo). Rotated credential, fixed README (`6d6b66c`), verified current tree clean and old password non-authenticating; re-ran `npm run verify` exit 0 + migrate + server health after rotation. History retains the dead value — history rewrite only on explicit owner instruction. |
