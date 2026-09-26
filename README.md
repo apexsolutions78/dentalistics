@@ -14,11 +14,13 @@ npm install
 Copy-Item .env.example .env   # then edit DB credentials
 ```
 
-The local development Docker database (used in this repo's dev environment):
+The local development Docker database (used in this repo's dev environment).
+Pick your own root password and put the same value in `.env` (`.env` is
+git-ignored; never write real credentials into tracked files):
 
 ```powershell
 docker run -d --name dentalistics-mysql -p 3306:3306 `
-  -e MYSQL_ROOT_PASSWORD=dev_root_pw_2026 -e MYSQL_DATABASE=dentalistics `
+  -e MYSQL_ROOT_PASSWORD=your_dev_password -e MYSQL_DATABASE=dentalistics `
   --health-cmd="mysqladmin ping -h 127.0.0.1" --health-interval=10s `
   --health-timeout=5s --health-retries=10 mysql:8.4
 ```
