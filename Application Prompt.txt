@@ -1,0 +1,20 @@
+I am planning a Sellable Dental Clinic Application that I can sell through my own website which I already have. When the application has been built, I will host it on my own DirectAdmin server with the use of Node.js and MySQl.
+
+It is a narrow system focused on:
+New lead capture and instant follow-up.
+Missed-call text-back.
+Appointment reminders.
+No-show reactivation.
+Review requests and recall nudges.
+A simple owner dashboard for visibility.
+
+Features for the starter service
+First package should include:
+Missed-call text-back within seconds.
+New lead acknowledgment for website forms.
+Appointment reminder sequence at 48h, 24h, and 2h.
+No-show follow-up and rebooking link.
+Recall reminder for overdue hygiene patients.
+Simple owner report showing leads, replies, confirmations, and no-shows.
+
+These features map directly to the strongest pain points in the research: front-desk overload, lost leads, recall failure, and scheduling inefficiency.
