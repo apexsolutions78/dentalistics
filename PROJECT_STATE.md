@@ -2,11 +2,11 @@
 
 **GOAL:** Build a narrow automation system for dental clinics covering lead capture, missed-call text-back, appointment reminders, no-show reactivation, review requests, recall nudges, and an owner dashboard.
 
-**CURRENT_STATUS:** `Project_Planning_Dentalistics.md` (owner, 2026-09-26) is the **governing development plan** — milestones M0–M23 with a gate system; it supersedes this document's phase/Stage structure where they conflict (issues recorded in `M0_Project_Audit.md`). Milestone 0 (repository audit) delivered 2026-09-26 as `M0_Project_Audit.md` — **IN_PROGRESS, awaiting owner acceptance**. No application code exists. No provider accounts exist. Prior discovery remains valid: B1/B6 partially answered, decisions D1 (integration staged) and D2 (WhatsApp + Twilio; global subscription market) recorded in §6.
+**CURRENT_STATUS:** `Project_Planning_Dentalistics.md` (owner, 2026-09-26) is the **governing development plan** — milestones M0–M23 with a gate system; it supersedes this document's phase/Stage structure where they conflict (issues recorded in `M0_Project_Audit.md`). Milestone 0 **ACCEPTED** (owner: "Please proceed", 2026-09-26; recorded as D3, §6). Milestone 1 (Foundation) **COMPLETED 2026-09-26 — awaiting owner acceptance**: Express 5 + mysql2 scaffold, fail-fast env validation, JSON logging with secret redaction, structured error handling, `GET /health` with DB check, SQL migration runner, Vitest/ESLint/tsc gates — `npm run verify` executed exit 0 (26/26 tests passed, including 4 live-DB integration tests against a local MySQL 8.4 Docker container); server smoke-tested (boot with DB verification, `/health` 200, `/` 200, unknown route 404, missing-env and unreachable-DB startup failures exit 1). Initial commit `de088b9` pushed to `origin` (https://github.com/apexsolutions78/dentalistics.git), remote HEAD verified with `git ls-remote`. No provider accounts exist. Prior discovery remains valid: B1/B6 partially answered, decisions D1 (integration staged), D2 (WhatsApp + Twilio; global subscription market) and D3 recorded in §6.
 
 **Governing protocol:** `CLAUDE.md` — MASTER_AI_RELIABILITY_PROTOCOL v1.0. This document is structured to its `<PROJECT_STATE>` durable-state categories.
 
-**Last updated:** 2026-09-26 (revision 7)
+**Last updated:** 2026-09-26 (revision 8)
 
 ---
 
@@ -79,7 +79,7 @@ Scope areas named by the owner:
 | `CLAUDE.md` | 8048 bytes. Contains MASTER_AI_RELIABILITY_PROTOCOL v1.0. Relocated by the owner from `App/` to the repository root, where it governs the whole project. Byte size and modification time unchanged by the move, so the content is identical to the version read in full. | Read in full |
 | `App/` | Now empty. Retained but contains no files. | Confirmed by directory listing |
 | `Country Wise Data/Bahrain/Bahrain_Dental_Prospects_2026.xlsx` | Present. **Contents not read.** Its role in this project has not been stated. | Existence only |
-| `.git` | Repository initialised on branch `master`, **zero commits** | Confirmed via `git log` |
+| `.git` | Repository initialised on branch `master`, **zero commits** at 2026-09-03 | Confirmed via `git log`. **Updated 2026-09-26 (rev 8):** initial commit `de088b9` created and pushed to `origin`; remote HEAD verified to match |
 | `PROJECT_STATE.md` | This document | — |
 
 No source code, dependency manifest, database schema, or configuration exists — FACT (verified: no such files found).
@@ -293,20 +293,23 @@ INFERENCE, not a decision: cron alone can send scheduled reminders reliably, but
 
 ## 5. ARCHITECTURE
 
-**None. No architecture has been designed.**
+**M0 recommendation (PROPOSED 2026-09-26):** one TypeScript modular monolith — Express HTTP layer, mysql2 pool, migration-managed schema, DB-backed job queue + provider abstraction (mock first), authenticated webhook receivers, structured logging, Vitest + ESLint + tsc quality gates. Alternatives (separate services, message brokers) rejected under the plan's Decision Rule. Full rationale: `M0_Project_Audit.md` RECOMMENDED ARCHITECTURE.
 
-Stack, database, hosting topology, messaging provider and telephony provider are all open, and are deliberately deferred until Section 4.1 is answered. Choosing a stack before B6 is answered would risk selecting a technology the server cannot run.
+**M1 implementation (CONFIRMED — executed 2026-09-26):** the foundation layer exists at scaffold level: Express 5 app factory with injected dependencies, `src/config.ts` (env validation, fail-fast, password never echoed in errors), `src/logger.ts` (structured JSON, redacts password/token/secret-like keys at any depth), `src/errors.ts` (AppError/NotFoundError/ValidationError + Express error handler: 400/404/413/500 with generic 500 message), `src/db/pool.ts` (mysql2 pool, UTC `timezone: 'Z'`, health check), `src/db/migrate.ts` (SQL-file runner, `schema_migrations` tracking, explicit `npm run migrate`, idempotent), `GET /` and `GET /health`, `tests/` (4 suites, 26 tests). Not implemented (later milestones): job queue, provider abstraction, webhook receivers, authentication, tenant isolation (M2+).
+
+**Stack acceptance status:** M1 was executed on the M0-recommended stack (TypeScript 5.9.3, Express 5, mysql2, Vitest, ESLint; all versions resolved live from npm, not memory). ASSUMED: the owner's "proceed" instruction — which under the gate system was required to include a stack decision for M1 to start — constitutes acceptance of that stack. No separate stack approval was given; the owner may still correct it at M1 acceptance.
 
 ---
 
 ## 6. DECISIONS
 
-No provider or technology selection has been made. One scoping decision is recorded:
+No provider selection has been made. Recorded scoping decisions:
 
 | Date | Decision | Reason | Made by |
 |---|---|---|---|
 | 2026-09-26 | **D1 — Call and SMS integration is deferred to a later stage, but stays in scope.** The application is to be built now with a provider-pluggable messaging layer (Stage 0), messaging integration happens at Stage 1, missed-call text-back at Stage 2. Plan recorded in `INTEGRATION_PLAN.md` (PROPOSED, awaiting owner approval) | Owner has no call/SMS provider, connection or plan at present; SMS/calls are current demand and the most convenient medium, so the capability cannot be skipped | Project owner |
 | 2026-09-26 | **D2 — Build integration for both WhatsApp and Twilio. Application is not Bahrain-only; global subscription marketing intended.** Timing of the build (with the application vs started immediately) clarified with the owner before code is written | Owner statement, 2026-09-26 | Project owner |
+| 2026-09-26 | **D3 — Owner instruction "Please proceed" after the M0 report.** Effects: M0 treated as accepted under the gate system; M1 (Foundation) authorized; the M0 audit's PROPOSED initial git commit + push authorized (reported at end of M1). ASSUMED to also accept the M0-recommended stack (gate requires a stack decision for M1; no separate stack approval given — confirmable at M1 acceptance) | Direct owner instruction following the M0 status report | Project owner |
 
 ---
 
@@ -337,8 +340,17 @@ No provider or technology selection has been made. One scoping decision is recor
 | C4 partially verified against Twilio documentation while researching the integration plan — 2026-09-26 | Verified with cited sources; remainder left NOT_VERIFIED |
 | `INTEGRATION_PLAN.md` created (Stage 0/1/2 plan, verification checklist, sources) | Written to disk; PROPOSED, awaiting owner approval |
 | Providers selected (WhatsApp + Twilio, both) and global subscription market scope recorded as D2 / §1.8 — 2026-09-26 | Verified against owner message; written to disk |
+| Milestone 0 accepted and Milestone 1 authorized via owner instruction "Please proceed" (decision D3, §6) — 2026-09-26 | Verified against owner message |
+| M1 foundation scaffold written: `src/config.ts`, `src/logger.ts`, `src/errors.ts`, `src/app.ts`, `src/index.ts`, `src/db/pool.ts`, `src/db/migrate.ts`, 4 test suites, `migrations/0001_create_app_meta.sql`, tooling configs (`package.json`, `tsconfig*`, `eslint.config.mjs`, `vitest.config.mts`, `.gitignore`, `.env.example`), `README.md` — 2026-09-26 | Written to disk |
+| M1 gates executed: `npm run lint` exit 0, `npm run typecheck` exit 0, `npm test` 26/26 passed, `npm run build` exit 0; full `npm run verify` exit 0 run twice (second run after a test fix) | Executed on this machine 2026-09-26; exit codes observed |
+| DB integration tests executed against local MySQL 8.4 Docker container (connection up/bad-credentials down, migration apply-once + idempotent re-run, real `./migrations` applied, `app_meta` table present) | Executed 2026-09-26; container `dentalistics-mysql` healthy |
+| Server smoke tests executed from `dist/`: boot verifies DB then listens; `GET /health` 200 `database:"up"`; `GET /` 200; unknown route structured 404; startup with missing env → ConfigError on stderr, exit 1; startup with unreachable DB → logged, exit 1 | Executed 2026-09-26; observed in terminal |
+| `npm run migrate` executed twice: first run applied `0001_create_app_meta.sql`, second run skipped it (idempotent, `schema_migrations` tracking works) | Executed 2026-09-26 |
+| Initial commit `de088b9` created (28 files) and pushed to `origin`; remote HEAD verified equal to local via `git ls-remote` | Verified 2026-09-26 |
 
-Nothing has been built, executed, or tested, because nothing exists to test.
+One test defect was found and fixed during M1 (migration probe used a fixed file name, so a second run against the same test database reported the file as already applied instead of applying it): fixed with a unique per-run name plus tracking-row cleanup, then re-verified — `npm test` 26/26 twice.
+
+Everything beyond the M1 scope (`/`, `/health`, config, logging, errors, migrations) remains unimplemented: no authentication, tenant isolation, domain schema, providers, webhooks, queue, or UI — those belong to later milestones.
 
 ---
 
@@ -367,6 +379,8 @@ Recorded so scope does not drift. Not rejected — simply not in scope.
 **Nothing proceeds past Phase 1 without explicit instruction from the project owner.**
 
 > Superseded note (2026-09-26, revision 7): the owner issued `Project_Planning_Dentalistics.md`, which replaces this phase model with milestones **M0–M23** governed by its MILESTONE GATE SYSTEM. Milestone 0 is in progress; every later milestone is NOT_STARTED. The stopping rule is unchanged: no next milestone without explicit acceptance of the current one.
+>
+> **Updated 2026-09-26 (revision 8):** M0 **ACCEPTED** (owner "Please proceed", D3); M1 **COMPLETED, awaiting owner acceptance**; M2–M23 NOT_STARTED. Stopping rule unchanged: M2 does not begin until the owner accepts the M1 report.
 
 ---
 
@@ -381,3 +395,4 @@ Recorded so scope does not drift. Not rejected — simply not in scope.
 | 5 | 2026-09-26 | Owner stated no call/SMS integration exists or is planned, requires the capability, and deferred integration to a later stage. Recorded as decision D1 (§6); B2/B3 annotated; A3 revised (SMS and calls owner-confirmed, WhatsApp still assumed); K2 annotated. C4 partially verified and corrected against Twilio documentation (Bahrain: no sender-ID pre-registration, two-way SMS unsupported on Twilio). `INTEGRATION_PLAN.md` created (Stage 0/1/2, verification checklist V1–V7, sources). |
 | 7 | 2026-09-26 | Owner issued `Project_Planning_Dentalistics.md` as the governing development plan ("follow as per planning in the file"). Milestone 0 executed: `M0_Project_Audit.md` written (13-section audit + M0–M23 status table), delivered IN_PROGRESS awaiting acceptance. B5 resolved (multi-clinic architecture required by MVP-1). CURRENT_STATUS, §1.0 phase log and inventory pointer updated. No code written. |
 | 6 | 2026-09-26 | Owner selected WhatsApp + Twilio (both to be built) and stated the application is not Bahrain-only — global subscription marketing intended. Recorded as D2 (§6) and §1.8; A1 confirmed (subscription product), A2 superseded, A3 confirmed (WhatsApp), A5 revised (subscription confirmed); B3 largely resolved; C2 applicability re-scoped to Bahraini clinics; K3 re-scoped; C2 caveat corrected. Build timing to be clarified with owner before code. |
+| 8 | 2026-09-26 | Owner instruction "Please proceed" recorded as decision D3: M0 accepted, M1 authorized, initial commit + push authorized. Milestone 1 executed: foundation scaffold written (7 source files, 4 test suites, 1 migration, tooling configs); `npm run verify` exit 0 with 26/26 tests (including 4 live-DB integration tests on MySQL 8.4 Docker); server smoke-tested incl. fail-fast startup paths; `npm run migrate` verified idempotent. One test defect found, fixed, re-verified. Initial commit `de088b9` pushed to `origin`, remote HEAD verified. §5 ARCHITECTURE rewritten (M0 proposal + M1 implementation status), §8 COMPLETED updated, M0 audit K-I1/R1/M0/M1 rows updated. M1 report delivered; awaiting owner acceptance — M2 NOT_STARTED. |

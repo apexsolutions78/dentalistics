@@ -1,6 +1,6 @@
 # MILESTONE 0 — PROJECT AUDIT AND DEVELOPMENT PLAN
 
-**Status: IN_PROGRESS — delivered for owner review. Per `Project_Planning_Dentalistics.md`, no Milestone 1 work begins until this audit is accepted.**
+**Status: ACCEPTED 2026-09-26** — owner instructed "Please proceed" after the M0 report (recorded as decision D3 in `PROJECT_STATE.md` §6; the same instruction authorized Milestone 1, which has since been executed — M1 now awaits its own owner acceptance).
 **Audit date:** 2026-09-26. Every statement below was produced by direct tool inspection of the repository or is explicitly labelled by its source (owner-stated / cited / ASSUMED / UNKNOWN).
 
 ---
@@ -20,11 +20,12 @@ Complete file inventory (verified by recursive listing, `.git` internals exclude
 | `Project_Planning_Dentalistics.md` | 50,323 B | **Governing development plan** — master prompt, milestones M0–M23, MVP scope (owner, 2026-09-26) |
 | `Country Wise Data/Bahrain/Bahrain_Dental_Prospects_2026.xlsx` | 9,748 B | Bahrain dental prospects spreadsheet. Role in project UNKNOWN (not read; not required for M0) |
 
-Git state (verified):
+Git state (verified at M0, 2026-09-26):
 
 - `master`, **zero commits ever** (reflog/`git log` both fail with "does not have any commits yet"); no other branches; no stashes.
 - Staged: `CLAUDE.md`, `PROJECT_STATE.md` (also modified), the xlsx. Untracked: `Application Prompt.txt`, `INTEGRATION_PLAN.md`, `Project_Planning_Dentalistics.md`.
 - No `.gitignore` exists.
+- **Superseded by M1 (2026-09-26):** initial commit `de088b9` pushed to `origin` with all work; `.gitignore` added — see K-I1.
 
 Application code: **none.** Verified by pattern search for `*.js, *.ts, *.mjs, *.cjs, *.tsx, *.jsx, *.php, *.html, *.css, *.sql, *.env, *.json, *.yml, *.yaml, *.lock` — zero matches. The previously documented `App/` directory no longer exists (removed after 2026-09-03).
 
@@ -89,7 +90,7 @@ Development machine (verified): Node.js **v24.18.0**, npm **11.16.0**. (Server-s
 
 | # | Issue | Source | Status |
 |---|---|---|---|
-| K-I1 | Repository has **zero commits**; all work exists only as uncommitted working-tree files (3 staged, 3 untracked) | git inspection | Open — a single accidental deletion loses everything. PROPOSED: initial commit at start of M1 (requires owner instruction to commit) |
+| K-I1 | Repository has **zero commits**; all work exists only as uncommitted working-tree files (3 staged, 3 untracked) | git inspection | **Resolved 2026-09-26 (M1):** initial commit `de088b9` created and pushed to `origin` (https://github.com/apexsolutions78/dentalistics.git); remote HEAD verified to match via `git ls-remote`. `.gitignore` added (excludes `.env`, `node_modules/`, `dist/`) |
 | K-I2 | Inbound HTTPS webhook capability of the DirectAdmin server is UNKNOWN — gates M5 (public endpoint), M12 (missed-call), and "within seconds" text-back | `PROJECT_STATE.md` B6/K2 | Open |
 | K-I3 | Cron interval / persistent-process capability UNKNOWN — gates M8 (scheduled reminders) | `PROJECT_STATE.md` B6 | Open |
 | K-I4 | No Twilio, Meta/WhatsApp or any provider account exists; M12/M13 can only be MOCKED/SANDBOX until accounts + capability verification (plan: NO FAKE INTEGRATIONS) | inspection + owner statements | Open |
@@ -103,7 +104,7 @@ Development machine (verified): Node.js **v24.18.0**, npm **11.16.0**. (Server-s
 
 | # | Risk | Impact | Mitigation |
 |---|---|---|---|
-| R1 | Nothing is committed to git (K-I1) | Total loss of work on accidental deletion/disk failure | Initial commit at M1 start (owner instruction required) |
+| R1 | Nothing is committed to git (K-I1) | Total loss of work on accidental deletion/disk failure | **Mitigated 2026-09-26:** initial commit `de088b9` pushed to `origin` (K-I1 closed) |
 | R2 | 24 milestones with mandatory gates; single-contributor cadence | Schedule pressure and temptation to skip gates | Plan forbids skipping; report format enforced every milestone |
 | R3 | Server capabilities (webhooks, cron, process persistence, SSL/domain) unverified | M5/M8/M12/M22 could stall late | Resolve B6 sub-items early (owner can answer without clinic involvement) |
 | R4 | Provider capability variance by country (global market; only Bahrain partially researched) | M12/M13 built against wrong assumptions | Plan already mandates official-doc verification before M12/M13; checklist V1–V11 exists in `INTEGRATION_PLAN.md` |
@@ -160,8 +161,8 @@ Governing sequence exactly as specified in `Project_Planning_Dentalistics.md` (M
 
 | ID | Milestone | Status | Entry gate / dependency |
 |---|---|---|---|
-| M0 | Repository audit + development plan (this document) | **IN_PROGRESS** — awaiting owner acceptance | — |
-| M1 | Foundation (structure, env config, DB connection, shell, error handling, logging, test harness, lint/typecheck/build) | NOT_STARTED | M0 accepted; PROPOSED initial git commit; stack decision |
+| M0 | Repository audit + development plan (this document) | **ACCEPTED 2026-09-26** — owner instructed "Please proceed" after the M0 report (treated as acceptance under the gate system; the instruction is also recorded as decision D3 in `PROJECT_STATE.md` §6) | — |
+| M1 | Foundation (structure, env config, DB connection, shell, error handling, logging, test harness, lint/typecheck/build) | **COMPLETED 2026-09-26 — awaiting owner acceptance** (report delivered; `npm run verify` exit 0, 26/26 tests, server smoke-tested, commit `de088b9` pushed) | M0 accepted; PROPOSED initial git commit; stack decision |
 | M2 | Authentication + multi-tenancy (roles, isolation tests) | NOT_STARTED | M1 PASSED |
 | M3 | Patients + leads | NOT_STARTED | M2 PASSED |
 | M4 | Communication abstraction + mock provider | NOT_STARTED | M3 PASSED |
@@ -191,4 +192,4 @@ Cross-references to `PROJECT_STATE.md` (discovery record, retained):
 - B2 (clinic telephony), B4 (data protection), B6 sub-items (webhooks, cron, process, SSL, location) — still open; mapped to M5/M12, M22, M1/M8 gates above.
 - Decisions D1 (integration staged) and D2 (WhatsApp + Twilio; global market) remain owner decisions; the plan adds the requirement that provider capabilities are verified from official documentation before M12/M13 implementation, which governs how D2 is executed.
 
-**M0 STOP.** No application code has been written. Milestone 1 must not begin until this audit is reviewed and accepted by the project owner.
+**M0 STOP (historical).** At delivery no application code had been written, and Milestone 1 was gated on owner acceptance of this audit. That acceptance arrived 2026-09-26 ("Please proceed", decision D3 in `PROJECT_STATE.md` §6), which also authorized M1; M1 has since been executed and its own report awaits acceptance (`PROJECT_STATE.md` rev 8).
