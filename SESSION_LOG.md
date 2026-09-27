@@ -394,3 +394,114 @@ Re-verification executed before answering (no PASS claim on stale evidence):
 **Result: M3 100% complete, tested, confirmed PASS, defects fixed (7 + 2
 coverage gaps closed) → M4 started.** Recorded in `PROJECT_STATE.md`
 revision 14 and the audit M3 row PASSED / M4 IN_PROGRESS.
+
+---
+
+## Session 4 — 2026-09-27 — Milestone 4 (Communication abstraction) implemented and tested
+
+**Owner instruction this session:** "If M3 is 100% completed, tested and
+confirmed PASS, defects fixed, then start M4 otherwise fix remaining defects
+first."
+
+**M3 gate outcome:** PASS confirmed after re-verification (see Session 3
+addendum): coverage gaps closed (defects 12–13), fresh verify 84/84, fresh
+smoke 29/29 PASS, rev-13 smoke-count miscount corrected. M3 recorded PASSED
+(rev 14, commit `d1c551a` pushed, `MATCH=OK`). M4 then started.
+
+### Work executed (M4)
+
+1. **Plan M4 read** — "Implement the internal communication architecture. Do
+   not immediately depend on a single real provider throughout the system.
+   Create provider abstractions and a mock/test provider." Test list: message
+   creation, sending, failure handling, delivery status, provider errors,
+   idempotency, logging.
+2. **Schema** `migrations/0004_communication.sql` — `communication_messages`
+   (channel SMS/WHATSAPP, recipient, body, status PENDING/SENT/FAILED/
+   DELIVERED/UNDELIVERED, provider key/message-id/error, **UNIQUE(org,
+   idempotency_key)**, attempts, sent_at/delivered_at, org FK). Applied to
+   dev DB (applied 0004, skipped 0001–0003, exit 0).
+3. **Provider abstraction** `src/communications/`:
+   - `types.ts` — `CommunicationProvider { key, send(OutboundMessage) }`,
+     `ProviderSendResult`, coded `ProviderSendError`.
+   - `mockProvider.ts` — `MockProvider`: records every attempt, returns
+     `mock-<messageId>-<n>` ids, throws coded `mock_recipient_failure` for
+     `failOn` recipients (default magic recipient `999999999`).
+   - `registry.ts` — register/get by key, mock pre-registered, unknown key
+     throws.
+4. **Message service** `src/services/messages.ts` — `createMessage`
+   (validates + inserts PENDING, ER_DUP_ENTRY on (org,key) → returns
+   existing with `created:false`), `sendMessage` (PENDING/FAILED dispatch →
+   SENT/FAILED, provider metadata + coded error stored, repeat send on
+   SENT → `skipped` without touching the provider), `applyProviderStatus`
+   (SENT→DELIVERED/UNDELIVERED only, else 409 `invalid_status_transition`),
+   `listMessages`/`getMessage` (org-scoped, status/channel filters,
+   pagination). No HTTP routes and no config change (both PROPOSED —
+   consumers and a second provider arrive later).
+5. **Tests** — `tests/m4.integration.test.ts` (9 live-DB acceptance tests
+   covering all 7 plan categories) + `tests/provider.test.ts` (6 no-DB unit
+   tests). Auth/M3 test purges extended to delete `communication_messages`
+   before organizations (FK order-independence across suite files).
+
+### Defects found and fixed
+
+| # | Defect | Fix | Re-verification |
+|---|---|---|---|
+| 14 | lint: `ValidationError` imported but unused in `messages.ts` (validators throw it internally) | import pruned | lint exit 0 |
+
+No test failures: first full run after the lint fix was **99/99, exit 0**.
+
+### Verification evidence (commands actually run)
+
+| Check | Command / action | Result |
+|---|---|---|
+| Migration (dev DB) | `npm run migrate` | exit 0; applied `0004_communication.sql`, skipped 0001–0003 (idempotent) |
+| Typecheck / lint | after each round | exit 0, final green |
+| Full test suite | `npm test` run 1 | **99/99 passed, 12 files, 0 skipped, exit 0** (M3 84 + M4 9 DB + 6 unit) |
+| Full gate | `npm run verify` | **exit 0** — lint 0, typecheck 0, tests 99/99, build 0 |
+| M3 smoke regression | `m3-smoke.ps1` after M4 | **29/29 PASS, SMOKE_PASS, exit 0** (app unaffected) |
+
+### Plan cross-check (M4 scope)
+
+All items implemented and tested: internal communication architecture ✓;
+no dependence on a single real provider (interface + registry + mock) ✓;
+provider abstractions ✓; mock/test provider ✓; message creation ✓, sending ✓,
+failure handling ✓ (failed status + coded error + retry), delivery status ✓
+(DELIVERED/UNDELIVERED transitions + guards), provider errors ✓ (coded and
+generic paths), idempotency ✓ (create de-dup + no-double-dispatch send),
+logging ✓ (lifecycle entries asserted). No gaps found.
+
+### Git state produced
+
+| Commit | Contents |
+|---|---|
+| (hash appended after push) | M4 source (migration, communications layer, message service), tests (m4 integration + provider unit, purge-order fixes), docs rev 15 (`PROJECT_STATE.md`, audit M4 row, this session entry) |
+
+### Durable doc updates
+
+- `PROJECT_STATE.md` → revision 15 (CURRENT_STATUS M4 complete awaiting
+  acceptance, §5 M4 block, five §8 evidence rows, phase-log note, changelog).
+- `M0_Project_Audit.md` → M4 row: complete, report delivered, awaiting
+  acceptance.
+- `SESSION_LOG.md` → this entry.
+
+### Session end state
+
+- M4 implementation complete; **all gates green**: `npm run verify` exit 0
+  (99/99 tests, 12 suites, 0 skipped), migrate idempotent, M3 smoke
+  regression 29/29 PASS, no stray processes.
+- Committed and pushed: rev 15; remote HEAD verified matching local.
+- Next: M4 STATUS REPORTING block → STOP for owner acceptance.
+  M5 NOT_STARTED (gate rule).
+
+### Decisions the owner has not yet made
+
+1. Accept (or reject) the M4 report — gate on M5.
+2. PROPOSED M4 design points: no HTTP message API at M4 (internal layer;
+   routes/authz when a consumer needs them); no provider-selection config
+   yet (provider injected; config when a second provider exists); status
+   lifecycle PENDING→SENT/FAILED, SENT→DELIVERED/UNDELIVERED only
+   (409 otherwise); mock failure recipient `999999999` (test seam, mock
+   provider only); channels SMS/WHATSAPP only (no email — no mail channel);
+   body limit 1–4096 chars; per-org idempotency keys.
+3. K6 question unchanged (public-repo history rewrite decision).
+4. OPEN ISSUES (B2, B4, B6 sub-items) unchanged.

@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS communication_messages (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  organization_id BIGINT UNSIGNED NOT NULL,
+  channel ENUM('SMS', 'WHATSAPP') NOT NULL,
+  recipient VARCHAR(32) NOT NULL,
+  body TEXT NOT NULL,
+  status ENUM('PENDING', 'SENT', 'FAILED', 'DELIVERED', 'UNDELIVERED') NOT NULL DEFAULT 'PENDING',
+  provider_key VARCHAR(64) NULL,
+  provider_message_id VARCHAR(255) NULL,
+  provider_error VARCHAR(1000) NULL,
+  idempotency_key VARCHAR(128) NOT NULL,
+  attempts INT UNSIGNED NOT NULL DEFAULT 0,
+  sent_at DATETIME NULL,
+  delivered_at DATETIME NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_messages_organization FOREIGN KEY (organization_id) REFERENCES organizations (id),
+  UNIQUE KEY uq_messages_org_idempotency (organization_id, idempotency_key),
+  INDEX idx_messages_org_status (organization_id, status),
+  INDEX idx_messages_org_created (organization_id, created_at)
+);
