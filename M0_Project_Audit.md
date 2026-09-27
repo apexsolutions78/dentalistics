@@ -92,7 +92,7 @@ Development machine (verified): Node.js **v24.18.0**, npm **11.16.0**. (Server-s
 |---|---|---|---|
 | K-I1 | Repository has **zero commits**; all work exists only as uncommitted working-tree files (3 staged, 3 untracked) | git inspection | **Resolved 2026-09-26 (M1):** initial commit `de088b9` created and pushed to `origin` (https://github.com/apexsolutions78/dentalistics.git); remote HEAD verified to match via `git ls-remote`. `.gitignore` added (excludes `.env`, `node_modules/`, `dist/`) |
 | K-I2 | Inbound HTTPS webhook capability of the DirectAdmin server is UNKNOWN — gates M5 (public endpoint), M12 (missed-call), and "within seconds" text-back | `PROJECT_STATE.md` B6/K2 | Open |
-| K-I3 | Cron interval / persistent-process capability UNKNOWN — gates M8 (scheduled reminders) | `PROJECT_STATE.md` B6 | Open |
+| K-I3 | Cron interval / persistent-process capability UNKNOWN — gated M8 (scheduled reminders) | `PROJECT_STATE.md` B6 | Open — M8 shipped an in-process scheduler instead (no external-cron dependency); deployment-side process persistence remains unverified, carried in the M8 report |
 | K-I4 | No Twilio, Meta/WhatsApp or any provider account exists; M12/M13 can only be MOCKED/SANDBOX until accounts + capability verification (plan: NO FAKE INTEGRATIONS) | inspection + owner statements | Open |
 | K-I5 | Data-protection position (consent, retention, opt-out, applicable law — B4) unanswered; global market makes this per-country. Plan forbids claiming compliance without assessment | `PROJECT_STATE.md` B4, §1.8 | Open |
 | K-I6 | `PROJECT_STATE.md` and `INTEGRATION_PLAN.md` predate the governing plan; their phase/Stage structure is superseded by the milestone system where they conflict | owner instruction 2026-09-26 | Recorded; documents retained, not deleted |
@@ -169,7 +169,7 @@ Governing sequence exactly as specified in `Project_Planning_Dentalistics.md` (M
 | M5 | Website lead capture API (public, rate-limited, tenant-identified) | **PASSED 2026-09-27** (owner conditional instruction; re-verified: plan cross-check all 7 categories, falsification review — no new defects, fresh verify 109/109, fresh extended smoke 35/35). Open items carried: K-I2 UNKNOWN (production-deployment blocker only), CORS not implemented (owner decision) | M4 PASSED; K-I2 UNKNOWN (deployment blocker only) |
 | M6 | Instant lead follow-up | **PASSED 2026-09-27** (owner conditional instruction; re-verified: plan cross-check, falsification review — no new defects, fresh verify 125/125, fresh smoke 35/35) | M5 PASSED |
 | M7 | Appointments (statuses, timezone) | **PASSED 2026-09-27** (owner conditional instruction; re-verified: plan cross-check, falsification review — no new defects, fresh verify 143/143, fresh smoke 47/47) | M6 PASSED |
-| M8 | Appointment reminders (48h/24h/2h, idempotent, quiet hours) | **IN_PROGRESS (started 2026-09-27)** — K-I3 still UNKNOWN; M8 uses in-process scheduler (no external-cron dependency), process persistence confirmed at M8 report | M7 PASSED |
+| M8 | Appointment reminders (48h/24h/2h, idempotent, quiet hours) | **COMPLETE — awaiting owner acceptance (2026-09-27)** — gates met: verify 159/159 (17 suites, 0 skipped), migrate 0008+0009 applied, extended smoke 49/49 PASS; K-I3 still UNKNOWN — in-process scheduler shipped (no external-cron dependency), process persistence carried in the M8 report | M7 PASSED |
 | M9 | No-show recovery | NOT_STARTED | M8 PASSED |
 | M10 | Recall automation | NOT_STARTED | M9 PASSED |
 | M11 | Review requests | NOT_STARTED | M10 PASSED |

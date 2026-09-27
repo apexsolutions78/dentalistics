@@ -10,7 +10,14 @@ import {
   requireString,
 } from '../validate';
 
-const UPDATABLE_PATIENT_FIELDS = ['firstName', 'lastName', 'phone', 'email', 'notes'] as const;
+const UPDATABLE_PATIENT_FIELDS = [
+  'firstName',
+  'lastName',
+  'phone',
+  'email',
+  'notes',
+  'smsOptOut',
+] as const;
 
 interface PatientRow extends RowDataPacket {
   id: number;
@@ -20,6 +27,7 @@ interface PatientRow extends RowDataPacket {
   phone: string;
   email: string | null;
   notes: string | null;
+  sms_opt_out: number | boolean;
   created_by: number | null;
   created_at: Date;
   updated_at: Date;
@@ -30,7 +38,7 @@ interface IdRow extends RowDataPacket {
 }
 
 const PATIENT_SELECT = `SELECT id, organization_id, first_name, last_name, phone, email,
-    notes, created_by, created_at, updated_at
+    notes, sms_opt_out, created_by, created_at, updated_at
   FROM patients`;
 
 function patientDto(row: PatientRow): Record<string, unknown> {
@@ -41,6 +49,7 @@ function patientDto(row: PatientRow): Record<string, unknown> {
     phone: row.phone,
     email: row.email,
     notes: row.notes,
+    smsOptOut: row.sms_opt_out === true || row.sms_opt_out === 1,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -209,6 +218,13 @@ export async function updatePatient(
   }
   if (body.notes !== undefined) {
     apply('notes', 'notes', optionalText(body.notes, 'notes', 5000), existing.notes);
+  }
+  if (body.smsOptOut !== undefined) {
+    if (typeof body.smsOptOut !== 'boolean') {
+      throw new ValidationError('Invalid input', ['smsOptOut must be a boolean']);
+    }
+    const previous = existing.sms_opt_out === true || existing.sms_opt_out === 1 ? 1 : 0;
+    apply('sms_opt_out', 'smsOptOut', body.smsOptOut ? 1 : 0, previous);
   }
 
   if (changed.length === 0) {

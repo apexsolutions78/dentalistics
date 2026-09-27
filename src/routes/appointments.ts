@@ -1,6 +1,10 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import type { Pool } from 'mysql2/promise';
+import {
+  cancelRemindersForAppointment,
+  scheduleRemindersForAppointment,
+} from '../automation/reminders';
 import type { SessionUser } from '../auth/sessions';
 import { AppError } from '../errors';
 import { readJsonBody } from '../http/body';
@@ -35,6 +39,46 @@ function requireAppointment(
   return result;
 }
 
+function appointmentIdOf(result: Record<string, unknown>): number {
+  const appt = result.appointment as { id: number } | undefined;
+  return appt?.id ?? 0;
+}
+
+async function safeScheduleReminders(
+  db: Pool,
+  logger: Logger,
+  appointmentId: number,
+): Promise<void> {
+  if (appointmentId === 0) {
+    return;
+  }
+  try {
+    await scheduleRemindersForAppointment(db, logger, appointmentId);
+  } catch (err) {
+    logger.error('reminder scheduling failed', {
+      appointmentId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+async function safeCancelReminders(
+  db: Pool,
+  logger: Logger,
+  appointmentId: number,
+  reason: string,
+): Promise<void> {
+  try {
+    await cancelRemindersForAppointment(db, logger, appointmentId, reason);
+  } catch (err) {
+    logger.error('reminder cancellation failed', {
+      appointmentId,
+      reason,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
 export function createAppointmentsRouter(deps: AppointmentsRouterDeps): Router {
   const router = Router();
   router.use(requireAuth);
@@ -59,6 +103,7 @@ export function createAppointmentsRouter(deps: AppointmentsRouterDeps): Router {
       actorId: actor.id,
       body,
     });
+    await safeScheduleReminders(deps.db, deps.logger, appointmentIdOf(created));
     res.status(201).json(created);
   });
 
@@ -108,6 +153,7 @@ export function createAppointmentsRouter(deps: AppointmentsRouterDeps): Router {
       appointmentId,
       actorId: actor.id,
     });
+    await safeCancelReminders(deps.db, deps.logger, appointmentId, 'appointment_cancelled');
     res.status(200).json(result);
   });
 
@@ -121,6 +167,7 @@ export function createAppointmentsRouter(deps: AppointmentsRouterDeps): Router {
       appointmentId,
       actorId: actor.id,
     });
+    await safeCancelReminders(deps.db, deps.logger, appointmentId, 'appointment_completed');
     res.status(200).json(result);
   });
 
@@ -134,6 +181,7 @@ export function createAppointmentsRouter(deps: AppointmentsRouterDeps): Router {
       appointmentId,
       actorId: actor.id,
     });
+    await safeCancelReminders(deps.db, deps.logger, appointmentId, 'appointment_no_show');
     res.status(200).json(result);
   });
 
@@ -149,6 +197,8 @@ export function createAppointmentsRouter(deps: AppointmentsRouterDeps): Router {
       actorId: actor.id,
       body,
     });
+    await safeCancelReminders(deps.db, deps.logger, appointmentId, 'appointment_rescheduled');
+    await safeScheduleReminders(deps.db, deps.logger, appointmentIdOf(result));
     res.status(200).json(result);
   });
 
@@ -164,6 +214,7 @@ export function createAppointmentsRouter(deps: AppointmentsRouterDeps): Router {
       actorId: actor.id,
       body,
     });
+    await safeScheduleReminders(deps.db, deps.logger, appointmentIdOf(result));
     res.status(200).json(result);
   });
 

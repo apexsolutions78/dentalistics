@@ -1054,3 +1054,186 @@ corrected: it previously read "scheduler capability confirmed (K-I3)"
 while K-I3 was Open — it now records K-I3 as still UNKNOWN with the
 in-process-scheduler design. M8 (Appointment reminders) started per owner
 instruction.
+
+---
+
+## Session 8 - 2026-09-27 - Milestone 8 (Appointment reminders) implemented and tested
+
+**Owner instruction this session:** "If M7 is 100% completed, tested and
+confirmed PASS, all defects fixed, then start M8 otherwise fix remaining
+defects first."
+
+**M7 gate outcome:** PASS confirmed (rev 22, commit `d744edf` pushed,
+`MATCH=OK`). The audit's M8 gate row had been corrected in rev 22 to stop
+claiming K-I3 confirmation; K-I3 remains Open. M8 then started on the
+in-process-scheduler design (no external-cron dependency).
+
+### Plan scope (fresh read)
+
+M8: appointment reminders at 48h / 24h / 2h, idempotent, quiet hours.
+Supporting sections re-read: plan line ~156 (starter package item 3),
+automation TRIGGER/WAIT model, TIME AND DATE HANDLING (clinic timezone),
+MVP-7 must-not-send list (cancelled / completed / rescheduled-old / not-
+permitted / already sent), MVP AUTOMATION REQUIREMENTS, MVP-14 reminder
+templates (L2213), TEST 5/6/7 (reminder stops on cancel/reschedule),
+section 4.2 messaging questions (quiet hours, consent - B4), D2 (mock
+until provider accounts exist - K-I4).
+
+### Work executed (M8)
+
+1. **Migration** `0008_reminders.sql` - `patients.sms_opt_out`
+   TINYINT(1) NOT NULL DEFAULT 0; `appointment_reminders` (org FK,
+   appointment FK CASCADE, message FK SET NULL, offset_hours,
+   scheduled_at DATETIME stored UTC, status ENUM PENDING/SENDING/SENT/
+   FAILED/SUPPRESSED/CANCELLED, message_id/attempts/last_error/
+   suppression_reason/sent_at, UNIQUE (appointment_id, offset_hours),
+   idx (status, scheduled_at)). Applied to dev DB.
+2. **Migration** `0009_app_meta_value_size.sql` - `app_meta.meta_value`
+   VARCHAR(255) -> TEXT (defect 24, below). Applied to dev DB.
+3. **`src/automation/time.ts`** - `zonedToUtc` (2-pass DST-safe clinic
+   wall-clock -> UTC), `clinicLocalTime` (Intl), `isWithinQuietHours`
+   (normal + overnight-wrap windows; equal start/end never quiet).
+4. **`src/automation/reminderConfig.ts`** - `app_meta` key
+   `reminder_config`: enabled, channel, provider, offsetsHours
+   [48,24,2], quietHours (21:00-08:00, default disabled), templates
+   for 48/24/2h (PROPOSED default texts following MVP-14 wording),
+   maxAttempts 3. Shape-guarded; missing/corrupt JSON -> defaults
+   (mirror of M6 automation config). No HTTP endpoint.
+5. **`src/automation/reminders.ts`** - `scheduleRemindersForAppointment`
+   (instant = zonedToUtc(date,time,org tz) - offset; past offsets
+   skipped; ER_DUP_ENTRY -> idempotent skip), `cancelRemindersFor-
+   Appointment` (PENDING/FAILED/SENDING -> CANCELLED + reason),
+   `runReminderTick` (config gate; stale-SENDING reclaim >10 min;
+   due query PENDING or FAILED-attempts<max; optimistic claim
+   `WHERE status = ? AND attempts = ?`; lazy appointment-status
+   backstop -> CANCELLED `appointment_inactive`; sms_opt_out ->
+   SUPPRESSED `communication_not_permitted`; quiet hours ->
+   SUPPRESSED `quiet_hours`; send via `sendTemplateMessage` with
+   idempotency `reminder:<id>`, messageType `appointment_reminder`,
+   template name `appointment_reminder_<h>h`, variables first_name/
+   clinic_name/appointment_date/appointment_time, or `sendMessage`
+   retry when message_id exists; FAILED -> backoff 60s*2^(n-1),
+   permanent stop at maxAttempts; returns counters).
+6. **Route wiring** `src/routes/appointments.ts` - never-throw
+   wrappers (M6 pattern): create/reschedule(new)/rebook -> schedule;
+   cancel -> `appointment_cancelled`, complete -> `appointment_completed`,
+   no-show -> `appointment_no_show`, reschedule(old) ->
+   `appointment_rescheduled`; confirm/edit -> nothing.
+7. **Patient preference** `src/services/patients.ts` - `smsOptOut`
+   boolean on GET/PATCH (owner/admin only; boolean-validated; default
+   false; DTO normalizes driver TINYINT/boolean).
+8. **Scheduler** `src/index.ts` - in-process tick loop
+   (`REMINDER_TICK_MS`, default 60000, 0 disables, `unref()`, cleared
+   on shutdown; startup log for scheduled/disabled). No external cron.
+9. **Tests** `tests/m8.integration.test.ts` - 16 live-DB tests.
+10. **Smoke** - M8 section (2 checks: smsOptOut PATCH true/false with
+    GET round-trip assertions) appended before the cleanup marker.
+
+### Defects found and fixed
+
+| # | Defect | Fix | Re-verification |
+|---|---|---|---|
+| 24 | Pre-gate inspection: `app_meta.meta_value` is VARCHAR(255) but the default reminder config JSON is 614 chars - config writes would fail at runtime | new migration `0009_app_meta_value_size.sql` (TEXT) | `npm run migrate` exit 0 (0009 applied); verify |
+| 25 | Typecheck round 1 exit 2: `zonedToUtc` destructured `.split().map(Number)` results are `number \| undefined` under `noUncheckedIndexedAccess` | destructure with defaults (`[y = 0, m = 1, d = 1]`, `[hh = 0, mm = 0, ss = 0]`) | typecheck exit 0 |
+
+Test-iteration fixes (test bugs, app code not at fault - re-execution
+verified): (a) "skips offsets" fixture appointment placed at +36h left a
+24h row that fell due at the quiet test's synthetic `now+2h` tick,
+inflating the send counter -> fixture moved to +6h with date/time both
+derived from the same instant; (b) quiet-hours test aborted on an
+assertion before `resetReminderConfig`, leaking the enabled quiet window
+into later tests -> wrapped in try/finally; (c) failure-recovery test
+created its retry appointment on a healthy recipient while the default
+mock only fails magic recipient `999999999` -> recovery appointment
+moved to the failing recipient, then provider swapped to `failOn: []`
+mid-test (restored in finally + afterAll).
+
+### Verification evidence (commands actually run)
+
+| Check | Result |
+|---|---|
+| `npm run typecheck` round 1 | exit 2 - defect 25 -> fixed |
+| `npm run typecheck` final | **exit 0** |
+| `npm run lint` | **exit 0** |
+| `npm run migrate` (dev DB) | **exit 0** - applied `0008_reminders.sql`, then `0009_app_meta_value_size.sql` (skipped 0001-0007; idempotent) |
+| M8 suite isolation round 1 | 11/15 - 3 test bugs (a)(b)(c) above |
+| M8 suite isolation round 2 | **15/15** |
+| `npm run verify` round 1 | **exit 0 - 158/158 tests (17 suites)** |
+| Falsification review | 1 untested code path (lazy `appointment_inactive` backstop) -> test 16 added |
+| `npm run verify` final | **exit 0 - 159/159 tests, 17 suites, 0 skipped** (log `m8-verify2.log`) |
+| HTTP smoke (M8 section added) | **49/49 PASS, 0 FAIL, SMOKE_PASS, exit 0** (log `m8-smoke.log`; counts verified: 49 `Check` calls = 49 PASS lines) |
+
+### Plan cross-check (M8 scope)
+
+Reminder timing (48h/24h/2h) via clinic timezone with DST-safe
+conversion - exact-instant tests (UTC, NY winter, NY summer, Bahrain) -
+cancellation stops reminders (eager + lazy backstop; TEST 6 semantics) -
+rescheduling stops old + schedules new (TEST 7) - idempotent
+(unique key + `reminder:<id>` message key; no resend after SENT) -
+failed messages (backoff, max attempts, recovery) - quiet hours
+(suppressed in window, delivered outside; default off) - patient
+communication preferences (smsOptOut set/read/validated, suppressed
+when opted out, resumes when cleared) - MVP-7 must-not-send (cancelled
+/ completed / no-show / rescheduled-old / not-permitted / already-sent
+all covered; inactive status also caught lazily). No gaps found.
+Consent capture at booking remains B4 (default false - PROPOSED).
+
+### Known limitations / open items (reported, not acceptance blockers)
+
+- **K-I3 still UNKNOWN:** M8 ships an in-process scheduler
+  (`REMINDER_TICK_MS`, default 60s). Whether the DirectAdmin server
+  keeps the Node process alive across restarts/reboots is unverified -
+  if it does not, reminders stop when the process stops. Carried to
+  the M8 report for the owner to answer (B6 sub-item).
+- Quiet hours semantics = suppress during window (literal plan
+  reading); defer-to-after-window alternative PROPOSED. Default off -
+  owner sets per clinic (no UI until M16).
+- Near-bookings: offsets already in the past at creation are skipped
+  (fewer reminders inside 48h) - PROPOSED, matches "48h/24h/2h before"
+  literally; compressed-schedule alternative (4.2) open.
+- Template texts are PROPOSED defaults following MVP-14 wording;
+  wording/language approval still owner's (4.2; C1 if WhatsApp).
+- `smsOptOut` defaults false; consent capture/booking form consent is
+  B4 (data protection) - not implemented.
+- No HTTP endpoint to view reminders (PROPOSED: M14 dashboard).
+- Partial scheduling failure (DB error mid-loop) logs and does not
+  retry - PROPOSED acceptable; not covered by a test.
+- Real provider sends still impossible (K-I4: no Twilio/Meta
+  accounts); all sends in tests/smoke go through MockProvider.
+
+### Git state produced
+
+| Commit | Contents |
+|---|---|
+| (hash appended after push) | M8 source (0008+0009 migrations, `src/automation/{time,reminderConfig,reminders}.ts`, appointments route wiring, patients smsOptOut, index tick), `tests/m8.integration.test.ts`, docs rev 23 (PROJECT_STATE, audit M8+K-I3 rows, this entry) |
+
+### Durable doc updates
+
+- `PROJECT_STATE.md` -> revision 23 (CURRENT_STATUS, §5 M8 block, §8
+  evidence rows, phase note, changelog row 23).
+- `M0_Project_Audit.md` -> M8 row COMPLETE awaiting acceptance; K-I3
+  row annotated (M8 shipped in-process scheduler; persistence Open).
+- `SESSION_LOG.md` -> this entry.
+
+### Session end state
+
+- M8 implementation complete; gates green: verify exit 0 (159/159,
+  17 suites, 0 skipped), typecheck 0, lint 0, build 0, migrate
+  idempotent (0008+0009), smoke 49/49 PASS.
+- Next: M8 STATUS REPORTING block -> STOP for owner acceptance.
+  M9 NOT_STARTED (gate).
+
+### Decisions the owner has not yet made
+
+1. Accept (or reject) the M8 report - gate on M9.
+2. PROPOSED M8 design points: default template texts (MVP-14 wording),
+   quiet hours default-off + suppression semantics, past-offset
+   skipping for near-bookings, smsOptOut default false / consent
+   capture (B4), no reminder HTTP view (defer to M14), partial-
+   schedule-error logging without retry.
+3. K-I3 answer: can the DirectAdmin server keep a Node process alive
+   (systemd/nohup/supervisor)? Until answered, reminder delivery
+   depends on the process staying up - PROPOSED to confirm before
+   production.
+4. K6 (history rewrite), K-I2 (inbound HTTPS), CORS pattern, and
+   OPEN ISSUES B2/B4/B6 unchanged.

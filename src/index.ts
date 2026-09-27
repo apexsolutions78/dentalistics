@@ -1,3 +1,4 @@
+import { runReminderTick } from './automation/reminders';
 import { createApp } from './app';
 import { ConfigError, loadEnv } from './config';
 import { checkDatabase, closePool, getPool, initPool } from './db/pool';
@@ -58,8 +59,27 @@ async function main(): Promise<void> {
     });
   });
 
+  const tickMs = Number(process.env.REMINDER_TICK_MS ?? '60000');
+  let reminderTimer: NodeJS.Timeout | undefined;
+  if (Number.isFinite(tickMs) && tickMs > 0) {
+    reminderTimer = setInterval(() => {
+      runReminderTick(getPool(), logger).catch((err: unknown) => {
+        logger.error('reminder tick failed', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
+    }, tickMs);
+    reminderTimer.unref();
+    logger.info('reminder tick scheduled', { intervalMs: tickMs });
+  } else {
+    logger.info('reminder tick disabled', { reminderTickMs: process.env.REMINDER_TICK_MS ?? '' });
+  }
+
   const shutdown = (signal: string): void => {
     logger.info('shutting down', { signal });
+    if (reminderTimer !== undefined) {
+      clearInterval(reminderTimer);
+    }
     server.close(async () => {
       await closePool();
       process.exit(0);
