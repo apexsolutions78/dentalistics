@@ -536,3 +536,142 @@ defects fixed, then start M5 otherwise fix remaining defects first."
 per owner instruction. K-I2 (inbound-HTTPS posture) remains UNKNOWN —
 flagged in the report as a deployment blocker for M5's public API only;
 local development and tests unaffected.
+
+---
+
+## Session 5 — 2026-09-27 — Milestone 5 (Website lead capture) implemented and tested
+
+**Owner instruction this session:** "If M4 is 100% completed, tested and
+confirmed PASS, defects fixed, then start M5 otherwise fix remaining defects
+first."
+
+**M4 gate outcome:** PASS confirmed after re-verification (falsification
+defect 15: unbounded MockProvider attempts → capped + test; fresh verify
+100/100; fresh smoke 29/29). M4 recorded PASSED (rev 16, commit `2ba0d53`
+pushed, `MATCH=OK`). M5 then started.
+
+### Plan scope (fresh read)
+
+M5: "Implement a secure mechanism for external websites to create leads"
+(Website → Lead API → Validation → Lead → Automation). Test list: valid
+lead, invalid lead, spam/rate limiting, duplicate requests, **authentication
+where applicable, tenant identification, automation trigger**.
+
+### Work executed (M5)
+
+1. **Migration** `0005_public_site_key.sql` — `organizations.site_key`
+   CHAR(64) nullable + unique; backfills existing orgs with
+   `SHA2(CONCAT(UUID(),UUID()),256)`. Applied to dev DB (applied 0005,
+   skipped 0001–0004, exit 0).
+2. **Tenant identification + API authentication (PROPOSED design):** per-org
+   random 64-hex site key (`src/security/siteKey.ts`, `randomBytes(32)`),
+   sent as `X-Site-Key` header on `POST /api/public/leads`. Missing key,
+   unknown key, and disabled-clinic key all return the **same** 401
+   `invalid_site_key` (no existence oracle). Key retrievable by the clinic
+   owner via `GET /api/organizations/:orgId` (lazy generation if absent,
+   race-safe conditional UPDATE + re-read).
+3. **Rate limiting (spam):** existing `createRateLimiter` reused — per-IP
+   30/min and per-site-key 120/min (60s window, constants in
+   `rateLimit.ts`); checked before any DB work; 429 `rate_limited` with
+   scoped warn logs (`scope: ip|key`); limits overridable via
+   `createApp({ publicLeadRate })` for tests.
+4. **Public lead service** `createPublicLead` in `services/leads.ts`:
+   validates firstName/lastName/phone(+)/email/requestedService/notes;
+   **rejects spoof fields** `status`, `source`, `assignedUserId`,
+   `organizationId` (400); forces source=WEBSITE, status=NEW, no assignee,
+   `created_by` NULL (column is NULL-able — confirmed in migration 0003);
+   reuses the M3 active-duplicate rule (409 `duplicate_lead`, per-org);
+   writes a `created` lead activity with NULL actor (column NULL-able —
+   confirmed); logs ids only (no phone/email); fires the automation trigger.
+5. **Automation trigger** `src/automation/leadCreated.ts` —
+   `triggerLeadCreated(logger, {organizationId, leadId, source})` logs
+   `automation trigger: lead_created`. M5 delivers the trigger point;
+   M6 delivers the actual follow-up behavior (log asserted in tests, phone
+   absence asserted too).
+6. **Route** `src/routes/public.ts` mounted at `/api/public` (no session
+   auth — key-based; express.json 100kb limit applies globally). Response:
+   201 `{ leadId }` only — no internal fields exposed.
+7. **Tests** `tests/m5.integration.test.ts` — 9 live-DB acceptance tests
+   covering all 7 plan categories (valid creation + canonical phone, trigger
+   firing + no-sensitive-data logging, NULL-actor activity, invalid/spoof
+   rejection, 401 matrix, duplicate 409 + per-tenant scoping, per-key then
+   per-IP rate limiting with scoped warn assertions, owner key retrieval +
+   lazy generation stability + cross-tenant 404).
+8. **Smoke** extended: `m3-smoke.ps1` helpers gained an optional site-key
+   header; M5 section added (no-key 401, wrong-key 401, valid 201, duplicate
+   409, spoof 400, tenant list shows source=WEBSITE, cleanup delete).
+
+### Defects found and fixed
+
+| # | Defect | Fix | Re-verification |
+|---|---|---|---|
+| 16 | m5 test TS errors under `noUncheckedIndexedAccess` (11×) | optional chaining / explicit undefined-typed casts | typecheck exit 0 |
+| 17 | m5 rate test: `orgRateId` inserted with an inline `generateSiteKey()` instead of `keyRate` → all requests 401 before dup logic (test bug, app correct) | insertOrg uses `keyRate` | verify 109/109 |
+
+### Verification evidence (commands actually run)
+
+| Check | Command / action | Result |
+|---|---|---|
+| Typecheck / lint (source) | `npm run typecheck`, `npm run lint` after source write | exit 0, exit 0 |
+| Full gate round 1 | `npm run verify` | exit 2 — 11 TS errors in m5 test (defect 16) |
+| Full gate round 2 | `npm run verify` | exit 1 — 1/109 test failed: rate test 401s (defect 17); lint+typecheck green |
+| Full gate round 3 | `npm run verify` | **exit 0 — 109/109 tests, 13 files, 0 skipped** (log `%TEMP%\opencode\m5-verify3.log`) |
+| Migration (dev DB) | `npm run migrate` | exit 0; applied `0005_public_site_key.sql`, skipped 0001–0004 |
+| HTTP smoke (extended) | `m3-smoke.ps1` | **35/35 PASS, 0 FAIL, SMOKE_PASS, exit 0** (29 prior + 6 new M5 checks; log `%TEMP%\opencode\m5-smoke.log`) |
+
+### Plan cross-check (M5 scope)
+
+All items implemented and tested: secure external-lead mechanism ✓, valid/
+invalid lead ✓, spam/rate limiting ✓ (per-IP + per-key 429), duplicate
+requests ✓ (409 + per-tenant scope), authentication where applicable ✓
+(site key; session N/A for public endpoint — stated), tenant identification
+✓ (key → org, cross-tenant 404), automation trigger ✓ (fired + logged +
+asserted; behavior at M6). No gaps found.
+
+### Known limitations / open items (reported, not blockers for acceptance)
+
+- **CORS not implemented** — plan does not mention it; browser-direct form
+  integration from a third-party site would need CORS config; server-side
+  proxy integration works today. Integration pattern = owner decision.
+- **K-I2 (inbound HTTPS posture) still UNKNOWN** — blocks production
+  deployment of the public API, not local dev/testing.
+- Concurrent double-submit duplicate TOCTOU (same class as M3 lead create;
+  no unique phone constraint by design).
+- Rate limiter is in-process (per-instance); multi-instance deployment needs
+  a shared limiter (deployment-phase concern, M22).
+- No `audit_logs` row for public lead creation (consistent with M3 staff
+  lead creation — activity row + logs are the trail; PROPOSED acceptable).
+
+### Git state produced
+
+| Commit | Contents |
+|---|---|
+| (hash appended after push) | M5 source (0005 migration, siteKey, public route, public lead service, automation trigger, rate-limit constants, app/org wiring), m5 tests, smoke extension lives in `%TEMP%\opencode\m3-smoke.ps1` (outside repo, as before), docs rev 17 |
+
+### Durable doc updates
+
+- `PROJECT_STATE.md` → revision 17 (CURRENT_STATUS M5 complete awaiting
+  acceptance, §5 M5 block, §8 evidence rows, phase note, changelog).
+- `M0_Project_Audit.md` → M5 row: complete, awaiting acceptance; K-I2 noted
+  as deployment blocker only.
+- `SESSION_LOG.md` → this entry.
+
+### Session end state
+
+- M5 implementation complete; gates green: verify exit 0 (109/109, 13
+  suites, 0 skipped), migrate idempotent, extended smoke 35/35 PASS.
+- Next: M5 STATUS REPORTING block → STOP for owner acceptance.
+  M6 NOT_STARTED (gate rule).
+
+### Decisions the owner has not yet made
+
+1. Accept (or reject) the M5 report — gate on M6.
+2. PROPOSED M5 design points: site-key tenant identification via
+   `X-Site-Key`; uniform 401 for invalid keys; limits 30/min per IP and
+   120/min per key; spoof-field rejection; duplicate = 409 (M3-consistent);
+   201 `{leadId}` response; automation trigger = log-only until M6; siteKey
+   exposed on owner org GET.
+3. Integration pattern for real websites: server-side proxy (works now) vs
+   browser-direct (needs CORS — not in plan).
+4. K6 and K-I2 questions unchanged; OPEN ISSUES (B2, B4, B6 sub-items)
+   unchanged.

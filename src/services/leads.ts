@@ -1,5 +1,6 @@
 import type { Pool, RowDataPacket } from 'mysql2/promise';
 import { recordAudit } from '../audit';
+import { triggerLeadCreated } from '../automation/leadCreated';
 import { AppError, ValidationError } from '../errors';
 import type { Logger } from '../logger';
 import {
@@ -143,7 +144,7 @@ async function writeActivity(
   db: Pool,
   logger: Logger,
   leadId: number,
-  actorId: number,
+  actorId: number | null,
   action: string,
   detail: string | null,
 ): Promise<void> {
@@ -203,6 +204,53 @@ export async function createLead(db: Pool, logger: Logger, input: CreateLeadInpu
 
   const [rows] = await db.query<LeadRow[]>(`${LEAD_SELECT} WHERE l.id = ?`, [leadId]);
   return { lead: leadDto(rows[0] as LeadRow) };
+}
+
+const PUBLIC_FORBIDDEN_FIELDS = ['status', 'source', 'assignedUserId', 'organizationId'] as const;
+
+export interface CreatePublicLeadInput {
+  organizationId: number;
+  body: unknown;
+}
+
+export async function createPublicLead(
+  db: Pool,
+  logger: Logger,
+  input: CreatePublicLeadInput,
+): Promise<number> {
+  if (input.body === null || typeof input.body !== 'object' || Array.isArray(input.body)) {
+    throw new ValidationError('Invalid input', ['body must be a JSON object']);
+  }
+  const body = input.body as Record<string, unknown>;
+  for (const field of PUBLIC_FORBIDDEN_FIELDS) {
+    if (body[field] !== undefined) {
+      throw new ValidationError('Invalid input', [`${field} is not accepted on this endpoint`]);
+    }
+  }
+  const firstName = requireString(body.firstName, 'firstName', { min: 1, max: 80 });
+  const lastName = requireString(body.lastName, 'lastName', { min: 1, max: 80 });
+  const phone = normalizePhone(body.phone);
+  const email = optionalEmail(body.email);
+  const requestedService = optionalText(body.requestedService, 'requestedService', 120);
+  const notes = optionalText(body.notes, 'notes', 5000);
+
+  await assertNoActiveDuplicate(db, input.organizationId, phone, null);
+
+  const [result] = await db.query(
+    `INSERT INTO leads (organization_id, first_name, last_name, phone, email, requested_service,
+       source, status, notes)
+     VALUES (?, ?, ?, ?, ?, ?, 'WEBSITE', 'NEW', ?)`,
+    [input.organizationId, firstName, lastName, phone, email, requestedService, notes],
+  );
+  const leadId = (result as { insertId: number }).insertId;
+  await writeActivity(db, logger, leadId, null, 'created', 'source=WEBSITE status=NEW');
+  logger.info('public lead created', { organizationId: input.organizationId, leadId });
+  triggerLeadCreated(logger, {
+    organizationId: input.organizationId,
+    leadId,
+    source: 'WEBSITE',
+  });
+  return leadId;
 }
 
 export interface LeadListQuery {

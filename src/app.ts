@@ -10,7 +10,15 @@ import { createAuthRouter } from './routes/auth';
 import { createLeadsRouter } from './routes/leads';
 import { createOrganizationsRouter } from './routes/organizations';
 import { createPatientsRouter } from './routes/patients';
-import { createRateLimiter, LOGIN_RATE_LIMIT, LOGIN_RATE_WINDOW_MS } from './security/rateLimit';
+import { createPublicRouter } from './routes/public';
+import {
+  createRateLimiter,
+  LOGIN_RATE_LIMIT,
+  LOGIN_RATE_WINDOW_MS,
+  PUBLIC_LEAD_IP_LIMIT,
+  PUBLIC_LEAD_KEY_LIMIT,
+  PUBLIC_LEAD_RATE_WINDOW_MS,
+} from './security/rateLimit';
 
 export type DatabaseStatus = 'up' | 'down' | 'unconfigured';
 
@@ -19,6 +27,7 @@ export interface AppDeps {
   checkDatabase?: () => Promise<DatabaseStatus>;
   db?: Pool;
   secureCookies?: boolean;
+  publicLeadRate?: { perIp: number; perKey: number; windowMs?: number };
 }
 
 function silentLogger(): Logger {
@@ -85,6 +94,23 @@ export function createApp(deps: AppDeps = {}): Express {
     app.use('/api/organizations', createOrganizationsRouter({ db, logger }));
     app.use('/api/organizations', createLeadsRouter({ db, logger }));
     app.use('/api/organizations', createPatientsRouter({ db, logger }));
+
+    const publicRate = deps.publicLeadRate;
+    app.use(
+      '/api/public',
+      createPublicRouter({
+        db,
+        logger,
+        ipLimiter: createRateLimiter(
+          publicRate?.perIp ?? PUBLIC_LEAD_IP_LIMIT,
+          publicRate?.windowMs ?? PUBLIC_LEAD_RATE_WINDOW_MS,
+        ),
+        keyLimiter: createRateLimiter(
+          publicRate?.perKey ?? PUBLIC_LEAD_KEY_LIMIT,
+          publicRate?.windowMs ?? PUBLIC_LEAD_RATE_WINDOW_MS,
+        ),
+      }),
+    );
   }
 
   app.use(notFoundHandler);

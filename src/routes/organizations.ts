@@ -9,6 +9,7 @@ import type { Logger } from '../logger';
 import { requireAuth } from '../middleware/auth';
 import { assertCanManageMembers, assertOrgExists } from '../middleware/tenant';
 import { createUserInOrg } from '../services/users';
+import { generateSiteKey } from '../security/siteKey';
 import { parsePathId } from '../validate';
 
 export interface OrganizationsRouterDeps {
@@ -21,6 +22,7 @@ interface OrganizationRow extends RowDataPacket {
   name: string;
   status: 'active' | 'disabled';
   created_at: Date;
+  site_key: string | null;
 }
 
 interface UserListRow extends RowDataPacket {
@@ -46,11 +48,24 @@ export function createOrganizationsRouter(deps: OrganizationsRouterDeps): Router
     const organizationId = parsePathId(req.params.orgId ?? '');
     assertOrgExists(req.user as SessionUser, organizationId);
     const [rows] = await deps.db.query<OrganizationRow[]>(
-      'SELECT id, name, status, created_at FROM organizations WHERE id = ?',
+      'SELECT id, name, status, created_at, site_key FROM organizations WHERE id = ?',
       [organizationId],
     );
     if (rows[0] === undefined) {
       throw new AppError('Organization not found', 404, 'not_found', true);
+    }
+    let siteKey = rows[0].site_key;
+    if (siteKey === null) {
+      siteKey = generateSiteKey();
+      await deps.db.query(
+        'UPDATE organizations SET site_key = ? WHERE id = ? AND site_key IS NULL',
+        [siteKey, organizationId],
+      );
+      const [again] = await deps.db.query<OrganizationRow[]>(
+        'SELECT site_key FROM organizations WHERE id = ?',
+        [organizationId],
+      );
+      siteKey = again[0]?.site_key ?? siteKey;
     }
     res.status(200).json({
       organization: {
@@ -58,6 +73,7 @@ export function createOrganizationsRouter(deps: OrganizationsRouterDeps): Router
         name: rows[0].name,
         status: rows[0].status,
         createdAt: rows[0].created_at,
+        siteKey,
       },
     });
   });
