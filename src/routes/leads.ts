@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import type { Pool } from 'mysql2/promise';
+import { triggerLeadCreated } from '../automation/leadCreated';
 import type { SessionUser } from '../auth/sessions';
 import { AppError } from '../errors';
 import { readJsonBody } from '../http/body';
@@ -39,6 +40,8 @@ export function createLeadsRouter(deps: LeadsRouterDeps): Router {
       actorId: actor.id,
       body,
     });
+    const leadId = (created.lead as { id: number }).id;
+    await triggerLeadCreated(deps.db, deps.logger, { organizationId, leadId });
     res.status(201).json(created);
   });
 

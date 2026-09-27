@@ -1,6 +1,14 @@
 export type MessageChannel = 'SMS' | 'WHATSAPP';
 
-export type MessageStatus = 'PENDING' | 'SENT' | 'FAILED' | 'DELIVERED' | 'UNDELIVERED';
+export type MessageStatus =
+  | 'PENDING'
+  | 'SENT'
+  | 'FAILED'
+  | 'DELIVERED'
+  | 'UNDELIVERED'
+  | 'RECEIVED';
+
+export type MessageDirection = 'OUTBOUND' | 'INBOUND';
 
 export interface OutboundMessage {
   messageId: number;

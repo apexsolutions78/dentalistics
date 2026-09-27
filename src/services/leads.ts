@@ -1,6 +1,5 @@
 import type { Pool, RowDataPacket } from 'mysql2/promise';
 import { recordAudit } from '../audit';
-import { triggerLeadCreated } from '../automation/leadCreated';
 import { AppError, ValidationError } from '../errors';
 import type { Logger } from '../logger';
 import {
@@ -25,7 +24,7 @@ export const LEAD_STATUSES = [
 
 export const LEAD_SOURCES = ['WEBSITE', 'MISSED_CALL', 'MANUAL', 'OTHER'] as const;
 
-const ACTIVE_STATUSES = ['NEW', 'CONTACTED', 'QUALIFIED', 'APPOINTMENT_BOOKED'] as const;
+export const ACTIVE_STATUSES = ['NEW', 'CONTACTED', 'QUALIFIED', 'APPOINTMENT_BOOKED'] as const;
 
 const UPDATABLE_LEAD_FIELDS = [
   'status',
@@ -245,11 +244,6 @@ export async function createPublicLead(
   const leadId = (result as { insertId: number }).insertId;
   await writeActivity(db, logger, leadId, null, 'created', 'source=WEBSITE status=NEW');
   logger.info('public lead created', { organizationId: input.organizationId, leadId });
-  triggerLeadCreated(logger, {
-    organizationId: input.organizationId,
-    leadId,
-    source: 'WEBSITE',
-  });
   return leadId;
 }
 

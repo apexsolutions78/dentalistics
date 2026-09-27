@@ -1,0 +1,10 @@
+ALTER TABLE communication_messages
+  ADD COLUMN direction ENUM('OUTBOUND', 'INBOUND') NOT NULL DEFAULT 'OUTBOUND',
+  ADD COLUMN message_type VARCHAR(64) NULL,
+  ADD COLUMN template VARCHAR(64) NULL,
+  ADD COLUMN lead_id BIGINT UNSIGNED NULL,
+  ADD CONSTRAINT fk_comm_messages_lead FOREIGN KEY (lead_id) REFERENCES leads (id) ON DELETE SET NULL,
+  ADD INDEX idx_comm_messages_lead (lead_id);
+
+ALTER TABLE communication_messages
+  MODIFY status ENUM('PENDING', 'SENT', 'FAILED', 'DELIVERED', 'UNDELIVERED', 'RECEIVED') NOT NULL DEFAULT 'PENDING';

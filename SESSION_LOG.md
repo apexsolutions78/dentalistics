@@ -704,3 +704,155 @@ all defects fixed, then start M6 otherwise fix remaining defects first."
 
 **Result: M5 recorded PASSED (rev 18).** M6 (Instant lead follow-up)
 started per owner instruction.
+
+---
+
+## Session 6 — 2026-09-27 — Milestone 6 (Instant lead follow-up) implemented and tested
+
+**Owner instruction this session:** "If M5 is 100% completed, tested and
+confirmed PASS, all defects fixed, then start M6 otherwise fix remaining
+defects first."
+
+**M5 gate outcome:** PASS confirmed after re-verification (fresh plan
+cross-check, falsification review — no new defects, fresh verify 109/109,
+fresh extended smoke 35/35). M5 recorded PASSED (rev 18, commit `38a896b`
+pushed, `MATCH=OK`). M6 then started.
+
+### Plan scope (fresh read)
+
+M6: "New Lead → Automation → Immediate acknowledgement → Communication
+record." Test list: correct template, correct recipient, correct clinic,
+duplicate prevention, provider failure, retry behavior, patient response
+handling. Supporting plan sections read: §2 Instant Lead Acknowledgement
+(8-step flow, "automation must be configurable rather than hard-coded"),
+COMMUNICATION ARCHITECTURE (sendTemplateMessage/handleInboundMessage,
+record fields incl. template + related lead + direction), MVP-4 (website
+leads, template-based, mock provider allowed, exact example text),
+MVP-14 (variables, safe missing-variable handling), MVP acceptance
+TEST 1/2 (one ack, no duplicate), history example (OUTBOUND/INBOUND).
+
+### Work executed (M6)
+
+1. **Migration** `0006_communication_lead_link.sql` — `communication_messages`
+   gains `direction`, `message_type`, `template`, `lead_id` (FK → leads
+   ON DELETE SET NULL + index), status enum gains `RECEIVED`. Applied to
+   dev DB (applied 0006, skipped 0001–0005, exit 0).
+2. **Template engine** `src/communications/template.ts` — `renderTemplate`
+   (missing/null → empty, no brace residue), `LEAD_ACK_TEMPLATE_NAME`,
+   MVP-4 default template verbatim. 5 unit tests in
+   `tests/template.test.ts` (no DB).
+3. **messages.ts extensions** — optional direction/messageType/template/
+   leadId/status on `createMessage` (lead org-validated; dynamic column
+   list so omitted status keeps DB default); `sendTemplateMessage`
+   (render → idempotent create `ack:lead:<leadId>` → dispatch;
+   repeat → `created:false`, no second dispatch); `handleInboundMessage`
+   (INBOUND/`patient_reply`/`RECEIVED`, auto-links most recent active lead
+   by phone org-scoped, optional explicit leadId validated, idempotency
+   key required). New DTO fields (direction/messageType/template/leadId).
+4. **Automation config** `src/automation/config.ts` — `loadAckConfig`
+   from `app_meta` key `automation_ack_config` (JSON); defaults
+   `{enabled:true, channel:SMS, provider:mock, sources:[WEBSITE],
+   template:<MVP-4>}`; missing/corrupt/invalid-shape → defaults.
+5. **Trigger + retry** `src/automation/leadCreated.ts` — full rewrite:
+   `triggerLeadCreated` logs `automation trigger: lead_created`
+   (DB-sourced source — keeps M5 field contract), config gates
+   (disabled/source filter), renders with `first_name` + `clinic_name`,
+   sends via config provider, **never throws** (whole body try/catch →
+   `error` action) so lead creation can always complete;
+   `retryLeadAcknowledgement` (FAILED **and** PENDING rows only —
+   explicit call; no scheduled retry until M8).
+6. **Wiring (cycle-free layering)** — trigger moved out of
+   `services/leads.ts` (M5 in-service call removed) to the route layer:
+   public `POST /api/public/leads` and staff
+   `POST /api/organizations/:id/leads` both `await` it after insert —
+   ALL new leads trigger automation; config `sources` filter decides
+   (default acknowledges WEBSITE only, per MVP-4's "when a website lead
+   is created"). `ACTIVE_STATUSES` exported from leads.ts for inbound
+   auto-linking (no import cycle: routes → automation → messages/leads).
+   Lead-detail `communicationHistory` intentionally left `[]` (M3
+   deferred state untouched — display wiring is M16+; M6 tests assert
+   message rows via the service).
+7. **Tests** — `tests/m6.integration.test.ts` (10 live-DB covering all
+   7 plan categories) + `tests/template.test.ts` (5 unit). Smoke
+   extended earlier at M5; M6 adds no HTTP surface (messages remain
+   internal per M4 decision) → smoke run as regression.
+
+### Defects found and fixed
+
+| # | Defect | Fix | Re-verification |
+|---|---|---|---|
+| 18 | First verification round: mysql2 `QueryResult` generic errors in `leadCreated.ts` (3 queries) + 14× `noUncheckedIndexedAccess` errors in m6 test | `RowDataPacket`-extending row interfaces; explicit undefined-typed cast + length assertion | typecheck/lint exit 0; verify 124/124 |
+| 19 | Falsification: `retryLeadAcknowledgement` skipped PENDING rows (crash window between message INSERT and dispatch) while labeling them `ack_duplicate` — interrupted acks could never be retried | retry now accepts FAILED **and** PENDING; dedicated interrupted-PENDING test added | verify **125/125 exit 0**; smoke re-run 35/35 |
+
+### Verification evidence (commands actually run)
+
+| Check | Command / action | Result |
+|---|---|---|
+| Typecheck (post-source) | `npm run typecheck` round 1 | exit 2 — mysql2 generics → fixed |
+| Lint | `npm run lint` after fixes | exit 0 |
+| Full gate round 1 | `npm run verify` | exit 2 — 14 TS errors in m6 test (defect 18) |
+| Full gate round 2 | `npm run verify` | **exit 0 — 124/124 tests, 15 files** |
+| Full gate round 3 | `npm run verify` (after defect 19 fix + test) | **exit 0 — 125/125 tests, 15 files, 0 skipped** (log `%TEMP%\opencode\m6-verify3.log`) |
+| Migration (dev DB) | `npm run migrate` | exit 0; applied `0006_communication_lead_link.sql`, skipped 0001–0005 |
+| HTTP smoke ×2 | `m3-smoke.ps1` before and after defect-19 fix | **35/35 PASS, 0 FAIL, SMOKE_PASS, exit 0** both runs (logs `m6-smoke.log`, `m6-smoke2.log`) |
+
+### Plan cross-check (M6 scope)
+
+All items implemented and tested: immediate acknowledgement ✓ (mock
+provider per MVP-4), correct template ✓ / recipient ✓ / clinic ✓
+(asserted incl. cross-clinic isolation), duplicate prevention ✓
+(idempotent ack key + direct double-trigger + MVP TEST 2 duplicate
+submission), provider failure ✓ (FAILED row + coded error, lead
+unaffected), retry behavior ✓ (fail→fail→success + interrupted-PENDING
+path), patient response handling ✓ (INBOUND/RECEIVED auto-linked,
+webhook-key dedup, orphan case), delivery status ✓ (SENT→DELIVERED),
+communication record fields ✓ (provider/type/template/lead/status/
+timestamps), configurable automation ✓ (app_meta JSON with safe
+fallbacks). No gaps found.
+
+### Known limitations / open items (reported, not acceptance blockers)
+
+- Staff notification (§2 step 8) not implemented — not in M6 test list
+  (M16+ decision).
+- Scheduled retry/queue → M8; inbound webhook transport → M12 (K-I2
+  inbound-HTTPS still UNKNOWN); template management UI/API → M16.
+- Lead-detail `communicationHistory` remains `[]` (M3 deferred state —
+  display integration M16+; message rows fully retrievable via service).
+- Trigger awaited in request path (mock is instant; real-provider latency
+  → move to queue at M8).
+- `app_meta.meta_value` VARCHAR(255): default config JSON fits (~190
+  chars, insert executed in tests); longer custom templates need a schema
+  change at M16 (noted, not blocking).
+
+### Git state produced
+
+| Commit | Contents |
+|---|---|
+| (hash appended after push) | M6 source (0006 migration, template engine, config, trigger/retry, message extensions, route wiring), tests (m6 integration + template unit), docs rev 19 |
+
+### Durable doc updates
+
+- `PROJECT_STATE.md` → revision 19 (CURRENT_STATUS M6 complete awaiting
+  acceptance, §5 M6 block, §8 evidence rows, phase note, changelog).
+- `M0_Project_Audit.md` → M6 row: complete, awaiting acceptance.
+- `SESSION_LOG.md` → this entry.
+
+### Session end state
+
+- M6 implementation complete; gates green: verify exit 0 (125/125, 15
+  suites, 0 skipped), migrate idempotent, smoke 35/35 PASS ×2.
+- Next: M6 STATUS REPORTING block → STOP for owner acceptance.
+  M7 NOT_STARTED (gate rule).
+
+### Decisions the owner has not yet made
+
+1. Accept (or reject) the M6 report — gate on M7.
+2. PROPOSED M6 design points: trigger at route layer for ALL new leads
+   with `sources` config filter (default `['WEBSITE']` per MVP-4);
+   ack config in `app_meta` JSON (read-only now; settings API at M16);
+   provider from config (mock until providers verified); explicit retry
+   (no scheduler until M8); inbound idempotency key required (webhook
+   layer supplies at M12); staff notification deferred; lead-detail
+   history display deferred.
+3. K6, K-I2, CORS questions unchanged; OPEN ISSUES (B2, B4, B6
+   sub-items) unchanged.
