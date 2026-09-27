@@ -856,3 +856,31 @@ fallbacks). No gaps found.
    history display deferred.
 3. K6, K-I2, CORS questions unchanged; OPEN ISSUES (B2, B4, B6
    sub-items) unchanged.
+
+---
+
+### Session 6 addendum — M6 acceptance re-verification (same session)
+
+**Owner instruction:** "If M6 is 100% completed, tested and confirmed PASS,
+all defects fixed, then start M7 otherwise fix remaining defects first.
+Docker is running."
+
+**Re-verification performed (fresh, per established precedent):**
+
+1. **Fresh plan cross-check** — M6 section re-read: flow + all 7 test
+   categories (correct template/recipient/clinic, duplicate prevention,
+   provider failure, retry behavior, patient response handling) map to
+   executed tests. No gaps.
+2. **Falsification review** of trigger/retry, `sendTemplateMessage`,
+   `handleInboundMessage`, config loader, route wiring — no new defects.
+   Re-checked: never-throws trigger, duplicate no-dispatch, PENDING retry,
+   org-scoped inbound link, RECEIVED not dispatchable, delivery status
+   only from SENT, config shape validation, id-only logging, lead-deleted
+   mid-trigger → caught error action.
+3. **Fresh gates:** `npm run verify` exit 0 — **125/125 tests (15 suites,
+   0 skipped)** (log `%TEMP%\opencode\m6-verify-r2.log`).
+4. **Fresh smoke:** **35/35 PASS, 0 FAIL, SMOKE_PASS, exit 0**
+   (log `%TEMP%\opencode\m6-smoke-r3.log`).
+
+**Result: M6 recorded PASSED (rev 20).** M7 (Appointments) started per
+owner instruction (Docker confirmed running by owner).
