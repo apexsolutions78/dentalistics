@@ -1,0 +1,178 @@
+import { Router } from 'express';
+import type { Request, Response } from 'express';
+import type { Pool, RowDataPacket } from 'mysql2/promise';
+import { recordAudit } from '../audit';
+import { getDummyHash, hashPassword, verifyPassword } from '../auth/password';
+import { createSession, revokeSession, revokeUserSessions } from '../auth/sessions';
+import type { SessionUser } from '../auth/sessions';
+import { AppError, ValidationError } from '../errors';
+import { readJsonBody } from '../http/body';
+import { buildClearCookie, buildSessionCookie, SESSION_TTL_HOURS } from '../http/cookies';
+import type { Logger } from '../logger';
+import { requireAuth } from '../middleware/auth';
+import type { RateLimiter } from '../security/rateLimit';
+import { normalizeEmail, requirePassword } from '../validate';
+
+export interface AuthRouterDeps {
+  db: Pool;
+  logger: Logger;
+  secureCookies: boolean;
+  loginLimiter: RateLimiter;
+}
+
+interface UserAuthRow extends RowDataPacket {
+  id: number;
+  email: string;
+  password_hash: string;
+  role: SessionUser['role'];
+  organization_id: number | null;
+  status: 'active' | 'disabled';
+  org_status: 'active' | 'disabled' | null;
+}
+
+interface PasswordHashRow extends RowDataPacket {
+  password_hash: string;
+}
+
+function userDto(user: SessionUser): Record<string, unknown> {
+  return {
+    id: user.id,
+    email: user.email,
+    role: user.role,
+    organizationId: user.organizationId,
+  };
+}
+
+export function createAuthRouter(deps: AuthRouterDeps): Router {
+  const router = Router();
+
+  router.post('/login', async (req: Request, res: Response) => {
+    const body = readJsonBody(req);
+    const emailRaw = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+    const password = typeof body.password === 'string' ? body.password : '';
+
+    if (!deps.loginLimiter.check(`${req.ip ?? 'unknown'}|${emailRaw}`)) {
+      deps.logger.warn('login rate limited', { ip: req.ip });
+      throw new AppError('Too many login attempts, try again later', 429, 'rate_limited', true);
+    }
+    if (emailRaw === '' || password === '') {
+      throw new ValidationError('Invalid input', ['email and password are required']);
+    }
+
+    let email: string;
+    try {
+      email = normalizeEmail(emailRaw);
+    } catch {
+      throw new AppError('Invalid credentials', 401, 'invalid_credentials', true);
+    }
+
+    const [rows] = await deps.db.query<UserAuthRow[]>(
+      `SELECT u.id, u.email, u.password_hash, u.role, u.organization_id, u.status, o.status AS org_status
+       FROM users u
+       LEFT JOIN organizations o ON o.id = u.organization_id
+       WHERE u.email = ?`,
+      [email],
+    );
+    const row = rows[0];
+    const storedHash = row?.password_hash ?? (await getDummyHash());
+    const passwordOk = await verifyPassword(password, storedHash);
+
+    if (row === undefined || !passwordOk) {
+      await recordAudit(deps.db, deps.logger, {
+        organizationId: row?.organization_id ?? null,
+        userId: row?.id ?? null,
+        action: 'login_failure',
+        detail: 'reason=invalid_credentials',
+      });
+      throw new AppError('Invalid credentials', 401, 'invalid_credentials', true);
+    }
+    if (row.status !== 'active') {
+      await recordAudit(deps.db, deps.logger, {
+        organizationId: row.organization_id,
+        userId: row.id,
+        action: 'login_failure',
+        detail: 'reason=account_disabled',
+      });
+      throw new AppError('Account is disabled', 403, 'account_disabled', true);
+    }
+    if (row.org_status === 'disabled') {
+      await recordAudit(deps.db, deps.logger, {
+        organizationId: row.organization_id,
+        userId: row.id,
+        action: 'login_failure',
+        detail: 'reason=organization_disabled',
+      });
+      throw new AppError('Account is disabled', 403, 'account_disabled', true);
+    }
+
+    const session = await createSession(deps.db, row.id);
+    await deps.db.query('UPDATE users SET last_login_at = UTC_TIMESTAMP() WHERE id = ?', [row.id]);
+    await recordAudit(deps.db, deps.logger, {
+      organizationId: row.organization_id,
+      userId: row.id,
+      action: 'login_success',
+    });
+
+    const user: SessionUser = {
+      id: row.id,
+      email: row.email,
+      role: row.role,
+      organizationId: row.organization_id,
+    };
+    res.setHeader(
+      'Set-Cookie',
+      buildSessionCookie(session.token, deps.secureCookies, SESSION_TTL_HOURS * 60 * 60),
+    );
+    res.status(200).json({ user: userDto(user) });
+  });
+
+  router.post('/logout', async (req: Request, res: Response) => {
+    if (req.sessionToken !== undefined) {
+      await revokeSession(deps.db, req.sessionToken);
+      if (req.user !== undefined) {
+        await recordAudit(deps.db, deps.logger, {
+          organizationId: req.user.organizationId,
+          userId: req.user.id,
+          action: 'logout',
+        });
+      }
+    }
+    res.setHeader('Set-Cookie', buildClearCookie(deps.secureCookies));
+    res.status(200).json({ ok: true });
+  });
+
+  router.get('/me', requireAuth, (req: Request, res: Response) => {
+    res.status(200).json({ user: userDto(req.user as SessionUser) });
+  });
+
+  router.post('/password', requireAuth, async (req: Request, res: Response) => {
+    const body = readJsonBody(req);
+    const currentPassword = typeof body.currentPassword === 'string' ? body.currentPassword : '';
+    const newPassword = requirePassword(body.newPassword, 'newPassword');
+    const user = req.user as SessionUser;
+
+    const [rows] = await deps.db.query<PasswordHashRow[]>(
+      'SELECT password_hash FROM users WHERE id = ?',
+      [user.id],
+    );
+    const row = rows[0];
+    const storedHash = row?.password_hash ?? (await getDummyHash());
+    const currentOk = await verifyPassword(currentPassword, storedHash);
+    if (row === undefined || !currentOk) {
+      throw new AppError('Current password is incorrect', 401, 'invalid_credentials', true);
+    }
+
+    const newHash = await hashPassword(newPassword);
+    await deps.db.query('UPDATE users SET password_hash = ? WHERE id = ?', [newHash, user.id]);
+    await revokeUserSessions(deps.db, user.id);
+    await recordAudit(deps.db, deps.logger, {
+      organizationId: user.organizationId,
+      userId: user.id,
+      action: 'password_changed',
+    });
+    res.setHeader('Set-Cookie', buildClearCookie(deps.secureCookies));
+    res.status(200).json({ ok: true });
+  });
+
+  return router;
+}

@@ -16,6 +16,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "migrate": "tsx src/db/migrate.ts",
+    "seed:admin": "tsx src/db/seed-admin.ts",
     "verify": "npm run lint && npm run typecheck && npm run test && npm run build"
   },
   "dependencies": {

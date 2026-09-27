@@ -47,6 +47,8 @@ async function main(): Promise<void> {
   const app = createApp({
     logger,
     checkDatabase: () => checkDatabase(getPool()),
+    db: getPool(),
+    secureCookies: config.nodeEnv === 'production',
   });
 
   const server = app.listen(config.port, () => {

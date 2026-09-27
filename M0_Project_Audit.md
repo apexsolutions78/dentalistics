@@ -163,7 +163,7 @@ Governing sequence exactly as specified in `Project_Planning_Dentalistics.md` (M
 |---|---|---|---|
 | M0 | Repository audit + development plan (this document) | **ACCEPTED 2026-09-26** — owner instructed "Please proceed" after the M0 report (treated as acceptance under the gate system; the instruction is also recorded as decision D3 in `PROJECT_STATE.md` §6) | — |
 | M1 | Foundation (structure, env config, DB connection, shell, error handling, logging, test harness, lint/typecheck/build) | **PASSED 2026-09-26** — M1 report re-verified on owner instruction ("start M2 if M1 confirmed PASS"): `npm run verify` exit 0 (26/26 tests), `npm audit` 0 vulnerabilities, all 9 plan acceptance criteria PASS, security incident fixed (K6), residual `root@localhost` socket-auth quirk resolved (re-ALTER via TCP; socket login verified exit 0). Initial commit `de088b9` + fixes pushed to `origin` | M0 accepted; PROPOSED initial git commit; stack decision |
-| M2 | Authentication + multi-tenancy (roles, isolation tests) | NOT_STARTED | M1 PASSED |
+| M2 | Authentication + multi-tenancy (roles, isolation tests) | **IMPLEMENTATION COMPLETE, report delivered 2026-09-27 - awaiting owner acceptance**: `npm run verify` exit 0 (62/62 tests across 8 suites, incl. 18 live-DB acceptance tests covering all 4 plan proofs), migrate idempotent, `seed:admin` create+update paths exit 0, manual HTTP smoke passed (login/me/logout/401s/health). Acceptance not yet given - M3 remains gated | M1 PASSED |
 | M3 | Patients + leads | NOT_STARTED | M2 PASSED |
 | M4 | Communication abstraction + mock provider | NOT_STARTED | M3 PASSED |
 | M5 | Website lead capture API (public, rate-limited, tenant-identified) | NOT_STARTED | M4 PASSED; server inbound-HTTPS posture known (K-I2) |

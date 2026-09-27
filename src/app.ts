@@ -1,14 +1,22 @@
 import express from 'express';
 import type { Express, Request, Response } from 'express';
+import type { Pool } from 'mysql2/promise';
 import { errorHandler, notFoundHandler } from './errors';
 import { createLogger } from './logger';
 import type { Logger } from './logger';
+import { attachSession } from './middleware/auth';
+import { createAdminRouter } from './routes/admin';
+import { createAuthRouter } from './routes/auth';
+import { createOrganizationsRouter } from './routes/organizations';
+import { createRateLimiter, LOGIN_RATE_LIMIT, LOGIN_RATE_WINDOW_MS } from './security/rateLimit';
 
 export type DatabaseStatus = 'up' | 'down' | 'unconfigured';
 
 export interface AppDeps {
   logger?: Logger;
   checkDatabase?: () => Promise<DatabaseStatus>;
+  db?: Pool;
+  secureCookies?: boolean;
 }
 
 function silentLogger(): Logger {
@@ -18,6 +26,7 @@ function silentLogger(): Logger {
 export function createApp(deps: AppDeps = {}): Express {
   const app = express();
   const logger = deps.logger ?? silentLogger();
+  const secureCookies = deps.secureCookies ?? false;
 
   app.disable('x-powered-by');
   app.use(express.json({ limit: '100kb' }));
@@ -57,6 +66,22 @@ export function createApp(deps: AppDeps = {}): Express {
       timestamp: new Date().toISOString(),
     });
   });
+
+  if (deps.db !== undefined) {
+    const db = deps.db;
+    app.use(attachSession(db));
+    app.use(
+      '/api/auth',
+      createAuthRouter({
+        db,
+        logger,
+        secureCookies,
+        loginLimiter: createRateLimiter(LOGIN_RATE_LIMIT, LOGIN_RATE_WINDOW_MS),
+      }),
+    );
+    app.use('/api/admin', createAdminRouter({ db, logger }));
+    app.use('/api/organizations', createOrganizationsRouter({ db, logger }));
+  }
 
   app.use(notFoundHandler);
   app.use(errorHandler(logger));
