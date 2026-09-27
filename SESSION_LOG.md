@@ -102,3 +102,92 @@ completed server-side (confirmed by hash comparison).
 ---
 
 *Append the next session below this line.*
+
+---
+
+## Session 2 — 2026-09-26/27 — Milestone 2 (Auth + multi-tenancy) implemented and tested
+
+**Owner instructions this session:** "What did we do so far?" → recap delivered;
+"Continue if you have next steps" → M2 implementation continued; "resume" →
+handoff state captured; "save session log" (this entry).
+
+**Starting state:** M1 PASSED and reported (rev 10 commit `5224879` local);
+M2 authorized by owner instruction. All M2 primitive source had been written
+in the prior portion of the session but not yet wired, gated, or tested.
+
+### Work executed
+
+1. Body parsing centralized on `readJsonBody` (`src/http/body.ts`): local
+   `readBody` removed from `routes/admin.ts` and `routes/organizations.ts`;
+   unused imports pruned.
+2. `src/app.ts` rewritten: `AppDeps { logger?, checkDatabase?, db?,
+   secureCookies? }`; when `db` is present the app mounts `attachSession(db)`,
+   `createAuthRouter` (per-app-instance login rate limiter),
+   `createAdminRouter`, `createOrganizationsRouter`; with `db` absent the M1
+   health-only behavior is unchanged (M1 tests untouched).
+3. `src/index.ts` wired: passes `db: getPool()` and
+   `secureCookies: config.nodeEnv === 'production'`.
+4. Bootstrap admin CLI written: `src/db/seed-admin.ts` (reads
+   `ADMIN_EMAIL`/`ADMIN_PASSWORD` from env, idempotent create-or-update,
+   revokes existing sessions on reset, no secret echo, exit 0/1),
+   `package.json` gained `"seed:admin"`, `.env.example` gained commented
+   `ADMIN_*` entries.
+5. Tests written: `tests/password.test.ts` (7), `tests/cookies.test.ts` (8),
+   `tests/rateLimit.test.ts` (3), `tests/auth.integration.test.ts` (18;
+   `skipIf` on missing `TEST_DB_HOST`, table purge in `beforeAll`, seeded
+   Clinic A/B + admin/owner/receptionist accounts). `vitest.config.mts`
+   gained `fileParallelism: false` so DB-sharing files cannot race.
+
+### Defects found and fixed (execution, not inspection)
+
+| # | Defect | Fix | Re-verification |
+|---|---|---|---|
+| 6 | typecheck: mysql2 `query<T[]>` generic constraint violated by plain row interfaces; `req.params` typed `string \| string[]`; lint `no-namespace` on the Express `declare global` augmentation | Row interfaces now `extends RowDataPacket`; `parsePathId` accepts `string \| string[] \| undefined`; switched to `declare module 'express-serve-static-core'` | typecheck exit 0, lint exit 0 |
+| 7 | `npm test` failed in beforeAll with FK error `fk_users_organization`: `const [rows] = await pool.query<ResultSetHeader[]>` then `rows[0].insertId` — the tuple's first element **is** the `ResultSetHeader` for INSERTs, so the extra `[0]` indexed into an object → `undefined ?? 0` → `orgAId = 0` → FK failure. Root cause established by direct DB diagnostic (orgs/users rows present, id column auto_increment) | All 3 INSERT sites now `query<mysql.ResultSetHeader>` + `.insertId` (SELECT sites were already correct — their rows really are arrays) | `npm test` → **62/62 passed, exit 0** (8 files) |
+| 8 | Smoke script `m2-smoke.ps1` health loop compared body+status concatenated by `curl -o - -w '%{http_code}'` against `'200'`, so it never matched → reported `SERVER_NEVER_CAME_UP`, exit 1. **App not at fault**: server log shows DB verified, listen on port 3000, repeated `GET /health` 200 | NOT YET FIXED — smoke incomplete | pending re-run |
+
+### Verification evidence (commands actually run)
+
+| Check | Command / action | Result |
+|---|---|---|
+| Typecheck / lint | `npm run typecheck`, `npm run lint` (after each fix round) | exit 0 both, final run green |
+| Full test suite | `npm test` run 1 | FAILED: FK error in `beforeAll` (defect 7); 44 passed / 18 skipped |
+| Full test suite | `npm test` run 2 (after fix) | exit 0; **62/62 tests, 8 files** — includes the 18 M2 acceptance tests executed against the live `dentalistics_test` DB (not skipped: `TEST_DB_HOST` set) |
+| Migration CLI (dev DB) | `npm run migrate` | exit 0; applied `0002_auth_and_tenancy.sql`, skipped `0001` (idempotent) |
+| Seed CLI | `npm run seed:admin` twice (password generated in shell, never echoed) | run 1 `created:true`; run 2 `created:false, sessionsRevoked:true`; exit 0 both |
+| Server boot + health (manual) | smoke script started `tsx src/index.ts` | log evidence: `database connection verified`, `server started port 3000`, ~30 × `GET /health` statusCode 200; script then exited 1 on its own comparison bug and stopped the server |
+| HTTP login → me → logout flow | smoke script steps after health | **NOT YET EXECUTED** (blocked by defect 8) |
+
+### Git state produced
+
+- No commits this session. Local HEAD `5224879` (rev 10); `git ls-remote origin
+  master` → `45179cb` … — **rev 10 confirmed NOT pushed** (remote one commit
+  behind local).
+- Uncommitted working tree: modified `.env.example`, `package.json`,
+  `src/app.ts`, `src/index.ts`, `vitest.config.mts`; new `migrations/0002_*`,
+  `src/audit.ts`, `src/auth/`, `src/db/seed-admin.ts`, `src/http/`,
+  `src/middleware/`, `src/routes/`, `src/security/`, `src/services/`,
+  `src/validate.ts`, 4 new test files.
+
+### Durable doc updates
+
+- None this session. `PROJECT_STATE.md` rev 11, audit M2 row, and this
+  session-log commit are still pending.
+
+### Session end state
+
+- M2 implementation complete; all automated gates green (lint 0, typecheck 0,
+  tests 62/62, build not yet re-run this session).
+- Manual smoke **partially done** (boot + health confirmed by execution;
+  login/me/logout HTTP flow outstanding).
+- Remaining before M2 report: fix smoke script → run full HTTP flow →
+  `npm run verify` → docs rev 11 → commit → push (incl. pending `5224879`) →
+  verify remote hash → M2 STATUS REPORTING block → STOP for acceptance.
+
+### Decisions the owner has not yet made
+
+1. Rev 10 (`5224879`) still unpushed; push will accompany the M2 commit
+   unless the owner objects.
+2. Session 1 open items unchanged: public-repo/history-rewrite question (K6),
+   `PROJECT_STATE.md` OPEN ISSUES (B2, B4, B6 sub-items).
+3. M2 report acceptance (pending report delivery).
