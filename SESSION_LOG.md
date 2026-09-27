@@ -1027,3 +1027,30 @@ found.
 3. K-I3 answer (scheduler capability) required before M8 per gate.
 4. K6, K-I2, CORS questions unchanged; OPEN ISSUES (B2, B4, B6
    sub-items) unchanged.
+
+---
+
+### Session 7 addendum — M7 acceptance re-verification (same session)
+
+**Owner instruction:** "If M7 is 100% completed, tested and confirmed PASS,
+all defects fixed, then start M8 otherwise fix remaining defects first."
+
+**Re-verification performed (fresh):**
+
+1. Fresh plan cross-check — M7 section re-read: all 8 items (records,
+   statuses, confirmation, cancellation, rescheduling, no-show, rebooking,
+   clinic timezone) + "test all state transitions" map to executed tests.
+   No gaps.
+2. Falsification review — no new defects (transition guard, transactional
+   reschedule/rebook, DATE_FORMAT wall-clock, timezone validation, authz
+   matrix, tenant isolation, delete-guard backstop via FK).
+3. Fresh `npm run verify` exit 0 — **143/143 tests (16 suites, 0 skipped)**
+   (log `%TEMP%\opencode\m7-verify-r2.log`).
+4. Fresh smoke **47/47 PASS, 0 FAIL, SMOKE_PASS, exit 0**
+   (log `%TEMP%\opencode\m7-smoke-r2.log`).
+
+**Result: M7 recorded PASSED (rev 22).** The audit's M8 gate text was
+corrected: it previously read "scheduler capability confirmed (K-I3)"
+while K-I3 was Open — it now records K-I3 as still UNKNOWN with the
+in-process-scheduler design. M8 (Appointment reminders) started per owner
+instruction.
