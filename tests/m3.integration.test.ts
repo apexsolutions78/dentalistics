@@ -319,6 +319,71 @@ describe.skipIf(testHost === undefined || testHost === '')(
       expect(badOffset.status).toBe(400);
     });
 
+    it('searches leads and patients by free-text q with LIKE escaping', async () => {
+      const lead = await request(app)
+        .post(`/api/organizations/${orgAId}/leads`)
+        .set('Cookie', ownerACookie)
+        .send({ firstName: 'Zanzibar', lastName: 'Qsearch', phone: '+97311110010', source: 'MANUAL' });
+      expect(lead.status).toBe(201);
+      const leadId: number = lead.body.lead.id;
+
+      const patient = await request(app)
+        .post(`/api/organizations/${orgAId}/patients`)
+        .set('Cookie', ownerACookie)
+        .send({ firstName: 'Finder', lastName: 'Queriable', phone: '+97322220010' });
+      expect(patient.status).toBe(201);
+      const patientId: number = patient.body.patient.id;
+
+      const byName = await request(app)
+        .get(`/api/organizations/${orgAId}/leads?q=Zanzibar`)
+        .set('Cookie', ownerACookie);
+      expect(byName.status).toBe(200);
+      expect(byName.body.total).toBe(1);
+      expect((byName.body.leads as Array<{ id: number }>).map((l) => l.id)).toContain(leadId);
+
+      const byPhone = await request(app)
+        .get(`/api/organizations/${orgAId}/leads?q=0010`)
+        .set('Cookie', ownerACookie);
+      expect(byPhone.status).toBe(200);
+      expect((byPhone.body.leads as Array<{ id: number }>).map((l) => l.id)).toContain(leadId);
+
+      const byMissing = await request(app)
+        .get(`/api/organizations/${orgAId}/leads?q=NoSuchLeadAnywhere`)
+        .set('Cookie', ownerACookie);
+      expect(byMissing.status).toBe(200);
+      expect(byMissing.body.total).toBe(0);
+
+      const byPercent = await request(app)
+        .get(`/api/organizations/${orgAId}/leads?q=%25`)
+        .set('Cookie', ownerACookie);
+      expect(byPercent.status).toBe(200);
+      expect(byPercent.body.total).toBe(0);
+
+      const byUnderscore = await request(app)
+        .get(`/api/organizations/${orgAId}/patients?q=_`)
+        .set('Cookie', ownerACookie);
+      expect(byUnderscore.status).toBe(200);
+      expect(byUnderscore.body.total).toBe(0);
+
+      const patientByName = await request(app)
+        .get(`/api/organizations/${orgAId}/patients?q=Finder`)
+        .set('Cookie', ownerACookie);
+      expect(patientByName.status).toBe(200);
+      expect((patientByName.body.patients as Array<{ id: number }>).map((p) => p.id)).toContain(
+        patientId,
+      );
+
+      const longQ = await request(app)
+        .get(`/api/organizations/${orgAId}/leads?q=${'a'.repeat(101)}`)
+        .set('Cookie', ownerACookie);
+      expect(longQ.status).toBe(400);
+
+      const repeatedQ = await request(app)
+        .get(`/api/organizations/${orgAId}/leads?q=one&q=two`)
+        .set('Cookie', ownerACookie);
+      expect(repeatedQ.status).toBe(400);
+    }, 25_000);
+
     it('rejects invalid patient input with 400 validation errors', async () => {
       const badPhone = await request(app)
         .post(`/api/organizations/${orgAId}/patients`)
@@ -568,8 +633,16 @@ describe.skipIf(testHost === undefined || testHost === '')(
       const created = await request(app)
         .post(`/api/organizations/${orgAId}/leads`)
         .set('Cookie', ownerACookie)
-        .send({ firstName: 'Assign', lastName: 'Check', phone: '+97311110008', source: 'OTHER' });
+        .send({
+          firstName: 'Assign',
+          lastName: 'Check',
+          phone: '+97311110008',
+          source: 'OTHER',
+          assignedUserId: recvAId,
+        });
       expect(created.status).toBe(201);
+      expect(created.body.lead.assignedUserId).toBe(recvAId);
+      expect(created.body.lead.assignedUserEmail).toBe(recvAEmail);
       const leadId: number = created.body.lead.id;
 
       const foreignAssign = await request(app)
@@ -589,6 +662,27 @@ describe.skipIf(testHost === undefined || testHost === '')(
         .set('Cookie', ownerACookie)
         .send({ assignedUserId: recvAId });
       expect(assign.status).toBe(200);
+      expect(assign.body.lead.assignedUserId).toBe(recvAId);
+
+      const unassign = await request(app)
+        .patch(`/api/organizations/${orgAId}/leads/${leadId}`)
+        .set('Cookie', ownerACookie)
+        .send({ assignedUserId: null });
+      expect(unassign.status).toBe(200);
+      expect(unassign.body.lead.assignedUserId).toBeNull();
+
+      const reassign = await request(app)
+        .patch(`/api/organizations/${orgAId}/leads/${leadId}`)
+        .set('Cookie', ownerACookie)
+        .send({ assignedUserId: recvAId });
+      expect(reassign.status).toBe(200);
+      expect(reassign.body.lead.assignedUserId).toBe(recvAId);
+
+      const foreignAgain = await request(app)
+        .patch(`/api/organizations/${orgAId}/leads/${leadId}`)
+        .set('Cookie', ownerACookie)
+        .send({ assignedUserId: ownerBId });
+      expect(foreignAgain.status).toBe(400);
 
       const filtered = await request(app)
         .get(`/api/organizations/${orgAId}/leads?assignedUserId=${recvAId}`)

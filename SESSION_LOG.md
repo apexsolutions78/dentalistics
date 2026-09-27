@@ -286,7 +286,7 @@ suite did not yet exist.
 |---|---|---|---|
 | 9 | First `npm test`: 7 failures / 3 files. (a) Duplicate tests got **201 not 409**: `normalizePhone` preserved the typed leading `+`, so `+973…` (stored) and `973…` (submitted without `+`) never matched — canonicalization inconsistency, not a query bug. (b) `auth.integration.test.ts` beforeAll failed FK `leads`: M2's purge deleted `users`/`organizations` while M3 tables referenced them. (c) 5 unit assertions expected failure detail in `ValidationError.message`, but detail lives in `.issues` (message is always `Invalid input`) | (a) phones now canonicalize to **digits-only** (`+` optional on input, stripped for storage); (b) purge extended to lead_activities → leads → patients → sessions → audit_logs → users → organizations; (c) `expectIssue()` helper asserts joined `.issues` | Re-run: **83/83 passed, exit 0** (10 files); `npm run verify` exit 0 |
 | 10 | typecheck: regex capture `match[1]` is `string \| undefined` under strict indexing; lint/test: `ValidationError` imported from `../src/validate` but not re-exported | Replaced capture with `PHONE_PATTERN.test` + `startsWith('+') ? slice(1) : cleaned`; `export { ValidationError }` re-export added | typecheck exit 0, lint exit 0 |
-| 11 | `m3-smoke.ps1` run 1: **26 FAIL**. Root cause: `seed:admin` creates a **global admin with `organization_id NULL`**, and role `admin` bypasses `assertOrgExists` — so `/me` had no `organizationId`, every org-scoped URL was malformed (404 cascade), receptionist never got created (401s), and the "foreign org 999999" check wrongly returned **200** (admin bypass, correct behavior for that role) | v2 bootstraps the intended production flow: admin login → `POST /api/admin/organizations` → admin creates clinic owner → owner login drives all M3 checks; run-unique owner/receptionist emails (fixed receptionist password for idempotent re-runs); receptionist created via the clinic member route; foreign-org 404 now checked as a real tenant | Run 2: **27/27 PASS, SMOKE_PASS, exit 0** |
+| 11 | `m3-smoke.ps1` run 1: **26 FAIL**. Root cause: `seed:admin` creates a **global admin with `organization_id NULL`**, and role `admin` bypasses `assertOrgExists` — so `/me` had no `organizationId`, every org-scoped URL was malformed (404 cascade), receptionist never got created (401s), and the "foreign org 999999" check wrongly returned **200** (admin bypass, correct behavior for that role) | v2 bootstraps the intended production flow: admin login → `POST /api/admin/organizations` → admin creates clinic owner → owner login drives all M3 checks; run-unique owner/receptionist emails (fixed receptionist password for idempotent re-runs); receptionist created via the clinic member route; foreign-org 404 now checked as a real tenant | Run 2: **29/29 PASS, SMOKE_PASS, exit 0** (count corrected at addendum) |
 
 ### Verification evidence (commands actually run)
 
@@ -298,7 +298,7 @@ suite did not yet exist.
 | Full gate | `npm run verify` | **exit 0** — lint 0, typecheck 0, tests 83/83, build 0 |
 | Migration CLI (dev DB) | `npm run migrate` | exit 0; applied `0003_patients_leads.sql`, skipped 0001/0002 (idempotent) |
 | HTTP smoke run 1 | `m3-smoke.ps1` | 26 FAIL → root cause defect 11 (script assumption, app not at fault) |
-| HTTP smoke run 2 | `m3-smoke.ps1` | **27/27 PASS, exit 0**: health 200; admin login; org+owner created 201; owner login/me; patient 201; lead 201; list 200; status filter 200; bad filter 400; lead detail (activity=1 `created`, deferred arrays present); status→CONTACTED 200 (activity=2 `status_changed`); duplicate lead 409 `duplicate_lead`; duplicate patient 409; receptionist created 201; receptionist login 200; receptionist lead 201; receptionist notes-patch 403; receptionist patient-create 403; receptionist lead-delete 403; foreign org 404; owner deletes lead/patient/receptionist-lead 200; logout 200 → me 401; health 200; server stopped cleanly |
+| HTTP smoke run 2 | `m3-smoke.ps1` | **29/29 PASS, exit 0** (count corrected from 27 at addendum — PASS-line count of the saved log): health 200; admin login; org+owner created 201; owner login/me; patient 201; lead 201; list 200; status filter 200; bad filter 400; lead detail (activity=1 `created`, deferred arrays present); status→CONTACTED 200 (activity=2 `status_changed`); duplicate lead 409 `duplicate_lead`; duplicate patient 409; receptionist created 201; receptionist login 200; receptionist lead 201; receptionist notes-patch 403; receptionist patient-create 403; receptionist lead-delete 403; foreign org 404; owner deletes lead/patient/receptionist-lead 200; logout 200 → me 401; health 200; server stopped cleanly |
 
 ### Plan cross-check (M3 scope, lines ~868–888)
 
@@ -335,7 +335,7 @@ credential); success confirmed by the `..hash` result line and
 
 - M3 implementation complete; **all gates green**: `npm run verify` exit 0
   (lint 0, typecheck 0, **83/83 tests / 10 suites / 0 skipped**, build 0),
-  migrate idempotent, HTTP smoke **27/27 PASS exit 0**, no stray processes.
+  migrate idempotent, HTTP smoke **29/29 PASS exit 0**, no stray processes.
 - Committed and pushed: `349dd41` (M3 code + tests + docs rev 13); remote
   HEAD verified matching local (`MATCH=OK`); this follow-up hash line pushed
   as a second docs commit.
@@ -361,3 +361,36 @@ credential); success confirmed by the `..hash` result line and
    not done).
 4. Everything recorded under OPEN ISSUES in `PROJECT_STATE.md` (B2, B4, B6
    sub-items) remains unanswered.
+
+---
+
+### Post-report owner instruction and M3 re-verification (2026-09-27, same session)
+
+Owner: *"If M3 is 100% completed, tested and confirmed PASS, defects fixed,
+then start M4 otherwise fix remaining defects first."*
+
+Re-verification executed before answering (no PASS claim on stale evidence):
+
+1. **Plan cross-check** — fresh read of the plan's M3 section (Patient records,
+   Lead records, statuses, source, activity, notes, Search/filter, Lead detail
+   + the six test categories): implementation covers every item, but two
+   **test-coverage gaps** were found and closed first:
+
+| # | Defect | Fix | Re-verification |
+|---|---|---|---|
+| 12 | Plan requires Search/filter **tested**, but the free-text `q` path (leads + patients: `LIKE` with `ESCAPE` and `escapeLike`) had **zero tests** | New test: name fragment, phone fragment, miss → total 0, literal `%` → 0 and literal `_` → 0 (escaping proofs — an unescaped `%`/`_` would match everything), `q` > 100 chars → 400, repeated `q` → 400, patient `q` search | `npm test` → **84/84 passed, exit 0** |
+| 13 | `assignedUserId` is accepted and org-validated on lead **create** (`leads.ts` L178/L180/L196) but was only exercised through PATCH | Create-with-assignment assertions (`assignedUserId` + `assignedUserEmail` in the 201 response), plus null-unassign → null, reassign → 200, foreign reassign → 400 | same run, 84/84 |
+
+   **Falsification review** of `leads.ts`/`patients.ts` (search escaping,
+   receptionist 403-before-404 ordering, no-op update short-circuit, count/list
+   parameter reuse): no implementation defects found.
+2. Fresh `npm run verify` → **exit 0, 84/84 tests (10 suites, 0 skipped)**.
+3. Fresh `m3-smoke.ps1` → **exit 0, 0 failures — 29/29 PASS**.
+4. **Correction (self-found):** revision 13 recorded the smoke as "27/27".
+   The saved run logs contain **29** PASS lines (both runs, 0 FAIL). The
+   claim "all checks green, exit 0" was correct; the count was not. Corrected
+   in `PROJECT_STATE.md`, `M0_Project_Audit.md` and this log at revision 14.
+
+**Result: M3 100% complete, tested, confirmed PASS, defects fixed (7 + 2
+coverage gaps closed) → M4 started.** Recorded in `PROJECT_STATE.md`
+revision 14 and the audit M3 row PASSED / M4 IN_PROGRESS.
