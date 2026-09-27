@@ -244,6 +244,18 @@ export async function deletePatient(
   if (existing === null) {
     return false;
   }
+  const [appointmentRows] = await db.query<IdRow[]>(
+    'SELECT id FROM appointments WHERE patient_id = ? LIMIT 1',
+    [patientId],
+  );
+  if (appointmentRows[0] !== undefined) {
+    throw new AppError(
+      'Patient has appointments and cannot be deleted',
+      409,
+      'patient_has_appointments',
+      true,
+    );
+  }
   await db.query('DELETE FROM patients WHERE id = ? AND organization_id = ?', [patientId, organizationId]);
   await recordAudit(db, logger, {
     organizationId,

@@ -2,6 +2,7 @@ import type { Pool, RowDataPacket } from 'mysql2/promise';
 import { recordAudit } from '../audit';
 import { AppError, ValidationError } from '../errors';
 import type { Logger } from '../logger';
+import { appointmentsForLead } from './appointments';
 import {
   normalizePhone,
   optionalEmail,
@@ -341,6 +342,7 @@ export async function getLeadDetail(
      ORDER BY a.created_at ASC, a.id ASC`,
     [leadId],
   );
+  const appointments = await appointmentsForLead(db, leadId);
   return {
     lead: leadDto(lead),
     notes: lead.notes,
@@ -353,7 +355,7 @@ export async function getLeadDetail(
       createdAt: row.created_at,
     })),
     communicationHistory: [],
-    appointments: [],
+    appointments,
   };
 }
 

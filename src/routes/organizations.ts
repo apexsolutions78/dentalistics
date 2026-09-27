@@ -4,13 +4,14 @@ import type { Pool, RowDataPacket } from 'mysql2/promise';
 import { recordAudit } from '../audit';
 import { revokeUserSessions } from '../auth/sessions';
 import type { SessionUser } from '../auth/sessions';
-import { AppError } from '../errors';
+import { AppError, ValidationError } from '../errors';
+import { readJsonBody } from '../http/body';
 import type { Logger } from '../logger';
 import { requireAuth } from '../middleware/auth';
 import { assertCanManageMembers, assertOrgExists } from '../middleware/tenant';
 import { createUserInOrg } from '../services/users';
 import { generateSiteKey } from '../security/siteKey';
-import { parsePathId } from '../validate';
+import { parsePathId, parseTimezone } from '../validate';
 
 export interface OrganizationsRouterDeps {
   db: Pool;
@@ -21,6 +22,7 @@ interface OrganizationRow extends RowDataPacket {
   id: number;
   name: string;
   status: 'active' | 'disabled';
+  timezone: string;
   created_at: Date;
   site_key: string | null;
 }
@@ -40,6 +42,52 @@ interface UserTargetRow extends RowDataPacket {
   email: string;
 }
 
+async function loadOrganization(
+  db: Pool,
+  organizationId: number,
+): Promise<{ organizationId: number; name: string; status: string; timezone: string; createdAt: Date; siteKey: string }> {
+  const [rows] = await db.query<OrganizationRow[]>(
+    'SELECT id, name, status, timezone, created_at, site_key FROM organizations WHERE id = ?',
+    [organizationId],
+  );
+  const row = rows[0];
+  if (row === undefined) {
+    throw new AppError('Organization not found', 404, 'not_found', true);
+  }
+  let siteKey = row.site_key;
+  if (siteKey === null) {
+    siteKey = generateSiteKey();
+    await db.query(
+      'UPDATE organizations SET site_key = ? WHERE id = ? AND site_key IS NULL',
+      [siteKey, organizationId],
+    );
+    const [again] = await db.query<OrganizationRow[]>(
+      'SELECT site_key FROM organizations WHERE id = ?',
+      [organizationId],
+    );
+    siteKey = again[0]?.site_key ?? siteKey;
+  }
+  return {
+    organizationId: row.id,
+    name: row.name,
+    status: row.status,
+    timezone: row.timezone,
+    createdAt: row.created_at,
+    siteKey,
+  };
+}
+
+function organizationDto(org: Awaited<ReturnType<typeof loadOrganization>>): Record<string, unknown> {
+  return {
+    id: org.organizationId,
+    name: org.name,
+    status: org.status,
+    timezone: org.timezone,
+    createdAt: org.createdAt,
+    siteKey: org.siteKey,
+  };
+}
+
 export function createOrganizationsRouter(deps: OrganizationsRouterDeps): Router {
   const router = Router();
   router.use(requireAuth);
@@ -47,35 +95,35 @@ export function createOrganizationsRouter(deps: OrganizationsRouterDeps): Router
   router.get('/:orgId', async (req: Request, res: Response) => {
     const organizationId = parsePathId(req.params.orgId ?? '');
     assertOrgExists(req.user as SessionUser, organizationId);
-    const [rows] = await deps.db.query<OrganizationRow[]>(
-      'SELECT id, name, status, created_at, site_key FROM organizations WHERE id = ?',
-      [organizationId],
+    const org = await loadOrganization(deps.db, organizationId);
+    res.status(200).json({ organization: organizationDto(org) });
+  });
+
+  router.patch('/:orgId', async (req: Request, res: Response) => {
+    const organizationId = parsePathId(req.params.orgId ?? '');
+    const actor = req.user as SessionUser;
+    assertCanManageMembers(actor, organizationId);
+    const body = readJsonBody(req);
+    const provided = Object.keys(body);
+    if (provided.length === 0) {
+      throw new ValidationError('Invalid input', ['at least one field to update is required']);
+    }
+    for (const key of provided) {
+      if (key !== 'timezone') {
+        throw new ValidationError('Invalid input', [`unknown or not updatable field: ${key}`]);
+      }
+    }
+    const timezone = parseTimezone(body.timezone);
+    const [result] = await deps.db.query(
+      'UPDATE organizations SET timezone = ? WHERE id = ?',
+      [timezone, organizationId],
     );
-    if (rows[0] === undefined) {
+    if ((result as { affectedRows: number }).affectedRows === 0) {
       throw new AppError('Organization not found', 404, 'not_found', true);
     }
-    let siteKey = rows[0].site_key;
-    if (siteKey === null) {
-      siteKey = generateSiteKey();
-      await deps.db.query(
-        'UPDATE organizations SET site_key = ? WHERE id = ? AND site_key IS NULL',
-        [siteKey, organizationId],
-      );
-      const [again] = await deps.db.query<OrganizationRow[]>(
-        'SELECT site_key FROM organizations WHERE id = ?',
-        [organizationId],
-      );
-      siteKey = again[0]?.site_key ?? siteKey;
-    }
-    res.status(200).json({
-      organization: {
-        id: rows[0].id,
-        name: rows[0].name,
-        status: rows[0].status,
-        createdAt: rows[0].created_at,
-        siteKey,
-      },
-    });
+    deps.logger.info('organization timezone updated', { organizationId, timezone });
+    const org = await loadOrganization(deps.db, organizationId);
+    res.status(200).json({ organization: organizationDto(org) });
   });
 
   router.get('/:orgId/users', async (req: Request, res: Response) => {

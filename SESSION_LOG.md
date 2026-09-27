@@ -884,3 +884,146 @@ Docker is running."
 
 **Result: M6 recorded PASSED (rev 20).** M7 (Appointments) started per
 owner instruction (Docker confirmed running by owner).
+
+---
+
+## Session 7 — 2026-09-27 — Milestone 7 (Appointments) implemented and tested
+
+**Owner instruction this session:** "If M6 is 100% completed, tested and
+confirmed PASS, all defects fixed, then start M7 otherwise fix remaining
+defects first. Docker is running."
+
+**M6 gate outcome:** PASS confirmed after re-verification (fresh plan
+cross-check, falsification review — no new defects, fresh verify 125/125,
+fresh smoke 35/35). M6 recorded PASSED (rev 20, commit `e088d67` pushed,
+`MATCH=OK`). M7 then started.
+
+### Plan scope (fresh read)
+
+M7: "Appointment records, Statuses, Confirmation, Cancellation,
+Rescheduling, No-show, Rebooking, Clinic timezone. Test all state
+transitions." Supporting sections read: MVP-6 (fields + 6 statuses +
+Create/View/Edit/Confirm/Cancel/Mark completed/Mark no-show/Rebook),
+MVP AUTOMATION REQUIREMENTS (cancellation/rescheduling awareness,
+timezone awareness), TIME AND DATE HANDLING (canonical storage tz,
+explicit clinic tz, never assume server tz), MVP UX ACCEPTANCE (tasks
+7–10), receptionist/owner role lists, scenarios A/C, TEST 6/7 (cancel/
+reschedule stop old workflows), §9 (patient self-service booking out of
+scope; rebooking link in scope), B1 (appointments originate in this
+system — CONFIRMED).
+
+### Work executed (M7)
+
+1. **Migration** `0007_appointments.sql` — `organizations.timezone`
+   VARCHAR(64) NOT NULL DEFAULT 'UTC'; `appointments` (org/patient FK,
+   optional lead FK SET NULL, DATE + TIME clinic-local wall clock,
+   6-status ENUM, service/provider, `previous_appointment_id` self-FK
+   SET NULL, created_by, indexes). Applied to dev DB (applied 0007,
+   skipped 0001–0006, exit 0).
+2. **Validators** — `parseTimeOnly` (HH:MM[/SS]), `parseTimezone`
+   (IANA via `Intl.DateTimeFormat` try/catch).
+3. **Service** `src/services/appointments.ts` — create (patient org-
+   validated, optional linked lead), list (status/patientId/from/to
+   filters, date ASC ordering), get, edit (service/provider while
+   SCHEDULED/CONFIRMED only), `APPOINTMENT_TRANSITIONS` map with 409
+   `invalid_status_transition` + optimistic `AND status = ?` guard,
+   reschedule (transaction + `FOR UPDATE`: old → RESCHEDULED, new
+   SCHEDULED linked), rebook (linked new from CANCELLED/NO_SHOW,
+   old unchanged), `appointmentsForLead` for lead detail. DTO joins
+   patient summary; date via `DATE_FORMAT` (wall-clock safe).
+4. **Routes** `src/routes/appointments.ts` (mounted in app.ts):
+   route-level authz — receptionist: create/view/confirm/no-show/
+   rebook (strict plan reading); owner/admin additionally: cancel/
+   complete/edit/reschedule; cross-clinic 404; unauth 401.
+5. **Clinic timezone** — organizations GET now returns `timezone`;
+   owner/admin-only `PATCH /api/organizations/:orgId` (timezone only,
+   unknown fields → 400; lazy siteKey logic extracted to shared
+   `loadOrganization`).
+6. **Integrations** — lead detail returns real `appointments` array
+   (M3 promise; empty array for unlinked — M3 assertion untouched);
+   `deletePatient` guarded with 409 `patient_has_appointments`;
+   test purges extended (appointments deleted before FK parents in
+   auth/m3/m5/m6 suites).
+7. **Tests** — `tests/m7.integration.test.ts` (18 live-DB tests).
+
+### Defects found and fixed
+
+| # | Defect | Fix | Re-verification |
+|---|---|---|---|
+| 20 | Typecheck: `PoolConnection` not assignable to `Pool` (reschedule/rebook post-commit loads) | param typed `Pool \| PoolConnection` | typecheck exit 0 |
+| 21 | Verify round 1: beforeAll lead creation 400 — staff `POST /leads` requires `source` (**test bug**) | test sends `source: 'MANUAL'` | verify round 2 |
+| 22 | Verify round 2: 2 wrong test assertions (`rescheduledFrom` status expected SCHEDULED instead of RESCHEDULED; same missing `source` in second lead) (**test bugs**) | assertions corrected | verify round 3: **143/143** |
+| 23 | Falsification: status transition read-then-write race (two concurrent ops could both pass the check) | guarded `UPDATE ... AND status = ?` + affectedRows → 409 | verify round 4: **143/143 exit 0** |
+
+### Verification evidence (commands actually run)
+
+| Check | Result |
+|---|---|
+| `npm run typecheck` round 1 | exit 2 — defect 20 → fixed |
+| `npm run typecheck` final | **exit 0** |
+| `npm run lint` | **exit 0** |
+| `npm run verify` rounds 1–2 | exit 1 — defects 21, 22 (test bugs) |
+| `npm run verify` round 3 | exit 0 — 143/143 (16 suites) |
+| Falsification review | defect 23 → guard added |
+| `npm run verify` round 4 (final) | **exit 0 — 143/143 tests, 16 suites, 0 skipped** (log `m7-verify4.log`) |
+| `npm run migrate` (dev DB) | **exit 0** — applied `0007_appointments.sql`, skipped 0001–0006 |
+| HTTP smoke (M7 section added) | **47/47 PASS, 0 FAIL, SMOKE_PASS, exit 0** (log `m7-smoke1.log`) |
+
+### Plan cross-check (M7 scope)
+
+Records ✓, statuses ✓ (6), confirmation ✓, cancellation ✓,
+rescheduling ✓ (TEST 7 semantics: old record → RESCHEDULED stops old
+workflows; new linked), no-show ✓, rebooking ✓ (from NO_SHOW/CANCELLED,
+linked), clinic timezone ✓ (IANA-validated, explicit, default UTC),
+"test all state transitions" ✓ (full matrix incl. terminal immunity,
+same-state 409s, race guard, authz matrix, tenant isolation). No gaps
+found.
+
+### Known limitations / open items (reported, not acceptance blockers)
+
+- **K-I3 contradiction to resolve before M8:** M8 gate row says
+  "scheduler capability confirmed (K-I3)" but K-I3 row = Open (cron/
+  persistent-process capability UNKNOWN on DirectAdmin). Owner decision
+  or investigation needed before M8 starts.
+- M8 must implement reminder automation reading these statuses;
+  M9 adds no-show workflow messaging; quiet hours are M8.
+- No appointment DELETE endpoint (records preserved by design —
+  PROPOSED); patient deletion blocked while appointments exist (409).
+- Receptionist permission set follows the plan's literal role list
+  (no cancel/complete/edit/reschedule for receptionist) — PROPOSED,
+  widenable on owner instruction.
+- Timezone default 'UTC' for pre-existing orgs — PROPOSED, owner sets
+  per clinic (no UI until M16).
+- Lead status is not auto-changed to APPOINTMENT_BOOKED when an
+  appointment is created (plan silent — not done; PROPOSED to decide).
+
+### Git state produced
+
+| Commit | Contents |
+|---|---|
+| (hash appended after push) | M7 source (0007 migration, appointments service/routes, timezone endpoint, validators, integrations), `tests/m7.integration.test.ts`, purge extensions, docs rev 21 |
+
+### Durable doc updates
+
+- `PROJECT_STATE.md` → revision 21 (CURRENT_STATUS, §5 M7 block, §8
+  evidence rows, phase note, changelog row 21).
+- `M0_Project_Audit.md` → M7 row complete/awaiting acceptance.
+- `SESSION_LOG.md` → this entry.
+
+### Session end state
+
+- M7 implementation complete; gates green: verify exit 0 (143/143,
+  16 suites, 0 skipped), typecheck 0, lint 0, migrate idempotent,
+  smoke 47/47 PASS.
+- Next: M7 STATUS REPORTING block → STOP for owner acceptance.
+  M8 NOT_STARTED (gate).
+
+### Decisions the owner has not yet made
+
+1. Accept (or reject) the M7 report — gate on M8.
+2. PROPOSED M7 design points: receptionist permission set (strict plan
+   reading), timezone default UTC, no appointment DELETE, patient
+   delete guard 409, no auto lead-status change on booking.
+3. K-I3 answer (scheduler capability) required before M8 per gate.
+4. K6, K-I2, CORS questions unchanged; OPEN ISSUES (B2, B4, B6
+   sub-items) unchanged.

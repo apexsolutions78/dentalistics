@@ -125,6 +125,29 @@ export function parseDateOnly(value: unknown, name: string): string {
   return value;
 }
 
+const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/;
+
+export function parseTimeOnly(value: unknown, name: string): string {
+  if (typeof value !== 'string' || !TIME_PATTERN.test(value)) {
+    throw new ValidationError('Invalid input', [
+      `${name} must be a time in HH:MM or HH:MM:SS format`,
+    ]);
+  }
+  return value.length === 5 ? `${value}:00` : value;
+}
+
+export function parseTimezone(value: unknown, name = 'timezone'): string {
+  const tz = requireString(value, name, { min: 1, max: 64 });
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: tz });
+  } catch {
+    throw new ValidationError('Invalid input', [
+      `${name} must be a valid IANA timezone (e.g. Asia/Bahrain)`,
+    ]);
+  }
+  return tz;
+}
+
 export function parseListParams(query: Record<string, unknown>): {
   limit: number;
   offset: number;

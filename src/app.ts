@@ -6,6 +6,7 @@ import { createLogger } from './logger';
 import type { Logger } from './logger';
 import { attachSession } from './middleware/auth';
 import { createAdminRouter } from './routes/admin';
+import { createAppointmentsRouter } from './routes/appointments';
 import { createAuthRouter } from './routes/auth';
 import { createLeadsRouter } from './routes/leads';
 import { createOrganizationsRouter } from './routes/organizations';
@@ -94,6 +95,7 @@ export function createApp(deps: AppDeps = {}): Express {
     app.use('/api/organizations', createOrganizationsRouter({ db, logger }));
     app.use('/api/organizations', createLeadsRouter({ db, logger }));
     app.use('/api/organizations', createPatientsRouter({ db, logger }));
+    app.use('/api/organizations', createAppointmentsRouter({ db, logger }));
 
     const publicRate = deps.publicLeadRate;
     app.use(
