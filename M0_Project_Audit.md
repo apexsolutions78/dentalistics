@@ -170,7 +170,7 @@ Governing sequence exactly as specified in `Project_Planning_Dentalistics.md` (M
 | M6 | Instant lead follow-up | **PASSED 2026-09-27** (owner conditional instruction; re-verified: plan cross-check, falsification review — no new defects, fresh verify 125/125, fresh smoke 35/35) | M5 PASSED |
 | M7 | Appointments (statuses, timezone) | **PASSED 2026-09-27** (owner conditional instruction; re-verified: plan cross-check, falsification review — no new defects, fresh verify 143/143, fresh smoke 47/47) | M6 PASSED |
 | M8 | Appointment reminders (48h/24h/2h, idempotent, quiet hours) | **PASSED 2026-09-27** (owner conditional instruction; re-verified: plan cross-check all 8 test items + MVP-7 must-not-send — no gaps, falsification review — no new defects, fresh verify 159/159, fresh smoke 49/49) — K-I3 still UNKNOWN: in-process scheduler shipped, process persistence carried forward (B6) | M7 PASSED |
-| M9 | No-show recovery | NOT_STARTED | M8 PASSED |
+| M9 | No-show recovery | **COMPLETE - awaiting owner acceptance (2026-09-27)** - gates met: verify 173/173 (18 suites, 0 skipped), migrate 0010 applied, extended smoke 59/59 PASS; K-I3 still UNKNOWN - M9 rides the same in-process scheduler (`REMINDER_TICK_MS` drives reminder + no-show ticks), process persistence carried in the M9 report | M8 PASSED |
 | M10 | Recall automation | NOT_STARTED | M9 PASSED |
 | M11 | Review requests | NOT_STARTED | M10 PASSED |
 | M12 | Missed-call integration | NOT_STARTED | **Provider capability verification from official docs** + K-I2 + clinic telephony facts (B2) + provider account (K-I4) |

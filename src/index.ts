@@ -1,3 +1,4 @@
+import { runNoShowTick } from './automation/noShow';
 import { runReminderTick } from './automation/reminders';
 import { createApp } from './app';
 import { ConfigError, loadEnv } from './config';
@@ -65,6 +66,11 @@ async function main(): Promise<void> {
     reminderTimer = setInterval(() => {
       runReminderTick(getPool(), logger).catch((err: unknown) => {
         logger.error('reminder tick failed', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
+      runNoShowTick(getPool(), logger).catch((err: unknown) => {
+        logger.error('no-show tick failed', {
           error: err instanceof Error ? err.message : String(err),
         });
       });

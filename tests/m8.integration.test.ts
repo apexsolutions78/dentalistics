@@ -441,6 +441,7 @@ describe.skipIf(testHost === undefined || testHost === '')(
       });
       const apptId = created.body.appointment.id as number;
       const before = await reminderRows(apptId);
+      const beforeMessages = await countMessages();
 
       const result = await runReminderTick(pool, logger);
       expect(result).toEqual({ processed: 0, sent: 0, failed: 0, suppressed: 0, cancelled: 0 });
@@ -448,7 +449,7 @@ describe.skipIf(testHost === undefined || testHost === '')(
       const after = await reminderRows(apptId);
       expect(after.map((r) => r.status)).toEqual(before.map((r) => r.status));
       expect(after.every((r) => r.message_id === null)).toBe(true);
-      expect(await countMessages()).toBe(0);
+      expect(await countMessages()).toBe(beforeMessages);
     });
 
     it('tick sends a due reminder with the rendered template exactly once', async () => {

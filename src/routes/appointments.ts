@@ -5,6 +5,7 @@ import {
   cancelRemindersForAppointment,
   scheduleRemindersForAppointment,
 } from '../automation/reminders';
+import { closeNoShowCase, startNoShowRecovery } from '../automation/noShow';
 import type { SessionUser } from '../auth/sessions';
 import { AppError } from '../errors';
 import { readJsonBody } from '../http/body';
@@ -74,6 +75,48 @@ async function safeCancelReminders(
     logger.error('reminder cancellation failed', {
       appointmentId,
       reason,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+async function safeStartNoShowRecovery(
+  db: Pool,
+  logger: Logger,
+  appointmentId: number,
+): Promise<void> {
+  if (appointmentId === 0) {
+    return;
+  }
+  try {
+    await startNoShowRecovery(db, logger, { appointmentId });
+  } catch (err) {
+    logger.error('no-show recovery start failed', {
+      appointmentId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+async function safeCloseNoShowOnRebook(
+  db: Pool,
+  logger: Logger,
+  appointmentId: number,
+  rebookedAppointmentId: number,
+): Promise<void> {
+  if (appointmentId === 0 || rebookedAppointmentId === 0) {
+    return;
+  }
+  try {
+    await closeNoShowCase(db, logger, {
+      appointmentId,
+      reason: 'rebooked',
+      rebookedAppointmentId,
+    });
+  } catch (err) {
+    logger.error('no-show recovery close on rebook failed', {
+      appointmentId,
+      rebookedAppointmentId,
       error: err instanceof Error ? err.message : String(err),
     });
   }
@@ -182,6 +225,7 @@ export function createAppointmentsRouter(deps: AppointmentsRouterDeps): Router {
       actorId: actor.id,
     });
     await safeCancelReminders(deps.db, deps.logger, appointmentId, 'appointment_no_show');
+    await safeStartNoShowRecovery(deps.db, deps.logger, appointmentId);
     res.status(200).json(result);
   });
 
@@ -215,8 +259,51 @@ export function createAppointmentsRouter(deps: AppointmentsRouterDeps): Router {
       body,
     });
     await safeScheduleReminders(deps.db, deps.logger, appointmentIdOf(result));
+    await safeCloseNoShowOnRebook(
+      deps.db,
+      deps.logger,
+      appointmentId,
+      appointmentIdOf(result),
+    );
     res.status(200).json(result);
   });
+
+  router.post(
+    '/:orgId/appointments/:appointmentId/noshow/close',
+    async (req: Request, res: Response) => {
+      const organizationId = parsePathId(req.params.orgId);
+      const actor = req.user as SessionUser;
+      assertCanManageMembers(actor, organizationId);
+      const appointmentId = parsePathId(req.params.appointmentId);
+      const body = readJsonBody(req) as Record<string, unknown>;
+      const rawReason = body.reason;
+      const reason =
+        typeof rawReason === 'string' && rawReason.trim() !== ''
+          ? rawReason.trim().slice(0, 64)
+          : 'staff_closed';
+      const result = await closeNoShowCase(deps.db, deps.logger, {
+        appointmentId,
+        organizationId,
+        reason,
+      });
+      if (!result.closed) {
+        throw new AppError(
+          'No open no-show case for this appointment',
+          404,
+          'not_found',
+          true,
+        );
+      }
+      res.status(200).json({
+        case: {
+          id: result.caseId,
+          appointmentId,
+          status: result.status,
+          closeReason: reason,
+        },
+      });
+    },
+  );
 
   return router;
 }

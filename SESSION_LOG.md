@@ -1274,3 +1274,101 @@ all defects fixed, then start M9 otherwise fix remaining defects first."
 M9 (No-show recovery) started per owner instruction: plan section 5
 (L183-198), MVP-8 (L2013-2047) and TEST 8 (L2644-2655) are the scope
 anchors for the next work block.
+
+---
+
+## Session 9 - M8 PASSED recorded; M9 (No-show recovery) implemented
+
+**M8 acceptance recorded first (rev 24):** fresh plan cross-check, fresh
+verify 159/159, fresh smoke 49/49, falsification review (no new defects)
+-> M8 **PASSED**, docs rev 24, commit `679f4f9` "M8 PASSED (rev 24 docs);
+M9 started" pushed, MATCH=OK.
+
+**M9 scope anchors (owner conditional instruction accepted):** plan M9
+section (L1010-1031), section 5 No-show reactivation (L183-198, 7 steps),
+MVP-8 (L2013-2047: NO_SHOW -> immediate message -> wait configured period
+-> follow-up -> stop when rebooked; predefined logic, configurable timing
+and templates, no workflow builder), TEST 8 (L2644-2655), MVP-14 message
+templates (no-show message + no-show follow-up).
+
+**Work executed (M9):**
+
+- `migrations/0010_no_show_recovery.sql` - `no_show_cases` (UNIQUE
+  appointment_id = duplicate-event idempotency, OPEN/REBOOKED/CLOSED,
+  rebooked_appointment_id self-FK SET NULL, close_reason/opened/closed)
+  + `no_show_messages` (UNIQUE (case_id, phase), PENDING/SENDING/SENT/
+  FAILED/SUPPRESSED/CANCELLED, attempts/last_error/suppression_reason).
+  Applied to dev DB (exit 0).
+- `src/automation/noShowConfig.ts` - app_meta `noshow_config`, defaults
+  (enabled, SMS, mock, followUpDelayHours 24, MVP-14 template texts,
+  maxAttempts 3), shape guard, corrupt/missing -> defaults, clone/load.
+- `src/automation/noShow.ts` - `startNoShowRecovery` (config gate, status
+  NO_SHOW required, INSERT IGNORE case -> idempotent `already_started`,
+  INITIAL due now + FOLLOW_UP due now+delay, compensating delete on row
+  failure, INITIAL processed synchronously for immediate message);
+  `closeNoShowCase` (only OPEN closes; reason `rebooked` -> REBOOKED else
+  CLOSED; guarded update idempotent; cancels that case's live messages);
+  `runNoShowTick` (enabled gate, stale SENDING reclaim >10min, **lazy
+  rebook detection** - OPEN case + patient has SCHEDULED/CONFIRMED
+  appointment dated >= today -> REBOOKED with that id, due follow-ups
+  with optimistic claim + case-still-OPEN + appointment-still-NO_SHOW +
+  opt-out checks, `noshow:<id>` idempotent sends, backoff 60s*2^(n-1),
+  permanent stop at maxAttempts 3).
+- Route wiring (`src/routes/appointments.ts`, never-throw wrappers):
+  no-show endpoint starts recovery after reminder cancellation; rebook
+  endpoint closes it as REBOOKED; new `POST .../noshow/close` manual
+  closure (assertCanManageMembers, optional `reason` default
+  `staff_closed`, no OPEN case -> 404).
+- `src/index.ts` - the single `REMINDER_TICK_MS` interval now runs both
+  `runReminderTick` and `runNoShowTick` (separate catch logs).
+
+**Tests:** `tests/m9.integration.test.ts` - 14 live-DB tests: recovery
+start (case + immediate INITIAL with rendered body + follow-up at +24h +
+M8 reminder-cancel cross-check); follow-up exactly once after delay;
+no-response keeps case open with no extra messages; rebook endpoint
+closes REBOOKED and stops automation; lazy detection when staff book via
+plain create; manual closure stops automation + repeat 404; duplicate
+no-show events (route 409 + service `already_started`, single case and
+message); cancellation starts nothing + closed cases stay closed; opt-out
+suppresses both phases with no outbound messages; disabled config skips
+entirely; corrupt config falls back to defaults; custom delay + missing
+variables ({{booking_link}}/{{clinic_phone}} render empty, no brace
+residue); failed sends back off and stop at maxAttempts; unknown ids
+never throw.
+
+**Defects/iterations (test-side only, no new product defects):** (1)
+phase-order assertion assumed alphabetical sort - MySQL ENUM ORDER BY uses
+ordinal position (INITIAL first); (2) global tick counters drained prior
+tests' due follow-ups (ticks at +25h are always past earlier +24h
+follow-ups) - switched to case-scoped assertions; (3) fixture appointment
+was past-dated so all reminder offsets were already past (M8 past-offset
+skip rule) - no rows to assert cancel against - moved to a future date.
+During full verify, M8's global `countMessages()==0` assertion failed
+because the new no-show wiring legitimately sends during M8's own no-show
+tests - root cause isolated by running m8 alone and inspecting the 2 test
+DB messages (both `no_show_message` type) - M8 assertion changed to a
+before/after snapshot, preserving the test's intent ("tick sends
+nothing"). M8 suite re-passed.
+
+**Gates (all green):** migrate 0010 applied exit 0; typecheck exit 0;
+lint exit 0; M9 isolation 14/14; full `npm run verify` **exit 0 -
+173/173 tests (18 suites, 0 skipped)** + build 0 (log
+`%TEMP%\opencode\m9-verify2.log`); smoke extended with an SQL helper +
+10 M9 checks (create patient/appointment, no-show, duplicate 409, case
+OPEN, INITIAL SENT, FOLLOW_UP PENDING, manual closure 200, CLOSED,
+repeat 404) -> **59/59 PASS, 0 FAIL, SMOKE_PASS, exit 0** (log
+`%TEMP%\opencode\m9-smoke1.log`).
+
+**Design decisions reported (PROPOSED until owner approves):** quiet
+hours not applied to M9 messages (plan does not require them for M9);
+lazy rebook detection uses date >= today at day granularity (not exact
+instant) and treats any active future booking - including one that
+predates the no-show - as "patient will be seen" and stops automation
+(conservative anti-spam choice); config is global per deployment (same
+as M6/M8); if the start-after-transition step fails it is logged, not
+retried (same class as M8 partial-schedule failures; duplicate no-show
+re-POST is blocked by 409 so a manual recovery path would be needed).
+
+**Status: M9 implementation complete - report delivered, STOPPED awaiting
+owner acceptance. M10 (Recall automation) does not begin until the owner
+accepts the M9 report.**
