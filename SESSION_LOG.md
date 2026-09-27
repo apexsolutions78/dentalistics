@@ -1237,3 +1237,40 @@ Consent capture at booking remains B4 (default false - PROPOSED).
    production.
 4. K6 (history rewrite), K-I2 (inbound HTTPS), CORS pattern, and
    OPEN ISSUES B2/B4/B6 unchanged.
+
+---
+
+### Session 8 addendum - M8 acceptance re-verification (same session)
+
+**Owner instruction:** "If M8 is 100% completed, tested and confirmed PASS,
+all defects fixed, then start M9 otherwise fix remaining defects first."
+
+**Re-verification performed (fresh):**
+
+1. Fresh plan cross-check - M8 section (L985-1007) re-read with section 4
+   (L156-179), MVP-7 (L2001-2009) and TEST 5/6/7 (L2597-2640): all 8
+   test items (correct timing, timezone, cancellation, rescheduling,
+   duplicate prevention, failed messages, quiet hours, patient
+   communication preferences) map to executed tests; MVP-7's five
+   must-not-send rules + "automation must be idempotent" all covered;
+   TEST 5 (each reminder exactly once), TEST 6 (no future reminders
+   after cancel), TEST 7 (old sequence cancelled, new created, no
+   duplicates) covered; sequence is config-driven (offsetsHours in
+   reminder_config), not hard-coded - section 4's "avoid hard-coding"
+   satisfied. No gaps.
+2. Falsification review - schedule/tick/wiring/config/claim/reclaim/
+   backoff paths attacked: no new defects. Two notes recorded (not
+   defects): reminder config is global per deployment (single app_meta
+   key - all clinics share offsets/quiet window/templates; same pattern
+   as M6; PROPOSED per-org settings at M16); concurrent-tick
+   double-send is guarded by the optimistic SQL claim only (untested
+   directly; single in-process scheduler shipped).
+3. Fresh `npm run verify` exit 0 - **159/159 tests (17 suites, 0
+   skipped)** (log `%TEMP%\opencode\m8-verify-r3.log`).
+4. Fresh smoke **49/49 PASS, 0 FAIL, SMOKE_PASS, exit 0**
+   (log `%TEMP%\opencode\m8-smoke-r2.log`).
+
+**Result: M8 recorded PASSED (rev 24, commit appended after push).**
+M9 (No-show recovery) started per owner instruction: plan section 5
+(L183-198), MVP-8 (L2013-2047) and TEST 8 (L2644-2655) are the scope
+anchors for the next work block.
