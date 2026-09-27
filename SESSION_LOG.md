@@ -675,3 +675,32 @@ asserted; behavior at M6). No gaps found.
    browser-direct (needs CORS — not in plan).
 4. K6 and K-I2 questions unchanged; OPEN ISSUES (B2, B4, B6 sub-items)
    unchanged.
+
+---
+
+### Session 5 addendum — M5 acceptance re-verification (same session)
+
+**Owner instruction:** "If M5 is 100% completed, tested and confirmed PASS,
+all defects fixed, then start M6 otherwise fix remaining defects first."
+
+**Re-verification performed (fresh, per established precedent):**
+
+1. **Fresh plan cross-check** — M5 section re-read: all 7 test categories
+   (valid/invalid lead, spam-rate limiting, duplicate requests,
+   authentication, tenant identification, automation trigger) map to
+   executed tests. No gaps.
+2. **Falsification review** of `public.ts`, `createPublicLead`,
+   `organizations.ts` lazy key generation, rate-limit wiring — no new
+   defects. Noted (not defects): SQL site-key lookup is not constant-time
+   (timing attack impractical over network — noted only); per-IP 30/min
+   shared-NAT throttle consideration (accepted PROPOSED constant);
+   receptionist can read siteKey via org GET (no escalation — staff can
+   already create leads); automation trigger intentionally fires for
+   public leads only (M6 must decide staff/missed-call trigger scope).
+3. **Fresh gates:** `npm run verify` exit 0 — **109/109 tests (13 suites,
+   0 skipped)** (log `%TEMP%\opencode\m5-verify-r2.log`).
+4. **Fresh extended smoke:** **35/35 PASS, 0 FAIL, SMOKE_PASS, exit 0**
+   (log `%TEMP%\opencode\m5-smoke-r2.log`).
+
+**Result: M5 recorded PASSED (rev 18).** M6 (Instant lead follow-up)
+started per owner instruction.
