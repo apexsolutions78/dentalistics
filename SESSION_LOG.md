@@ -198,7 +198,9 @@ Uncommitted at time of writing: only this file's final git-state section
 
 ### Decisions the owner has not yet made
 
-1. Accept (or reject) the M2 report — gate on M3.
+1. ~~Accept (or reject) the M2 report — gate on M3.~~ **Resolved 2026-09-27:**
+   owner instruction conditionally authorizing M3, after re-verification
+   (below), recorded as M2 PASSED (rev 12).
 2. K6 question from Session 1 unchanged: keep repo public, make it private,
    or authorize a history rewrite to purge the rotated dead password
    (needs force-push — not done).
@@ -208,3 +210,27 @@ Uncommitted at time of writing: only this file's final git-state section
    `organization_id NULL` and global cross-org read; email-global-unique
    users; no self-signup (admins create orgs/users); password reset limited
    to self-change + admin reset until a mail channel exists.
+
+### Post-report owner instruction and M2 re-verification (2026-09-27, same session)
+
+Owner: *"If M2 is 100% completed, tested and confirmed PASS, defects fixed,
+then start M3 otherwise fix remaining defects first."*
+
+Re-verification executed before answering (no PASS claim on stale evidence):
+
+1. Plan cross-check — M2 section items (authentication, clinic/organization,
+   membership, roles, authorization, tenant isolation), all 7 MVP-1 bullets
+   (incl. "password reset if required by architecture" → admin reset +
+   self-change, documented), SECURITY items in scope at M2 (webhook/replay
+   items N/A — no webhooks exist yet), MVP USERS capabilities (owner
+   user-management ✓, admin org/user management ✓, receptionist exclusions ✓,
+   "no elaborate admin panel" ✓). No gaps found.
+2. Fresh `npm run verify` → **exit 0, 62/62 (8 suites, 0 skipped)**.
+3. Fresh manual smoke → **all 8 checks green** (seed update path, health 200
+   `database:"up"`, login 200 + correct user JSON, me 200, logout 200,
+   3 × 401, health still 200, clean shutdown, no stray processes).
+4. Falsification spot-checks: rate-limiter bucket pruning (bounded memory),
+   audit writer non-blocking (cannot fail a login) — no defects found.
+
+**Result: M2 100% complete, tested, confirmed PASS, no defects remaining →
+M3 started.** Recorded in `PROJECT_STATE.md` rev 12 and audit M2 row PASSED.
