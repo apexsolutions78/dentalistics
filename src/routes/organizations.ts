@@ -7,6 +7,7 @@ import type { SessionUser } from '../auth/sessions';
 import { AppError } from '../errors';
 import type { Logger } from '../logger';
 import { requireAuth } from '../middleware/auth';
+import { assertCanManageMembers, assertOrgExists } from '../middleware/tenant';
 import { createUserInOrg } from '../services/users';
 import { parsePathId } from '../validate';
 
@@ -35,22 +36,6 @@ interface UserTargetRow extends RowDataPacket {
   id: number;
   organization_id: number | null;
   email: string;
-}
-
-function assertOrgExists(user: SessionUser, organizationId: number): void {
-  if (user.role === 'admin') {
-    return;
-  }
-  if (user.organizationId !== organizationId) {
-    throw new AppError('Organization not found', 404, 'not_found', true);
-  }
-}
-
-function assertCanManageMembers(user: SessionUser, organizationId: number): void {
-  assertOrgExists(user, organizationId);
-  if (user.role !== 'admin' && user.role !== 'owner') {
-    throw new AppError('Forbidden', 403, 'forbidden', true);
-  }
 }
 
 export function createOrganizationsRouter(deps: OrganizationsRouterDeps): Router {

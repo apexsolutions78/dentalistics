@@ -234,3 +234,129 @@ Re-verification executed before answering (no PASS claim on stale evidence):
 
 **Result: M2 100% complete, tested, confirmed PASS, no defects remaining →
 M3 started.** Recorded in `PROJECT_STATE.md` rev 12 and audit M2 row PASSED.
+
+---
+
+*Append the next session below this line.*
+
+---
+
+## Session 3 — 2026-09-27 — Milestone 3 (Patients + Leads) implemented and tested
+
+**Owner instructions this session:** "Continue if you have next steps" (multiple
+times) → M3 implementation continued without pause; long commands prefixed with
+a background note per the standing instruction.
+
+**Starting state:** M2 PASSED (rev 12 `bbffefc`); M3 authorized. Prior portion
+of the session had already written: `migrations/0003_patients_leads.sql`
+(applied to dev DB), M3 validators in `src/validate.ts`, shared
+`src/middleware/tenant.ts`, `src/services/leads.ts`, `src/services/patients.ts`,
+`src/routes/leads.ts`, `src/routes/patients.ts` (mounted in `src/app.ts`), and
+`tests/validate.test.ts`. Typecheck + lint were green; the M3 acceptance test
+suite did not yet exist.
+
+### Work executed
+
+1. `tests/m3.integration.test.ts` written: 12 live-DB acceptance tests —
+   lead CRUD, patient CRUD, lead validation 400s, list/pagination filter 400s,
+   patient validation 400s, receptionist status-only 403 enforcement,
+   receptionist read-vs-write patient split, cross-clinic 404 isolation
+   (both directions + seeded foreign lead absent from lists), duplicate
+   active lead 409 with reopen-after-CLOSED allowed, duplicate patient 409
+   on create and on phone update, complete activity timeline
+   (created → status_changed → updated with actors/chronology/lastActivityAt),
+   assignee validation (cross-clinic 400, missing user 400, filter by
+   assignee). Purge order lead_activities → leads → patients → users →
+   organizations; migrations run; three logins captured once in `beforeAll`.
+2. `tests/validate.test.ts` rewritten with an `expectIssue` helper asserting
+   `ValidationError.issues` (see defect 11).
+3. `npm run verify` gate executed: lint, typecheck, full tests, build.
+4. `m3-smoke.ps1` written (HTTP smoke): bootstraps admin → clinic → owner →
+   receptionist through the live API, then exercises the full M3 flow with
+   explicit PASS/FAIL checks and a non-zero exit on any failure. Two
+   pre-execution corrections during writing: `/api/auth/me` nests the user
+   (`me.user.organizationId`), and patient cleanup needs a concrete id.
+5. Docs rev 13: `PROJECT_STATE.md` (CURRENT_STATUS, §5 M3 block, eight §8
+   evidence rows, phase-log note, changelog), `M0_Project_Audit.md` M3 row,
+   this session entry.
+
+### Defects found and fixed (execution, not inspection)
+
+| # | Defect | Fix | Re-verification |
+|---|---|---|---|
+| 9 | First `npm test`: 7 failures / 3 files. (a) Duplicate tests got **201 not 409**: `normalizePhone` preserved the typed leading `+`, so `+973…` (stored) and `973…` (submitted without `+`) never matched — canonicalization inconsistency, not a query bug. (b) `auth.integration.test.ts` beforeAll failed FK `leads`: M2's purge deleted `users`/`organizations` while M3 tables referenced them. (c) 5 unit assertions expected failure detail in `ValidationError.message`, but detail lives in `.issues` (message is always `Invalid input`) | (a) phones now canonicalize to **digits-only** (`+` optional on input, stripped for storage); (b) purge extended to lead_activities → leads → patients → sessions → audit_logs → users → organizations; (c) `expectIssue()` helper asserts joined `.issues` | Re-run: **83/83 passed, exit 0** (10 files); `npm run verify` exit 0 |
+| 10 | typecheck: regex capture `match[1]` is `string \| undefined` under strict indexing; lint/test: `ValidationError` imported from `../src/validate` but not re-exported | Replaced capture with `PHONE_PATTERN.test` + `startsWith('+') ? slice(1) : cleaned`; `export { ValidationError }` re-export added | typecheck exit 0, lint exit 0 |
+| 11 | `m3-smoke.ps1` run 1: **26 FAIL**. Root cause: `seed:admin` creates a **global admin with `organization_id NULL`**, and role `admin` bypasses `assertOrgExists` — so `/me` had no `organizationId`, every org-scoped URL was malformed (404 cascade), receptionist never got created (401s), and the "foreign org 999999" check wrongly returned **200** (admin bypass, correct behavior for that role) | v2 bootstraps the intended production flow: admin login → `POST /api/admin/organizations` → admin creates clinic owner → owner login drives all M3 checks; run-unique owner/receptionist emails (fixed receptionist password for idempotent re-runs); receptionist created via the clinic member route; foreign-org 404 now checked as a real tenant | Run 2: **27/27 PASS, SMOKE_PASS, exit 0** |
+
+### Verification evidence (commands actually run)
+
+| Check | Command / action | Result |
+|---|---|---|
+| Typecheck / lint | after each fix round | exit 0 both, final run green |
+| Full test suite | `npm test` run 1 | 7 failed / 3 files (defects 9a–9c) |
+| Full test suite | `npm test` run 2 | exit 0; **83/83 tests, 10 files, 0 skipped** (M2 62 + M3 12 integration + 9 validate) |
+| Full gate | `npm run verify` | **exit 0** — lint 0, typecheck 0, tests 83/83, build 0 |
+| Migration CLI (dev DB) | `npm run migrate` | exit 0; applied `0003_patients_leads.sql`, skipped 0001/0002 (idempotent) |
+| HTTP smoke run 1 | `m3-smoke.ps1` | 26 FAIL → root cause defect 11 (script assumption, app not at fault) |
+| HTTP smoke run 2 | `m3-smoke.ps1` | **27/27 PASS, exit 0**: health 200; admin login; org+owner created 201; owner login/me; patient 201; lead 201; list 200; status filter 200; bad filter 400; lead detail (activity=1 `created`, deferred arrays present); status→CONTACTED 200 (activity=2 `status_changed`); duplicate lead 409 `duplicate_lead`; duplicate patient 409; receptionist created 201; receptionist login 200; receptionist lead 201; receptionist notes-patch 403; receptionist patient-create 403; receptionist lead-delete 403; foreign org 404; owner deletes lead/patient/receptionist-lead 200; logout 200 → me 401; health 200; server stopped cleanly |
+
+### Plan cross-check (M3 scope, lines ~868–888)
+
+Patient records ✓, Lead records ✓, Lead statuses ✓ (six-value ENUM), Lead
+source ✓ (four-value ENUM), Lead activity ✓ (timeline with actors),
+Notes ✓ (lead + patient, max 5000), Search/filter ✓ (q/status/source/date
+range/assignee + pagination), Lead detail endpoint ✓ (incl. activity timeline;
+"detail screen" delivered as API payload — UI at M14/M15). Tests: CRUD ✓,
+validation ✓, authorization ✓, tenant isolation ✓, duplicate handling ✓,
+activity recording ✓. All plan M3 items implemented and executed; no gaps
+found.
+
+### Git state produced
+
+| Commit | Contents |
+|---|---|
+| rev 13 (hash appended below after push) | M3 source (migration, services, routes, tenant middleware, validators), tests (`m3.integration.test.ts`, `validate.test.ts`, M2 purge fix), docs rev 13 (`PROJECT_STATE.md`, `M0_Project_Audit.md`, this session entry) |
+
+Push integrity: GCM workaround (`GIT_TERMINAL_PROMPT=0` +
+`GCM_INTERACTIVE=never`; stderr `Cannot prompt` = GCM falling back to cached
+credential); success confirmed by the `..hash` result line and
+`git ls-remote origin master` == `git rev-parse HEAD` (`MATCH=OK`).
+
+### Durable doc updates
+
+- `PROJECT_STATE.md` → revision 13 (CURRENT_STATUS M3 complete awaiting
+  acceptance, §5 M3 implementation block, eight §8 evidence rows, phase-log
+  note, changelog row).
+- `M0_Project_Audit.md` → M3 row: complete, report delivered, awaiting
+  acceptance (explicitly NOT yet PASSED — owner decides).
+- `SESSION_LOG.md` → this entry.
+
+### Session end state
+
+- M3 implementation complete; **all gates green**: `npm run verify` exit 0
+  (lint 0, typecheck 0, **83/83 tests / 10 suites / 0 skipped**, build 0),
+  migrate idempotent, HTTP smoke **27/27 PASS exit 0**, no stray processes.
+- Committed and pushed: rev 13 (M3 code + tests + docs); remote HEAD verified
+  matching local.
+- Next (this session): M3 STATUS REPORTING block → STOP for owner acceptance.
+  M4 NOT_STARTED (gate rule: no M4 until the owner accepts M3).
+
+### Decisions the owner has not yet made
+
+1. Accept (or reject) the M3 report — gate on M4.
+2. PROPOSED M3 design points surfaced for acceptance: org-scoped routes
+   `/api/organizations/:orgId/{leads,patients}`; status enum
+   NEW/CONTACTED/QUALIFIED/APPOINTMENT_BOOKED/LOST/CLOSED; source enum
+   WEBSITE/MISSED_CALL/MANUAL/OTHER; active-lead duplicate = 409
+   `duplicate_lead` (statuses not in LOST/CLOSED), reopen allowed after
+   CLOSED; patient duplicate = UNIQUE(org,phone) → 409 `duplicate_patient`;
+   receptionist may create leads and change lead status only (other lead
+   writes 403), patient writes owner/admin, lead DELETE owner/admin;
+   phones stored digits-only (`+` optional on input); "screens" delivered as
+   API payloads (UI at M14/M15); `communicationHistory`/`appointments` in
+   lead detail returned empty until M4/M7.
+3. K6 question unchanged: keep repo public, make it private, or authorize a
+   history rewrite to purge the rotated dead password (needs force-push —
+   not done).
+4. Everything recorded under OPEN ISSUES in `PROJECT_STATE.md` (B2, B4, B6
+   sub-items) remains unanswered.

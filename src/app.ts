@@ -7,7 +7,9 @@ import type { Logger } from './logger';
 import { attachSession } from './middleware/auth';
 import { createAdminRouter } from './routes/admin';
 import { createAuthRouter } from './routes/auth';
+import { createLeadsRouter } from './routes/leads';
 import { createOrganizationsRouter } from './routes/organizations';
+import { createPatientsRouter } from './routes/patients';
 import { createRateLimiter, LOGIN_RATE_LIMIT, LOGIN_RATE_WINDOW_MS } from './security/rateLimit';
 
 export type DatabaseStatus = 'up' | 'down' | 'unconfigured';
@@ -81,6 +83,8 @@ export function createApp(deps: AppDeps = {}): Express {
     );
     app.use('/api/admin', createAdminRouter({ db, logger }));
     app.use('/api/organizations', createOrganizationsRouter({ db, logger }));
+    app.use('/api/organizations', createLeadsRouter({ db, logger }));
+    app.use('/api/organizations', createPatientsRouter({ db, logger }));
   }
 
   app.use(notFoundHandler);

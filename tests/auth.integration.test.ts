@@ -80,6 +80,9 @@ describe.skipIf(testHost === undefined || testHost === '')(
       expect(migrationResult.applied.length + migrationResult.skipped.length).toBeGreaterThan(0);
 
       pool = createPool(cfg);
+      await pool.query('DELETE FROM lead_activities');
+      await pool.query('DELETE FROM leads');
+      await pool.query('DELETE FROM patients');
       await pool.query('DELETE FROM sessions');
       await pool.query('DELETE FROM audit_logs');
       await pool.query('DELETE FROM users');
