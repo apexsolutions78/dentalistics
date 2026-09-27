@@ -42,6 +42,16 @@ describe('MockProvider', () => {
     const ok = await provider.send(outbound({ to: MOCK_FAIL_RECIPIENT }));
     expect(ok.providerMessageId).toMatch(/^mock-/);
   });
+
+  it('caps recorded attempt history so long-running processes cannot grow it unbounded', async () => {
+    const provider = new MockProvider();
+    for (let i = 1; i <= 1005; i++) {
+      await provider.send(outbound({ messageId: i }));
+    }
+    expect(provider.attempts).toHaveLength(1000);
+    expect(provider.attempts[provider.attempts.length - 1]).toMatchObject({ messageId: 1005 });
+    expect(provider.attempts[0]).toMatchObject({ messageId: 6 });
+  });
 });
 
 describe('provider registry', () => {

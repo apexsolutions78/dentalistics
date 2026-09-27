@@ -505,3 +505,34 @@ logging âœ“ (lifecycle entries asserted). No gaps found.
    body limit 1â€“4096 chars; per-org idempotency keys.
 3. K6 question unchanged (public-repo history rewrite decision).
 4. OPEN ISSUES (B2, B4, B6 sub-items) unchanged.
+
+---
+
+### Session 4 addendum — M4 acceptance re-verification (same session)
+
+**Owner instruction:** "If M4 is 100% completed, tested and confirmed PASS,
+defects fixed, then start M5 otherwise fix remaining defects first."
+
+**Re-verification performed (fresh, per M2/M3 precedent):**
+
+1. **Fresh plan cross-check** — M4 section re-read: abstraction ✓, no single
+   real-provider dependence ✓, provider abstractions + mock/test provider ✓,
+   all 7 test categories present ✓. No gaps.
+2. **Falsification review** of `mockProvider.ts`, `messages.ts`, `registry.ts`
+   — found **defect 15**: shared registry `MockProvider.attempts` array grew
+   unbounded (memory growth in a long-running process using the mock).
+   → Fixed: cap at 1000 recorded attempts (shift oldest) + dedicated test
+   (`provider.test.ts`, 1005 sends → exactly 1000 kept, oldest dropped).
+   Concurrent double-`sendMessage` TOCTOU also identified → ASSUMED
+   acceptable for M4 (sequential idempotency tested; atomic dispatch claim
+   requires a queue claim state — revisit at M8).
+3. **Fresh gates:** `npm run verify` exit 0 — lint 0, typecheck 0,
+   **100/100 tests (12 suites, 0 skipped)**, build 0 (log
+   `%TEMP%\opencode\m4-verify-r2.log`).
+4. **Fresh smoke:** `m3-smoke.ps1` → **29/29 PASS, 0 FAIL, SMOKE_PASS,
+   exit 0** (log `%TEMP%\opencode\m4-smoke-r2.log`).
+
+**Result: M4 recorded PASSED (rev 16).** M5 (Website lead capture) started
+per owner instruction. K-I2 (inbound-HTTPS posture) remains UNKNOWN —
+flagged in the report as a deployment blocker for M5's public API only;
+local development and tests unaffected.

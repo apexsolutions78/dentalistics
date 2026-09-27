@@ -7,6 +7,8 @@ export interface MockProviderOptions {
 
 export const MOCK_FAIL_RECIPIENT = '999999999';
 
+const MAX_RECORDED_ATTEMPTS = 1000;
+
 export class MockProvider implements CommunicationProvider {
   readonly key = 'mock';
   readonly attempts: OutboundMessage[] = [];
@@ -19,6 +21,9 @@ export class MockProvider implements CommunicationProvider {
 
   async send(message: OutboundMessage): Promise<ProviderSendResult> {
     this.attempts.push(message);
+    if (this.attempts.length > MAX_RECORDED_ATTEMPTS) {
+      this.attempts.shift();
+    }
     if (this.failOn.has(message.to)) {
       throw new ProviderSendError(
         'mock_recipient_failure',
