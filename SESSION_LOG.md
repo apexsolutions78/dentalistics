@@ -144,7 +144,7 @@ in the prior portion of the session but not yet wired, gated, or tested.
 |---|---|---|---|
 | 6 | typecheck: mysql2 `query<T[]>` generic constraint violated by plain row interfaces; `req.params` typed `string \| string[]`; lint `no-namespace` on the Express `declare global` augmentation | Row interfaces now `extends RowDataPacket`; `parsePathId` accepts `string \| string[] \| undefined`; switched to `declare module 'express-serve-static-core'` | typecheck exit 0, lint exit 0 |
 | 7 | `npm test` failed in beforeAll with FK error `fk_users_organization`: `const [rows] = await pool.query<ResultSetHeader[]>` then `rows[0].insertId` — the tuple's first element **is** the `ResultSetHeader` for INSERTs, so the extra `[0]` indexed into an object → `undefined ?? 0` → `orgAId = 0` → FK failure. Root cause established by direct DB diagnostic (orgs/users rows present, id column auto_increment) | All 3 INSERT sites now `query<mysql.ResultSetHeader>` + `.insertId` (SELECT sites were already correct — their rows really are arrays) | `npm test` → **62/62 passed, exit 0** (8 files) |
-| 8 | Smoke script `m2-smoke.ps1` health loop compared body+status concatenated by `curl -o - -w '%{http_code}'` against `'200'`, so it never matched → reported `SERVER_NEVER_CAME_UP`, exit 1. **App not at fault**: server log shows DB verified, listen on port 3000, repeated `GET /health` 200 | NOT YET FIXED — smoke incomplete | pending re-run |
+| 8 | Smoke script `m2-smoke.ps1` failed to verify the HTTP flow — three **script** defects, app not at fault: (a) health loop compared body+status concatenated by `curl -o - -w '%{http_code}'` against `'200'`; (b) `Stop-Process` killed only the `.cmd` shim, orphaning `node` children (a run-1 server kept serving port 3000 for hours, `uptimeSeconds:23461` exposed it); (c) PS 5.1 native-arg mangling corrupted inline JSON `-d` bodies → server logged `"Malformed JSON body"` 400 | (a) status-only capture via `-o NUL`; (b) pre/post cleanup kills port-3000 listener + any project `index.ts` node process; (c) request bodies written to temp files and sent via `--data-binary @file` | Full smoke re-run: **all 8 checks met** (see evidence table); `SERVER_NEVER_CAME_UP` path never triggered again |
 
 ### Verification evidence (commands actually run)
 
@@ -155,39 +155,56 @@ in the prior portion of the session but not yet wired, gated, or tested.
 | Full test suite | `npm test` run 2 (after fix) | exit 0; **62/62 tests, 8 files** — includes the 18 M2 acceptance tests executed against the live `dentalistics_test` DB (not skipped: `TEST_DB_HOST` set) |
 | Migration CLI (dev DB) | `npm run migrate` | exit 0; applied `0002_auth_and_tenancy.sql`, skipped `0001` (idempotent) |
 | Seed CLI | `npm run seed:admin` twice (password generated in shell, never echoed) | run 1 `created:true`; run 2 `created:false, sessionsRevoked:true`; exit 0 both |
-| Server boot + health (manual) | smoke script started `tsx src/index.ts` | log evidence: `database connection verified`, `server started port 3000`, ~30 × `GET /health` statusCode 200; script then exited 1 on its own comparison bug and stopped the server |
-| HTTP login → me → logout flow | smoke script steps after health | **NOT YET EXECUTED** (blocked by defect 8) |
+| Server boot + health (manual) | smoke script started `tsx src/index.ts` | log evidence: `database connection verified`, `server started port 3000`, repeated `GET /health` statusCode 200 |
+| Full manual HTTP smoke (after defect-8 fixes) | `m2-smoke.ps1` against live server + dev DB | **all checks met**: health body `{"status":"ok","database":"up"}`; login **200** returning correct user JSON (no hash leak); `me` **200**; logout **200**; `me` after logout **401**; `me` no cookie **401**; login wrong password **401**; health still **200**; server + orphans stopped (port 3000 verified free after) |
+| Full gate | `npm run verify` | **exit 0** — lint 0, typecheck 0, tests **62/62 (8 suites)**, build 0 |
+| Process hygiene | port/process scan after smoke | clean: no stray `index.ts` node processes, no listener on 3000 |
 
 ### Git state produced
 
-- No commits this session. Local HEAD `5224879` (rev 10); `git ls-remote origin
-  master` → `45179cb` … — **rev 10 confirmed NOT pushed** (remote one commit
-  behind local).
-- Uncommitted working tree: modified `.env.example`, `package.json`,
-  `src/app.ts`, `src/index.ts`, `vitest.config.mts`; new `migrations/0002_*`,
-  `src/audit.ts`, `src/auth/`, `src/db/seed-admin.ts`, `src/http/`,
-  `src/middleware/`, `src/routes/`, `src/security/`, `src/services/`,
-  `src/validate.ts`, 4 new test files.
+| Commit | Contents |
+|---|---|
+| `70be8f9` | Docs: session 2 log (M2 execution record) — pushed with rev 10 `5224879` (remote was one commit behind; both went up together) |
+| `6f3da25` | M2 source + tests + tooling (25 files, 1679 insertions) + docs rev 11 (`PROJECT_STATE`, audit M2 row, this session log's defect/evidence sections) |
+
+Push integrity: both pushes exit 0 via the GCM workaround
+(`GIT_TERMINAL_PROMPT=0` + `GCM_INTERACTIVE=never`; a `Cannot prompt` line on
+stderr is GCM declining and falling back to the cached credential — the
+`70be8f9..` / `6f3da25..` result lines confirm success); `git ls-remote`
+hash matched local HEAD after each push (`MATCH=OK`).
+
+Uncommitted at time of writing: only this file's final git-state section
+(merged with the push just performed).
 
 ### Durable doc updates
 
-- None this session. `PROJECT_STATE.md` rev 11, audit M2 row, and this
-  session-log commit are still pending.
+- `PROJECT_STATE.md` → revision 11 (CURRENT_STATUS M2 complete + evidence,
+  §5 M2 implementation block, §8 five new evidence rows, phase log note,
+  changelog row).
+- `M0_Project_Audit.md` → M2 row: implementation complete, report delivered,
+  awaiting acceptance (M3 still gated).
+- `SESSION_LOG.md` → this entry (defect 8 closed, final evidence).
 
 ### Session end state
 
-- M2 implementation complete; all automated gates green (lint 0, typecheck 0,
-  tests 62/62, build not yet re-run this session).
-- Manual smoke **partially done** (boot + health confirmed by execution;
-  login/me/logout HTTP flow outstanding).
-- Remaining before M2 report: fix smoke script → run full HTTP flow →
-  `npm run verify` → docs rev 11 → commit → push (incl. pending `5224879`) →
-  verify remote hash → M2 STATUS REPORTING block → STOP for acceptance.
+- M2 implementation complete; **all gates green**: `npm run verify` exit 0
+  (lint 0, typecheck 0, **62/62 tests / 8 suites**, build 0), migrate
+  idempotent, seed CLI both paths exit 0, full manual HTTP smoke all-green,
+  no stray processes.
+- Committed and pushed: `70be8f9` (session log part 1) and `6f3da25`
+  (M2 code + rev 11 docs); remote HEAD verified matching local.
+- Next (this session): M2 STATUS REPORTING block → STOP for owner acceptance.
+  M3 NOT_STARTED (gate rule).
 
 ### Decisions the owner has not yet made
 
-1. Rev 10 (`5224879`) still unpushed; push will accompany the M2 commit
-   unless the owner objects.
-2. Session 1 open items unchanged: public-repo/history-rewrite question (K6),
-   `PROJECT_STATE.md` OPEN ISSUES (B2, B4, B6 sub-items).
-3. M2 report acceptance (pending report delivery).
+1. Accept (or reject) the M2 report — gate on M3.
+2. K6 question from Session 1 unchanged: keep repo public, make it private,
+   or authorize a history rewrite to purge the rotated dead password
+   (needs force-push — not done).
+3. Everything recorded under OPEN ISSUES in `PROJECT_STATE.md` (B2, B4, B6
+   sub-items) remains unanswered.
+4. PROPOSED design points surfaced at M2 acceptance: platform-admin role with
+   `organization_id NULL` and global cross-org read; email-global-unique
+   users; no self-signup (admins create orgs/users); password reset limited
+   to self-change + admin reset until a mail channel exists.
