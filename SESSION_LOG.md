@@ -315,7 +315,7 @@ found.
 
 | Commit | Contents |
 |---|---|
-| rev 13 (hash appended below after push) | M3 source (migration, services, routes, tenant middleware, validators), tests (`m3.integration.test.ts`, `validate.test.ts`, M2 purge fix), docs rev 13 (`PROJECT_STATE.md`, `M0_Project_Audit.md`, this session entry) |
+| `349dd41` | M3 source (migration `0003`, services leads/patients, routes, tenant middleware, validators), tests (`m3.integration.test.ts`, `validate.test.ts`, M2 purge fix), docs rev 13 (`PROJECT_STATE.md`, `M0_Project_Audit.md`, this session entry) — pushed; remote HEAD verified == local (`MATCH=OK`) |
 
 Push integrity: GCM workaround (`GIT_TERMINAL_PROMPT=0` +
 `GCM_INTERACTIVE=never`; stderr `Cannot prompt` = GCM falling back to cached
@@ -336,8 +336,9 @@ credential); success confirmed by the `..hash` result line and
 - M3 implementation complete; **all gates green**: `npm run verify` exit 0
   (lint 0, typecheck 0, **83/83 tests / 10 suites / 0 skipped**, build 0),
   migrate idempotent, HTTP smoke **27/27 PASS exit 0**, no stray processes.
-- Committed and pushed: rev 13 (M3 code + tests + docs); remote HEAD verified
-  matching local.
+- Committed and pushed: `349dd41` (M3 code + tests + docs rev 13); remote
+  HEAD verified matching local (`MATCH=OK`); this follow-up hash line pushed
+  as a second docs commit.
 - Next (this session): M3 STATUS REPORTING block → STOP for owner acceptance.
   M4 NOT_STARTED (gate rule: no M4 until the owner accepts M3).
 
