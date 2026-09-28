@@ -148,6 +148,31 @@ export function parseTimezone(value: unknown, name = 'timezone'): string {
   return tz;
 }
 
+export function parseReviewUrl(value: unknown, name = 'reviewUrl'): string | null {
+  if (value === undefined || value === null || value === '') {
+    return null;
+  }
+  if (typeof value !== 'string') {
+    throw new ValidationError('Invalid input', [`${name} must be a URL string or null`]);
+  }
+  const trimmed = value.trim();
+  if (trimmed.length > 512) {
+    throw new ValidationError('Invalid input', [`${name} must be at most 512 characters`]);
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    throw new ValidationError('Invalid input', [
+      `${name} must be an absolute URL (e.g. https://maps.example.com/reviews)`,
+    ]);
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new ValidationError('Invalid input', [`${name} must use http or https`]);
+  }
+  return trimmed;
+}
+
 export function parseListParams(query: Record<string, unknown>): {
   limit: number;
   offset: number;

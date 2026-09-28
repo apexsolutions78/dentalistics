@@ -1,6 +1,7 @@
 import { runNoShowTick } from './automation/noShow';
 import { runRecallTick } from './automation/recall';
 import { runReminderTick } from './automation/reminders';
+import { runReviewRequestTick } from './automation/reviewRequests';
 import { createApp } from './app';
 import { ConfigError, loadEnv } from './config';
 import { checkDatabase, closePool, getPool, initPool } from './db/pool';
@@ -77,6 +78,11 @@ async function main(): Promise<void> {
       });
       runRecallTick(getPool(), logger).catch((err: unknown) => {
         logger.error('recall tick failed', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
+      runReviewRequestTick(getPool(), logger).catch((err: unknown) => {
+        logger.error('review request tick failed', {
           error: err instanceof Error ? err.message : String(err),
         });
       });

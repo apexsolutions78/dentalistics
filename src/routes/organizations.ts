@@ -11,7 +11,7 @@ import { requireAuth } from '../middleware/auth';
 import { assertCanManageMembers, assertOrgExists } from '../middleware/tenant';
 import { createUserInOrg } from '../services/users';
 import { generateSiteKey } from '../security/siteKey';
-import { parsePathId, parseTimezone } from '../validate';
+import { parsePathId, parseReviewUrl, parseTimezone } from '../validate';
 
 export interface OrganizationsRouterDeps {
   db: Pool;
@@ -23,6 +23,7 @@ interface OrganizationRow extends RowDataPacket {
   name: string;
   status: 'active' | 'disabled';
   timezone: string;
+  review_url: string | null;
   created_at: Date;
   site_key: string | null;
 }
@@ -45,9 +46,17 @@ interface UserTargetRow extends RowDataPacket {
 async function loadOrganization(
   db: Pool,
   organizationId: number,
-): Promise<{ organizationId: number; name: string; status: string; timezone: string; createdAt: Date; siteKey: string }> {
+): Promise<{
+  organizationId: number;
+  name: string;
+  status: string;
+  timezone: string;
+  reviewUrl: string | null;
+  createdAt: Date;
+  siteKey: string;
+}> {
   const [rows] = await db.query<OrganizationRow[]>(
-    'SELECT id, name, status, timezone, created_at, site_key FROM organizations WHERE id = ?',
+    'SELECT id, name, status, timezone, review_url, created_at, site_key FROM organizations WHERE id = ?',
     [organizationId],
   );
   const row = rows[0];
@@ -72,6 +81,7 @@ async function loadOrganization(
     name: row.name,
     status: row.status,
     timezone: row.timezone,
+    reviewUrl: row.review_url,
     createdAt: row.created_at,
     siteKey,
   };
@@ -83,6 +93,7 @@ function organizationDto(org: Awaited<ReturnType<typeof loadOrganization>>): Rec
     name: org.name,
     status: org.status,
     timezone: org.timezone,
+    reviewUrl: org.reviewUrl,
     createdAt: org.createdAt,
     siteKey: org.siteKey,
   };
@@ -109,19 +120,29 @@ export function createOrganizationsRouter(deps: OrganizationsRouterDeps): Router
       throw new ValidationError('Invalid input', ['at least one field to update is required']);
     }
     for (const key of provided) {
-      if (key !== 'timezone') {
+      if (key !== 'timezone' && key !== 'reviewUrl') {
         throw new ValidationError('Invalid input', [`unknown or not updatable field: ${key}`]);
       }
     }
-    const timezone = parseTimezone(body.timezone);
+    const sets: string[] = [];
+    const params: unknown[] = [];
+    if (body.timezone !== undefined) {
+      sets.push('timezone = ?');
+      params.push(parseTimezone(body.timezone));
+    }
+    if (body.reviewUrl !== undefined) {
+      sets.push('review_url = ?');
+      params.push(parseReviewUrl(body.reviewUrl));
+    }
+    params.push(organizationId);
     const [result] = await deps.db.query(
-      'UPDATE organizations SET timezone = ? WHERE id = ?',
-      [timezone, organizationId],
+      `UPDATE organizations SET ${sets.join(', ')} WHERE id = ?`,
+      params,
     );
     if ((result as { affectedRows: number }).affectedRows === 0) {
       throw new AppError('Organization not found', 404, 'not_found', true);
     }
-    deps.logger.info('organization timezone updated', { organizationId, timezone });
+    deps.logger.info('organization settings updated', { organizationId, fields: provided });
     const org = await loadOrganization(deps.db, organizationId);
     res.status(200).json({ organization: organizationDto(org) });
   });

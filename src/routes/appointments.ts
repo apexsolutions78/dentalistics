@@ -12,6 +12,7 @@ import {
   closeRecall,
   createRecallForCompletedAppointment,
 } from '../automation/recall';
+import { createReviewRequestForCompletedAppointment } from '../automation/reviewRequests';
 import type { SessionUser } from '../auth/sessions';
 import { AppError } from '../errors';
 import { readJsonBody } from '../http/body';
@@ -182,6 +183,24 @@ async function safeCloseRecallOnVisitCompleted(
   }
 }
 
+async function safeCreateReviewRequest(
+  db: Pool,
+  logger: Logger,
+  appointmentId: number,
+): Promise<void> {
+  if (appointmentId === 0) {
+    return;
+  }
+  try {
+    await createReviewRequestForCompletedAppointment(db, logger, { appointmentId });
+  } catch (err) {
+    logger.error('review request creation failed', {
+      appointmentId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
 export function createAppointmentsRouter(deps: AppointmentsRouterDeps): Router {
   const router = Router();
   router.use(requireAuth);
@@ -274,6 +293,7 @@ export function createAppointmentsRouter(deps: AppointmentsRouterDeps): Router {
     await safeCancelReminders(deps.db, deps.logger, appointmentId, 'appointment_completed');
     await safeCloseRecallOnVisitCompleted(deps.db, deps.logger, appointmentId);
     await safeCreateRecall(deps.db, deps.logger, appointmentId);
+    await safeCreateReviewRequest(deps.db, deps.logger, appointmentId);
     res.status(200).json(result);
   });
 

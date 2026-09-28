@@ -1656,3 +1656,151 @@ IN_PROGRESS; this entry). **M11 (Review requests) started.**
 - Fourth job under `REMINDER_TICK_MS` (in-process scheduler grows
   to reminder + no-show + recall + review ticks) - K-I3 impact
   unchanged (D5, M22).
+
+### Implementation record (rev 30)
+
+- Migration `0012_review_requests.sql` applied to dev DB (exit 0,
+  idempotent: 1 applied, 11 skipped): `organizations.review_url`
+  VARCHAR(512) NULL + `review_requests` (UNIQUE appointment_id,
+  PENDING/SENDING/SENT/FAILED/SUPPRESSED/CANCELLED, scheduled/sent/
+  message link/attempts/last_error/suppression_reason/review_url
+  snapshot, org/patient/appointment FKs).
+- `src/automation/reviewConfig.ts` - app_meta `review_config`:
+  enabled / channel / provider / delayHours (default 24, guard
+  0-720 - 0 sends synchronously) / suppressionPeriodDays (default
+  180, guard 1-3650) / template / maxAttempts 3; shape guard,
+  corrupt JSON -> `DEFAULT_REVIEW_CONFIG`; no HTTP endpoint (M16
+  owns Review settings UI).
+- `src/automation/reviewRequests.ts` -
+  `createReviewRequestForCompletedAppointment` (config gate;
+  COMPLETED required; per-appointment `already_exists` idempotency;
+  no review_url -> `review_url_missing` skip, no row; patient
+  suppression window -> row SUPPRESSED `within_suppression_period`
+  recorded with zero messages; PENDING with `scheduled_at =
+  now + delayHours`; synchronous process when due),
+  `processReviewRequest` (optimistic claim; context re-checks:
+  inactive/closed/opt-out/url-missing -> CANCELLED or SUPPRESSED;
+  send via `sendTemplateMessage` idempotency `review:<id>`,
+  messageType `review_request`, variables
+  first_name/clinic_name/review_url from the row snapshot; retry
+  via existing `sendMessage`; FAILED -> backoff
+  `60s * 2^(n-1)`), `runReviewRequestTick` (stale SENDING reclaim
+  >600s, due drain PENDING/FAILED<maxAttempts, batch 100).
+- `src/validate.ts`: `parseReviewUrl` (absolute http/https,
+  <=512, null/empty clears, else 400).
+- `src/routes/organizations.ts`: PATCH `/:orgId` accepts
+  `timezone` and/or `reviewUrl` (dynamic SET; owner/admin -
+  receptionist 403, foreign/unknown org 404); GET returns
+  `reviewUrl`.
+- `src/routes/appointments.ts`: completion ->
+  `safeCreateReviewRequest` (never-throw) after recall wiring.
+  `src/index.ts`: fourth job under `REMINDER_TICK_MS` (own catch).
+- Tests: `tests/m11.integration.test.ts` - 10 live-DB tests;
+  **10/10 on the first run (0 test-iteration defects)**.
+
+### Plan cross-check (acceptance self-check)
+
+- S5 M11 test list all mapped: eligibility (COMPLETED + config +
+  review_url - tests 1, 5, 7; non-completed refusal test 1),
+  duplicate prevention (UNIQUE appointment + patient window +
+  post-window allowance - tests 1, 3), timing (delayHours window
+  + not-due/due ticks - test 2), opt-out/communication
+  preferences (suppress + resume - test 4), clinic-specific
+  review URL (roundtrip, validation, roles, tenant, missing -
+  test 7), audit history (row lifecycle fields - tests 1, 8, 9).
+- S7 numbered duties: (1) eligibility check in create, (2)
+  consent via smsOptOut, (3) configured request sent through the
+  provider abstraction with the clinic's template, (4) request
+  recorded in `review_requests` (+ message row), (5) duplicates
+  prevented within the configured period
+  (`suppressionPeriodDays`); destination configurable per clinic
+  (`organizations.review_url` via PATCH).
+- MVP-15: completed -> wait `delayHours` -> send; clinic
+  configures review URL; repeated requests suppressed inside the
+  window - covered by tests 2, 3, 7.
+- MVP-14 "Review request" template: default template with
+  `{{review_url}}` + standard variables; missing variables render
+  empty (asserted no `{{` residue - test 1; template.test.ts
+  engine coverage from M6).
+- TEST 10 executed in tests 1 + 3 (complete -> request; second
+  execution / second visit no duplicate inside suppression
+  period).
+- Interpretations recorded as PROPOSED: audit history = the
+  `review_requests` row lifecycle (workflow-table precedent; the
+  `audit_logs` table stays staff/auth-only); quiet hours not
+  applied (D4 precedent for M9 messages; no M11 instruction);
+  default delayHours 24 / suppressionPeriodDays 180 / default
+  template text.
+
+### Falsification review
+
+Attempted to break the claims, results:
+
+- Double execution on one appointment: pre-check + UNIQUE catch
+  -> `already_exists`, single row (test 1).
+- Patient double-visit inside window: second row SUPPRESSED with
+  zero messages, recorded not silently dropped (test 3); after
+  window expiry the request goes out again (test 3, backdated).
+- Opt-out bypass: SUPPRESSED at process time, zero messages;
+  resume on opt-in (test 4).
+- URL manipulation: non-URL/ftp/overlong rejected 400 before
+  storage; cleared URL -> no row; cleared AFTER a row exists ->
+  lazy `review_url_missing` suppression at process time (code
+  path; create-time path tested).
+- Role/tenant bypass: receptionist 403, foreign org 404, unknown
+  org 404 (test 7).
+- Config bypass: disabled gate covers create AND tick (test 5);
+  corrupt config falls back (test 6).
+- Backoff runaway: attempts capped at 3, tick stops touching the
+  row; retries reuse the same message (count stays 1) (test 9).
+- Concurrent claim: optimistic `WHERE status = ? AND attempts = ?`
+  guard (same as M8-M10; single in-process scheduler).
+- **No new defects found.**
+
+### Defects
+
+- **None new in M11** (next defect number remains 26). All
+  rounds green on first execution: M11 suite 10/10 first run,
+  verify 196/196 first run, smoke 85/85 first run.
+
+### Git state produced
+
+| Commit | Contents |
+|---|---|
+| (hash appended after push) | M11 source (0012 migration, `src/automation/{reviewConfig,reviewRequests}.ts`, `parseReviewUrl`, organizations reviewUrl PATCH/GET, appointments completion wiring, index fourth tick), `tests/m11.integration.test.ts`, docs rev 30 (PROJECT_STATE, audit M11 row, this entry) |
+
+### Durable doc updates
+
+- `PROJECT_STATE.md` -> revision 30 (CURRENT_STATUS + K-I3
+  4-tick note, M11 implementation entry, evidence rows x4, phase
+  note, changelog row 30).
+- `M0_Project_Audit.md` -> M11 row implementation-complete
+  awaiting acceptance.
+- `SESSION_LOG.md` -> this entry.
+
+### Session end state
+
+- M11 implementation complete; gates green: verify exit 0
+  (196/196, 20 suites, 0 skipped), lint 0, typecheck 0, build 0,
+  migrate idempotent (0012), extended smoke 85/85 PASS.
+- Next: M11 status report -> STOP for owner acceptance.
+  M12 (Missed-call integration) NOT_STARTED (gate: M11 PASSED;
+  plan L1065-1087 additionally requires verified provider
+  capabilities first).
+
+### Decisions the owner has not yet made
+
+1. Accept (or reject) the M11 report - gate on M12.
+2. PROPOSED M11 design points: delayHours default 24 /
+   suppressionPeriodDays default 180; default review-request
+   template text; `organizations.review_url` as the per-clinic
+   destination (PATCH endpoint now, settings UI at M16);
+   audit history interpreted as the `review_requests` row
+   lifecycle; BOOKED-style semantics n/a; no recall-style manual
+   close endpoint (rows are terminal by lifecycle); quiet hours
+   NOT applied to review sends - say the word to add them
+   (reminder_config.quietHours exists as the only configured
+   window).
+3. K-I3 unchanged (D5): confirm DirectAdmin process persistence
+   before production (M22) - four automation ticks now ride the
+   in-process scheduler.
