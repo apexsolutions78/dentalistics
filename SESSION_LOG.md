@@ -1583,3 +1583,76 @@ Attempted to break the claims, results:
 3. K-I3 unchanged (D5): confirm DirectAdmin process persistence
    before production (M22) - three automation ticks now ride
    the in-process scheduler.
+
+---
+
+## Session 11 - M10 PASSED recorded; M11 (Review requests) started
+
+**Owner instruction:** "proceed to M11" - accepts the M10 report.
+
+**Effect:** M10 **PASSED** per owner conditional instruction (gates at
+pass unchanged from rev 28: verify 186/186 (19 suites), migrate 0011
+applied, extended smoke 72/72 PASS). Docs rev 29 (PROJECT_STATE
+CURRENT_STATUS/phase note/changelog row 29; audit M10 PASSED + M11
+IN_PROGRESS; this entry). **M11 (Review requests) started.**
+
+### Plan scope (fresh read)
+
+- S5 M11 (L1050-1061): implement configurable review requests; test
+  eligibility, duplicate prevention, timing, opt-out/communication
+  preferences, clinic-specific review URL, audit history.
+- S7 REVIEW REQUESTS (L232-242): after an eligible appointment -
+  (1) determine whether a review request should be sent, (2) respect
+  communication/consent rules, (3) send the configured request,
+  (4) record the request, (5) prevent duplicate review requests
+  within the configured period; the review destination should be
+  configurable per clinic.
+- MVP-15 (L2250-2264): appointment completed -> wait configured
+  period -> send review request; the clinic can configure its
+  review URL; the system must prevent repeated review requests
+  within the configured period.
+- MVP-14 (L2233): "Review request" template listed among the
+  template set; standard variables (first_name, clinic_name,
+  appointment_date, appointment_time, booking_link, clinic_phone);
+  template engine must safely handle missing variables.
+- TEST 10 (L2675-2685): complete eligible appointment -> review
+  request; second execution must not create a duplicate request
+  inside the configured suppression period.
+- Scenario A (L1261): appointment completed -> review request.
+- M16 (L1171) owns "Review settings" (UI) - M11 ships backend
+  config like M6/M8/M9/M10 (no settings UI).
+- MVP DATABASE DOMAIN (L2463-2478) has no explicit
+  `review_requests` table - established pattern (inspect existing
+  first) is a workflow table + communication_messages linkage, as
+  for reminders/noshow/recalls.
+- S8 dashboard metrics (L252-266) list no review metric - M14
+  unaffected.
+
+### Design choices (PROPOSED, to be reported)
+
+- `organizations.review_url` (nullable, org PATCH, owner/admin) as
+  the per-clinic destination - mirrors the `timezone` column
+  precedent; M16 adds the settings UI.
+- `review_config` app_meta: enabled / channel / provider /
+  delayHours (wait period, default 24 - PROPOSED) /
+  suppressionPeriodDays (duplicate-prevention window, default 180 -
+  PROPOSED) / template / maxAttempts 3; shape-guarded with corrupt
+  fallback to `DEFAULT_REVIEW_CONFIG`.
+- `review_requests` table: UNIQUE (appointment_id) idempotency;
+  statuses PENDING/SENDING/SENT/FAILED/SUPPRESSED/CANCELLED; the
+  row itself is the "record the request" / audit history (created/
+  scheduled/sent timestamps, message_id link, suppression reason).
+- Eligibility: appointment COMPLETED + config enabled +
+  review_url present; smsOptOut -> SUPPRESSED
+  `communication_not_permitted` (row still recorded - consent
+  audit); missing review_url -> no row (config not ready).
+- Suppression (TEST 10 second execution): per patient - any
+  active/sent row within suppressionPeriodDays -> new row
+  SUPPRESSED `within_suppression_period`, zero messages; plus
+  UNIQUE (appointment_id) for same-appointment re-execution.
+- Quiet hours NOT applied to review sends (D4 precedent for M9
+  messages; no owner instruction for M11) - PROPOSED to owner;
+  only existing quiet-hours config is scoped to reminders.
+- Fourth job under `REMINDER_TICK_MS` (in-process scheduler grows
+  to reminder + no-show + recall + review ticks) - K-I3 impact
+  unchanged (D5, M22).
