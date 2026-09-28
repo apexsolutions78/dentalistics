@@ -2121,3 +2121,102 @@ Attempted to break the claims, results:
    re-gate M22); K-I4: real provider accounts not opened
    (fact-gate at M13); Bahrain local-carrier capabilities
    NOT_VERIFIED (Twilio two-way SMS = No is verified).
+
+## Session 13 - M13 WhatsApp Integration (research + implementation)
+
+**Owner instruction:** "save session log, commit, push and proceed to
+M13" (2026-09-28), accepting the M12 report implicitly; the M12 gate
+rule satisfied. Session log save/commit/push confirmed first:
+`2ead319` (M12 source + rev 31 docs) was already pushed with
+MATCH=OK and a clean tree before this session began.
+
+**Plan anchors:** L1104-1118 MILESTONE 13 - WHATSAPP INTEGRATION:
+"Only implement after current official WhatsApp/Meta/provider
+requirements have been verified" (research gate); test list -
+template messaging, delivery, incoming response, webhook
+verification, duplicate webhook, opt-out, provider failure,
+conversation state (8 items). S3 L141-152: architecture abstracts
+providers behind internal interfaces (`WhatsAppProvider` is one of
+the conceptual interfaces; "exact implementation must be determined
+after inspecting the project and verifying provider documentation").
+Provider rules L2298-2325: Mock Provider must be available during
+development; real provider must be explicitly tested for
+production; do NOT assume WhatsApp capability without verification.
+MVP-4: mock provider allowed during development, real provider only
+after capabilities verified. MVP-10: communication history shows
+INBOUND patient replies (direction/channel/type/status/timestamp).
+MVP-14 template engine + defaults already exist. TEST 12 (role
+authorization) is milestone-wide and maps to M13 per the audit
+pattern (M11->TEST 10, M12->TEST 11).
+
+**Research record (to be executed before any M13 code - plan gate):**
+
+Fetch current official Meta/WhatsApp documentation and cite it here:
+webhook setup (GET verification challenge + POST signature scheme,
+header name, hashing algorithm, secret source), inbound message
+payload shape (message id format, text body, sender), delivery
+status payloads (sent/delivered/read/failed), template messaging
+rules (pre-approved templates, session/window constraints,
+opt-in/opt-out policy), error/failure reporting. Capability claims
+will be labelled CONFIRMED (cited) / NOT VERIFIED exactly as in
+Session 12.
+
+**Current state inspected (CONFIRMED by file read 2026-09-28):**
+
+- `MessageChannel` is already `'SMS' | 'WHATSAPP'` (M4;
+  `communications/types.ts`, migration 0004 ENUM) - channel plumbing
+  exists end-to-end (createMessage/listMessages/automations).
+- `CommunicationProvider` interface = `{key, send()}` only
+  (communications/types.ts:35) - no webhook/verify/parse surface;
+  `communications/registry.ts` holds the mock SMS provider (key
+  `mock`, failOn-recipients defect-15 cap).
+- `handleInboundMessage` exists at `services/messages.ts:267`
+  (RECEIVED row, direction INBOUND, messageType `patient_reply`,
+  auto-links active lead by phone, idempotent on
+  org+idempotency_key) but **no HTTP transport calls it** (grep:
+  no route references) - M6 carried "inbound webhook transport" to
+  a later gate; M12 shipped telephony webhooks only.
+- `applyProviderStatus` (messages.ts:367) accepts DELIVERED/
+  UNDELIVERED transitions (SENT-only, 409 otherwise) but **no route
+  feeds it** either.
+- No WhatsApp provider implementation exists (src tree surveyed).
+- Opt-out: automations suppress via patient `smsOptOut` regardless
+  of channel (M8 precedent); inbound-STOP parsing is NOT specified
+  anywhere in the plan (will not be invented).
+
+**Scope mapping (PROPOSED - to be validated against research):**
+
+1. `whatsapp_config` in global app_meta (enabled default false,
+   verify token, app secret, phone number id / provider selection;
+   shape-guarded; secrets deployment-global like telephony_config,
+   flagged for M16 per-org UI).
+2. Public webhook endpoints (one org path as in M12):
+   GET verification challenge (hub.mode/hub.verify_token/hub.challenge
+   style - final names per research), POST signed inbound + status
+   events: signature verification (algorithm/header per research,
+   timing-safe, empty secret => invalid), 404 unknown org, 403
+   disabled, 401 bad signature, 200 after verification (outages ->
+   200 + logged, never 5xx - M12 disposition precedent).
+3. Provider: `whatsapp` adapter implementing the documented send
+   path (real HTTP only when configured; mock adapter for
+   development/tests via the existing registry) - NO FAKE
+   INTEGRATIONS: no live calls possible without accounts (K-I4).
+4. Inbound: route -> handleInboundMessage (existing, idempotent on
+   provider message id -> duplicate webhook test).
+5. Delivery: status events -> applyProviderStatus (existing
+   guards).
+6. Opt-out: smsOptOut suppresses WhatsApp sends (existing rule,
+   asserted for WHATSAPP channel in tests).
+7. Provider failure: mock failOn -> FAILED + coded provider_error
+   (existing mechanism, asserted on the WhatsApp path).
+8. Conversation state: interpretation to be settled after research
+   (candidates: (a) Meta conversation/window phase driving whether
+   template vs free-form is allowed - WhatsApp-specific; (b)
+   inbound reply recorded + linked so staff can "see whether the
+   patient replied" per MVP UX L2738). Will be decided + recorded
+   as PROPOSED with rationale; not silently invented.
+9. TEST 12 role authorization: add/mapping role tests for any new
+   authenticated endpoints; webhook endpoints are public by design.
+
+**Stop condition:** M13 report -> STOP; M14 gated on owner
+acceptance of M13.
