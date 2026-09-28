@@ -1409,3 +1409,44 @@ K-I2/K-I3/K-I4/K-I5 rows; this entry.
 **Status:** M9 still awaiting owner acceptance; M10 gate unchanged.
 Docs-only change - no code touched; M9 gates stand as reported
 (verify 173/173, smoke 59/59).
+
+---
+
+## Session 10 - M9 PASSED recorded; M10 (Recall automation) started
+
+**Owner instruction:** pending M9 issues assessed for deferral - "Whatever
+is still pending can it be done at a later stage without creating an ocean
+of mistakes or challenges or work. If yes then proceed to the next milestone
+if no, resolve the pending issues first."
+
+**Deferral assessment (answer: YES, safe):** K-I3 -> M22 (already mapped by
+D5; one deployment check), K-I2 -> M12 (M10 is outbound-only), B4 -> M22
+(owner legal answer; M10 reuses the M8 smsOptOut suppression), K-I4 ->
+M12/M13 (provider-pluggable layer; M10 ships MockProvider like M6/M8/M9),
+CORS already resolved by D6. No code depends on these answers; no rework
+cascade. Reported to owner.
+
+**Effect:** M9 **PASSED** per owner conditional instruction; M10 (Recall
+automation) started. Docs rev 27 (PROJECT_STATE CURRENT_STATUS/phase note/
+changelog row 27; audit M9 PASSED + M10 IN_PROGRESS; this entry).
+
+### Plan scope (fresh read)
+
+- S5 M10 (L1035-1046): recall eligibility, recall date, recall status,
+  reminder sequence, rebooking, closure; test date calculations and
+  duplicate prevention.
+- MVP-9 (L2051-2088): fields patient / recall type / due date / status /
+  last contacted / appointment if rebooked; statuses DUE, CONTACTED,
+  BOOKED, COMPLETED, CLOSED; workflow overdue -> recall message ->
+  follow-up -> patient books -> recall closes; no complex clinical recall
+  logic.
+- S6 (L201-228): hygiene / routine check-up / treatment follow-up + other
+  configurable categories; response -> appointment -> recall closed.
+- TEST 9 (L2659-2671): create overdue patient -> recall created ->
+  message -> follow-up -> patient books -> recall closes.
+- MVP-14 (L2231): "Recall message" template listed; follow-up template
+  not listed - PROPOSED to add one (report).
+- Plan data model mentions a ` recalls ` table (L2476) with the
+  instruction to inspect the existing application first.
+- M16 owns recall settings UI; M14 owns recall dashboard metrics - M10
+  ships app_meta config like M6/M8/M9 (no HTTP config endpoint).
