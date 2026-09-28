@@ -2476,3 +2476,52 @@ M13 report.
 acceptance. M14 must not begin until the owner accepts the M13 report.
 
 **Session end** - 2026-09-28.
+
+### Session 14 - start (2026-09-28)
+
+**Owner instruction:** "save session log, commit, push and proceed to M14" -
+recorded as M13 acceptance (M13 PASSED; commit `180766f` verified pushed with
+MATCH=OK immediately before this instruction).
+
+**M14 scope (plan anchors, CONFIRMED by file read):**
+- M14 section L1121-1140: "Implement the owner dashboard"; required metrics:
+  Leads, Lead responses, Appointments, Confirmations, No-shows, Rebookings,
+  Recall, Messages, Delivery, Failures; "Every metric must have a documented
+  definition"; "Verify dashboard calculations against database fixtures".
+- Section 8 (L246-272): 13 initial metrics (new leads, leads contacted, lead
+  response rate, appointments booked, confirmations, no-shows, rebooked,
+  recall opportunities, recall appointments, messages sent/delivered/failed,
+  patient replies); trends over time where possible; avoid vanity metrics;
+  every metric clearly defined.
+- MVP-12 (L2155-2190): grouped metrics - Leads: new / contacted / converted
+  to appointments; Appointments: scheduled / confirmed / completed / no-show /
+  rebooked; Communication: sent / delivered / failed / patient replies;
+  Recall: patients due / contacted / booked; no dozens of metrics; explicit
+  calculation definitions.
+- MVP USERS (L1675-1710): Clinic Owner "View dashboard"; Receptionist list has
+  no dashboard entry; System Administrator manages integrations/logs.
+- MVP UX acceptance (L2744): owner opens the dashboard and understands the
+  current situation without reading technical logs (qualitative).
+- Test structure: the plan's TEST list ends at TEST 12 - there is NO TEST 13.
+  M14 verification = the plan's own fixture-verification requirement +
+  section 7 / MVP-12 / section 8 mappings. L1233 "Dashboard calculations"
+  belongs to M19 (performance); L1312 "Dashboard" to M21 (UX review).
+
+**Interpretation (PROPOSED - owner may reject at acceptance):** M14 delivers
+the dashboard METRICS API (metrics + documented definitions + fixture-verified
+calculations), consistent with the M3-M13 precedent of delivering plan screens
+as API payloads. No frontend exists anywhere in the repository (`App/` never
+existed; plan L378 "Identify frontend architecture" found none), and
+introducing a frontend framework is a stack decision reserved for the owner
+(carried; M15 receptionist interface and M21 UX review depend on it).
+
+**Current state (CONFIRMED by inspection):** no dashboard code exists;
+`src/services/` has leads / appointments / recalls / noShow / reviewRequests /
+callEvents / messages / patients with the data needed for all 10 metrics;
+routes mount at `/api/organizations` with `requireAuth` + tenant middleware;
+reads currently allowed for all clinic members (dashboard will use owner/admin
+per MVP USERS - PROPOSED).
+
+**Session 14 plan:** docs rev 34 (M13 PASSED, M14 IN_PROGRESS) -> commit +
+push -> M14 design + implementation + tests -> gates -> docs rev 35 ->
+commit + push -> Rule-10 report -> STOP (M15 gated on M14 acceptance).
