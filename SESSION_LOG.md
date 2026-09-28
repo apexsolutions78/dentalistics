@@ -2525,3 +2525,170 @@ per MVP USERS - PROPOSED).
 **Session 14 plan:** docs rev 34 (M13 PASSED, M14 IN_PROGRESS) -> commit +
 push -> M14 design + implementation + tests -> gates -> docs rev 35 ->
 commit + push -> Rule-10 report -> STOP (M15 gated on M14 acceptance).
+
+### Session 14 - design decisions (PROPOSED - M14 build)
+
+1. **Scope interpretation (PROPOSED):** M14 = dashboard METRICS API
+   (metrics + documented definitions + fixture-verified calculations); no
+   frontend. Basis: M3-M13 precedent (plan screens delivered as API payloads),
+   repository has no frontend architecture, plan L378 instruction unresolved.
+   Owner may reject at acceptance; M15/M21 depend on the stack decision.
+2. **Endpoint:** `GET /api/organizations/:orgId/dashboard?from=YYYY-MM-DD&to=YYYY-MM-DD`.
+   Both optional: default `to` = today (UTC), `from` = `to` - 29 days
+   (30-day window). Validation (ValidationError -> 400): both must parse as
+   dates, `from <= to`, span <= 366 days.
+3. **Authorization (PROPOSED strict reading of MVP USERS):** `requireAuth` +
+   `assertCanManageMembers` - Owner 200, platform Administrator 200,
+   Receptionist 403 (dashboard is not in the receptionist capability list),
+   foreign-org member 404, unauthenticated 401.
+4. **Response shape:** `{window, metrics, definitions, trends}` where
+   `window` = {from, to, basis}, `definitions` = {metrics: {key -> text},
+   planMetrics: {plan metric name -> [keys]}} always returned (plan: "Every
+   metric must have a documented definition"), `trends.daily` = per-UTC-date
+   zero-filled buckets {date, newLeads, messagesSent, patientReplies} for the
+   whole window (span cap keeps bucket count <= 367).
+5. **Time basis (documented in window.basis):** timestamp columns compared as
+   UTC instants `[from 00:00 UTC, to+1d 00:00 UTC)`; `appointment_date` and
+   `due_date` (DATE, clinic-local wall values) compared as an inclusive date
+   range (M7 no-conversion precedent).
+6. **Metric definitions (exact, PROPOSED):**
+   - leads.new: leads with created_at in window.
+   - leads.contacted: DISTINCT leads having a lead_activities row
+     action='status_changed' with created_at in window (any lead creation
+     date - "progressed during the period").
+   - leads.converted: leads CREATED in window that have >= 1 linked
+     appointment (appointments.lead_id set) - cohort conversion.
+   - leads.responseRate: leadResponses / leads.new (4-dp; null when new = 0).
+   - leadResponses: INBOUND messages with lead_id NOT NULL, created_at in
+     window.
+   - appointments.booked: appointments with created_at in window (all
+     statuses) - section 8 "Appointments booked".
+   - appointments.scheduled/confirmed/completed/noShows: appointment_date in
+     range AND current status = SCHEDULED/CONFIRMED/COMPLETED/NO_SHOW
+     (point-in-time current status; no status history exists - documented
+     limitation).
+   - appointments.rebooked: appointment_date in range AND
+     previous_appointment_id NOT NULL (new rows linked by reschedule or
+     rebook; may overlap status buckets - documented).
+   - recall.due: recalls with due_date in range (any current status).
+   - recall.contacted: recalls with last_contacted_at in window.
+   - recall.booked: recalls status='BOOKED' with closed_at in window.
+   - messages.sent: OUTBOUND messages with sent_at in window (sent_at is set
+     only on successful dispatch).
+   - messages.patientReplies: INBOUND messages with created_at in window.
+   - delivery.delivered: OUTBOUND messages with delivered_at in window.
+   - delivery.deliveredRate: delivered / sent (4-dp; null when sent = 0).
+   - failures.failed: OUTBOUND messages status='FAILED' with updated_at in
+     window (approximation - no failed_at column exists; documented).
+   - failures.failedRate: failed / (sent + failed) (4-dp; null when 0).
+7. **Plan-metric mapping (documented in definitions.planMetrics):** Leads ->
+   leads.*; Lead responses -> leadResponses; Appointments ->
+   appointments.booked/scheduled/completed; Confirmations ->
+   appointments.confirmed; No-shows -> appointments.noShows; Rebookings ->
+   appointments.rebooked; Recall -> recall.*; Messages -> messages.*;
+   Delivery -> delivery.*; Failures -> failures.*.
+8. **Trends:** daily series for newLeads / messagesSent / patientReplies
+   only (section 8 "where possible"; three core series - avoids the plan's
+   "vanity metrics" and "dozens of metrics" warnings).
+9. **Queries:** one small filtered query per metric group + 3 grouped trend
+   queries (~10 per call); acceptable at MVP scale (M19 performance gate).
+   All counts coerced with Number() (SUM may return DECIMAL strings).
+10. **Structure:** no migration (all source tables exist); `src/services/
+    dashboard.ts` (DASHBOARD_METRIC_DEFINITIONS + getDashboard),
+    `src/routes/dashboard.ts` (mounted at `/api/organizations`), no new
+    scheduler tick; `tests/m14.integration.test.ts` = the plan's fixture
+    verification; smoke extended with M14 checks; docs rev 35 at completion.
+
+### Session 14 - M14 implementation, gates, completion
+
+**Delivered (PROPOSED interpretation confirmed by passing gates, owner acceptance pending):**
+
+- `src/services/dashboard.ts`:
+  - `resolveDashboardRange(from, to)` - optional params; default `to` = today UTC,
+    `from` = `to` - 29 days (30-day window); `parseDateOnly` validation (400 on
+    malformed/impossible dates), `from <= to` (400), window capped at 366 dates (400).
+  - `DASHBOARD_METRIC_DEFINITIONS` - a documented definition for every metric key
+    (21 metric leaves + 3 trend keys) and `DASHBOARD_PLAN_METRICS` mapping the plan's
+    10 metric names (Leads, Lead responses, Appointments, Confirmations, No-shows,
+    Rebookings, Recall, Messages, Delivery, Failures) to their value keys; both always
+    returned in the `definitions` object (plan: "Every metric must have a documented
+    definition").
+  - `getDashboard` - ~10 org-scoped SQL queries in one `Promise.all` (leads new /
+    converted / contacted, appointments booked, appointment status+rebooked by date,
+    recall due/contacted/booked, message sent/replies/lead-replies/delivered/failed,
+    3 grouped trend series); rates rounded to 4 dp with null on zero denominators;
+    zero-filled daily trends for the whole window (DATE_FORMAT '%Y-%m-%d' buckets).
+  - Metric definitions exactly as recorded in the Session 14 design block above
+    (timestamp columns = UTC instant windows; appointment_date/due_date = inclusive
+    date ranges; `leads.contacted` anchored on status_changed activities regardless of
+    lead creation date; `leads.converted` = leads created in window with >= 1 linked
+    appointment; failures = OUTBOUND FAILED by updated_at, documented approximation;
+    rebooked may overlap status buckets, documented).
+- `src/routes/dashboard.ts` + `src/app.ts` mount: GET
+  `/api/organizations/:orgId/dashboard?from&to` behind `requireAuth` +
+  `assertCanManageMembers` (Owner 200, platform Administrator 200, Receptionist 403
+  per MVP USERS capability list, foreign-org member 404, unauthenticated 401).
+- `tests/m14.integration.test.ts` - **12 tests, all fixture-verified per plan
+  ("Verify dashboard calculations against database fixtures")**: exact in-window
+  metrics (all 20 values + 3 rates) against hand-built fixtures with in-window AND
+  out-of-window rows (past period + future period both excluded correctly), zero
+  window, daily-trend sums equal window totals + per-date assertions, definitions
+  coverage for every leaf + all 10 plan names mapped, default 30-day window,
+  admin/receptionist/foreign/unauth roles, 4 validation 400s, org scoping.
+- Smoke: +11 M14 checks inserted before cleanup -> **126 total** (role checks,
+  validation checks, default-window echo, API-vs-SQL cross-check for leads.new and
+  messages.sent, definitions presence, trend length).
+
+**Gate results (actual, executed):**
+- `npm run verify` = lint 0 + typecheck 0 + test **228/228 passed, 23 suites,
+  0 failed, 0 skipped** + build 0; exit 0.
+- `npm run migrate` x2: applied 0 / skipped 13, exit 0 both runs (no M14
+  migration - all source tables pre-date M14).
+- Extended smoke: **126/126 PASS, 0 FAIL, SMOKE_PASS, exit 0** (log
+  `m14-smoke-run2.log`; run 1 failed on 2 checks - see smoke-script fix below).
+
+**Falsification review (results):**
+- UTC window basis CHALLENGED and CONFIRMED: DB `@@system_time_zone = UTC`,
+  `@@time_zone = SYSTEM`, `NOW() = UTC_TIMESTAMP()`; app pool sets `timezone: 'Z'`;
+  DATETIME columns are wall-clock (no tz conversion on compare) - the documented
+  `window.basis` "UTC instants" claim is evidence-backed, not assumed.
+- Fixture tests caught a real product bug during development: trend queries used
+  SQL `DATE()`, whose DATE-typed results mysql2 returns as JS Date objects -> all
+  daily map lookups missed -> trends all zero while metric totals were correct.
+  **Defect 27** (in-new-code, found by fixture tests before commit): fixed with
+  `DATE_FORMAT(..., '%Y-%m-%d')` (string keys); re-ran suite green.
+- Smoke run 1 exposed a **smoke-script fix** (PS 5.1 only, script not product):
+  in an expandable
+  string `"$m14DashUrl?from=abc"`, PowerShell parses `m14DashUrl?from` as ONE
+  variable name -> URL became `=abc` -> curl 000. Fixed with braced
+  `"${m14DashUrl}?from=..."`; run 2 = SMOKE_PASS (precedent: row 31 smoke-script
+  fixes, unnumbered).
+- Test-iteration fixes (not defects): past-window failedRate expectation (0 not
+  null when sent>0), future-window date-sign arithmetic in the test itself,
+  lexicographic sort order of plan-metric names ('Rebookings' < 'Recall').
+- Route conflicts, tenant scoping, authz precedence (403 before 400 on bad range),
+  SQL parametrization, definitions completeness: all covered by passing tests;
+  no further issues found.
+
+**Plan cross-check:** M14 plan L1121-1140 (10 metrics each documented + fixture
+verification) -> covered (definitions map + fixture test); section 8 L246-272 (13
+initial metrics, trends where possible, no vanity metrics, defined calculations) ->
+all 13 present (new leads, leads contacted, lead response rate, appointments booked,
+confirmations, no-shows, rebookings, recall due/contacted/booked, messages sent,
+delivery rate, failure rate) + 3 core trend series + definitions map; MVP-12 groups
+(leads new/contacted/converted; appointments scheduled/confirmed/completed/no-show/
+rebooked; communication sent/delivered/failed/patient replies; recall due/contacted/
+booked) -> all present; MVP USERS (Owner dashboard) -> owner/admin read, receptionist
+403 (PROPOSED strict reading - receptionist capability list has no dashboard); MVP UX
+L2744 qualitative -> untestable programmatically, relies on definitions being
+returned with the payload; no TEST 13 exists (test list ends at TEST 12) -> fixture
+test + section 7 / MVP-12 / section 8 mapping govern.
+
+**Unresolved / carried:** frontend stack decision UNKNOWN (plan L378; M15/M21
+depend on it - owner decision required); defect 26 candidate (M3 `createPatient`
+drops `smsOptOut`) unchanged, owner decision pending; K-I2 UNKNOWN (re-gate M22);
+K-I4 open (re-gate M22); K-I3 UNKNOWN (D5 -> M22); B4 -> M22. No migration, no
+scheduler changes, no new config keys in M14.
+
+**Status:** report delivered; M14 awaiting owner acceptance; M15 does not begin
+until the owner accepts the M14 report.

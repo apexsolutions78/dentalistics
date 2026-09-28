@@ -13,6 +13,7 @@ import { createAppointmentsRouter } from './routes/appointments';
 import { createAuthRouter } from './routes/auth';
 import { createCallEventsRouter } from './routes/callEvents';
 import { createConversationStateRouter } from './routes/conversationState';
+import { createDashboardRouter } from './routes/dashboard';
 import { createLeadsRouter } from './routes/leads';
 import { createOrganizationsRouter } from './routes/organizations';
 import { createPatientsRouter } from './routes/patients';
@@ -115,6 +116,7 @@ export function createApp(deps: AppDeps = {}): Express {
     app.use('/api/organizations', createLeadsRouter({ db, logger }));
     app.use('/api/organizations', createPatientsRouter({ db, logger }));
     app.use('/api/organizations', createAppointmentsRouter({ db, logger }));
+    app.use('/api/organizations', createDashboardRouter({ db, logger }));
 
     const publicRate = deps.publicLeadRate;
     app.use(
