@@ -1804,3 +1804,320 @@ Attempted to break the claims, results:
 3. K-I3 unchanged (D5): confirm DirectAdmin process persistence
    before production (M22) - four automation ticks now ride the
    in-process scheduler.
+
+## Session 12 - M12 Missed-call Integration (design + implementation)
+
+**Owner instruction:** "Proceed to M12" (2026-09-28), accepting the M11
+report implicitly; the M11 gate rule satisfied.
+
+**Plan anchors:** S5 M12 (L1065-1099: "Only begin after provider
+capabilities have been verified", "Research current official provider
+documentation before selecting implementation", flow
+Incoming call -> Call event -> Missed call -> Webhook -> Verification ->
+Idempotency -> Lead -> Automation -> Message, "Do not assume Bahrain
+supports every telephony/SMS feature", 9 test scenarios); S3 missed-call
+recovery flow (L109-137, incl. notify clinic + track response as
+product-level flow); Scenario B (L1264); MVP-14 missed-call response
+template (L2219); MVP-16 mentions missed-call staff notifications
+(separate MVP, NOT in M12 scope); TEST 11/12 are milestone-wide
+(tenant/roles - covered per-suite).
+
+**Provider capability research (executed 2026-09-28, official docs):**
+
+1. Twilio Call resource (twilio.com/docs/voice/api/call-resource,
+   dateModified 2026-06-22, fetched today): call status enum
+   queued/ringing/in-progress/completed/busy/failed/no-answer/canceled;
+   `no-answer` = "no answer or the call was rejected"; `completed` =
+   answered and ended normally; StatusCallback events
+   initiated/ringing/answered/completed, default completed, POST
+   form-encoded to a configured URL.
+2. Twilio webhook security (twilio.com/docs/usage/webhooks/
+   webhooks-security, dateModified 2026-08-13): every request signed
+   with `X-Twilio-Signature` = HMAC-SHA1 keyed by the account auth
+   token over (full webhook URL + form parameters sorted by name,
+   each name+value concatenated, no delimiter), base64. No
+   timestamp/nonce in the construction -> replay protection must come
+   from payload idempotency (Twilio docs tell integrators to
+   deduplicate on identifiers such as CallSid - third-party
+   verification of the same, webhook.co docs checked 2026-07-22).
+3. Vonage Voice API (developer.vonage.com, fetched today) as an
+   independent cross-check: explicit event statuses
+   started/ringing/answered/completed/busy/cancelled/failed/
+   rejected/timeout/unanswered; `rejected` is a first-class event
+   (rejected before connection; detail invalid_number/restricted/
+   declined/throttled); event webhooks + signed callbacks (JWT) +
+   fallback URL. Confirms (a) missed-call events ARE delivered by
+   webhook, (b) "rejected" exists as a real provider status
+   somewhere in the market, (c) verification schemes differ per
+   provider (HMAC vs JWT).
+4. Bahrain-specific, Twilio official pages (fetched today):
+   SMS guidelines BH: "Two-way SMS supported: **No**"; voice
+   guidelines BH: domestic reachability rows N/A, international
+   outbound Yes. => For a Bahrain clinic number, Twilio does NOT
+   offer two-way SMS and domestic voice is not a supported
+   configuration. NOT VERIFIED: equivalent capabilities of local
+   carriers (STC/Batelco/Zain) - no official public API docs
+   consumed. Consequence: M12 implements the provider-agnostic
+   webhook pipeline + a Twilio-compatible adapter (statuses and
+   HMAC scheme as documented) and a mock adapter for tests/dev;
+   real Bahrain telephony vendor selection stays an OPEN decision
+   (owner) and is recorded as such. No capability claims beyond the
+   cited docs are made.
+
+**Design (PROPOSED until the M12 report is accepted):**
+
+- Migration `0013_call_events.sql`: `call_events` - org FK CASCADE,
+  provider_key + provider_event_id (UNIQUE idempotency), raw +
+  canonical status/outcome (VARCHAR: provider status space may
+  evolve), caller/called numbers, occurred_at/received_at, status
+  RECORDED|PROCESSED|PARTIAL, disposition, lead/patient/message FKs
+  SET NULL, last_error, raw_payload TEXT.
+- `src/telephony/`: `types.ts` (CallOutcome
+  ANSWERED|MISSED|REJECTED|BUSY|FAILED|CANCELED|IN_PROGRESS,
+  InboundCallEvent, TelephonyAdapter interface: key, signatureHeader,
+  verifySignature, parse), `signature.ts` (Twilio-documented
+  HMAC-SHA1 URL+sorted-params, base64), `twilio.ts` (form-encoded
+  params, CallSid/CallStatus/From/To/Timestamp, status map:
+  completed->ANSWERED, no-answer->MISSED (docs: rejected collapses
+  here), busy->BUSY, failed->FAILED, canceled->CANCELED,
+  queued/ringing/in-progress->IN_PROGRESS), `mock.ts` (JSON or form,
+  same HMAC scheme, header x-mock-signature, statuses incl.
+  `rejected`->REJECTED per Vonage-verified semantics), `registry.ts`
+  (mirrors communications registry, registers both at load).
+- Endpoint `POST /api/webhooks/telephony/:provider/:organizationId`
+  (public, IP rate-limited): resolve adapter + active org ->
+  telephony_config (app_meta {enabled, signingSecret}) gate 403 ->
+  signature verify 401 -> parse 400 -> ingest. Always 200 after
+  verification (downstream failure never 5xx's the provider).
+- Idempotency: UNIQUE (provider_key, provider_event_id); duplicate ->
+  200 {status:'duplicate'} no reprocessing (required because HMAC
+  scheme has no replay window - cited above).
+- Recovery outcomes MISSED/REJECTED/BUSY (PROPOSED: busy/rejected
+  count as unreached calls): resolve in order active lead by phone
+  (record `call_missed` activity, no new lead) -> else existing
+  patient (link event, NO lead - they are already a patient) ->
+  else create lead source=MISSED_CALL status=NEW
+  (first_name='Unknown', last_name=caller phone, notes with call
+  info - names unknown from caller ID). ANSWERED/IN_PROGRESS/
+  CANCELED/FAILED recorded only.
+- Automation: dedicated `missed_call_config` app_meta
+  {enabled, channel, provider, template} (default template MVP-14
+  `missed_call_response`); NOT the generic lead ack (its default
+  sources ['WEBSITE'] already excludes MISSED_CALL -> no double
+  send); idempotency `missedcall:<provider>:<eventId>`;
+  messageType `missed_call_response`; smsOptOut on patient ->
+  message suppressed (consent), event still recorded. No new
+  scheduler tick - synchronous ingest (K-I3 untouched).
+- Retry for provider outage: authenticated
+  `POST /api/organizations/:orgId/call-events/:callEventId/retry`
+  (owner/admin; receptionist 403) resends a FAILED response through
+  the existing sendMessage path.
+- Config keys stored in global app_meta like every prior automation
+  config (PROPOSED - per-org settings UI belongs to M16; note the
+  signing secret is therefore deployment-global, acceptable only
+  while the MVP runs single-clinic-per-deployment - flagged for M16).
+- Rate limit: new TELEPHONY_WEBHOOK_LIMIT constants (PROPOSED
+  120/min/IP).
+- Tests will sign with a fixed Host header
+  (`x-mock-signature`/`x-twilio-signature` over
+  `http://webhook.test<originalUrl>` + sorted params, computed with
+  node crypto independently of src code).
+
+**Out of M12 scope (recorded):** clinic staff notifications
+(MVP-16, no milestone assigned yet), track-response/read endpoints
+for call events, per-org secret UI (M16), real Bahrain provider
+contract (owner decision + M22 deployment), inbound SMS replies for
+Bahrain (Twilio two-way SMS = No, verified above; M13 owns
+WhatsApp).
+
+### Implementation record (M12 build, executed 2026-09-28)
+
+- Migration: `migrations/0013_call_events.sql` - `call_events`
+  (org FK CASCADE; UNIQUE (provider_key, provider_event_id);
+  provider_status/call_outcome; caller/called numbers;
+  occurred_at/received_at; status RECORDED/PROCESSED/PARTIAL;
+  disposition; lead/patient/message FKs SET NULL; last_error;
+  raw_payload). Applied to dev DB (1 applied, 12 skipped).
+- Provider module `src/telephony/`: `types.ts` (CallOutcome +
+  RECOVERY_OUTCOMES MISSED/REJECTED/BUSY; TelephonyAdapter),
+  `signature.ts` (documented scheme - HMAC-SHA1 over URL + params
+  sorted by name, base64, `timingSafeEqual`, empty secret ->
+  invalid), `twilio.ts` (`x-twilio-signature`;
+  CallSid/CallStatus/From/To/Timestamp; completed->ANSWERED,
+  no-answer->MISSED, busy->BUSY, failed->FAILED,
+  canceled->CANCELED, queued/ringing/in-progress->IN_PROGRESS),
+  `mock.ts` (`x-mock-signature`; answered/missed/rejected/busy/
+  failed/canceled/ringing), `registry.ts` (both adapters
+  auto-registered), `config.ts` (app_meta `telephony_config`
+  {enabled default false, signingSecret}, shape-guarded, corrupt
+  -> defaults).
+- Ingest `src/services/callEvents.ts`: insert + ER_DUP_ENTRY ->
+  idempotent `duplicate` with re-drive when status RECORDED;
+  recovery (PROPOSED order): active-lead-by-phone -> lead_updated
+  + `call_missed` activity (no new lead) -> existing patient ->
+  patient_contacted link, NO lead -> else new lead
+  MISSED_CALL/NEW, first_name Unknown, last_name caller phone;
+  smsOptOut -> consent_suppressed; automation disabled ->
+  automation_disabled; ANSWERED/IN_PROGRESS/CANCELED/FAILED
+  recorded only, never recovered. Provider outage -> disposition
+  captured + PARTIAL event (message row FAILED), never a 5xx to
+  the provider.
+- Webhook route `src/routes/webhooks.ts` (public):
+  POST /api/webhooks/telephony/:provider/:orgId - IP limiter
+  (TELEPHONY_WEBHOOK_IP_LIMIT 200/60s) -> 404 unknown_provider ->
+  404 org -> 403 telephony_disabled -> 401 invalid_signature ->
+  400 parse -> 200 {status} after verification
+  (recorded|processed|partial|duplicate).
+- Retry `src/routes/callEvents.ts` (authenticated):
+  POST /api/organizations/:orgId/call-events/:callEventId/retry
+  - requireAuth + assertCanManageMembers (receptionist 403,
+  cross-org 404); no message -> 409; sent -> status PROCESSED,
+  last_error NULL.
+- Automation `src/automation/missedCall.ts`: `missed_call_config`
+  (default template MVP-14 `missed_call_response` via
+  MISSED_CALL_TEMPLATE_NAME in template.ts); send idempotency
+  `missedcall:<provider>:<eventId>`; retry actions
+  sent/failed/duplicate/not_found/error.
+- Supporting: `leads.ts` `recordLeadActivity` exported;
+  `rateLimit.ts` telephony constants; `app.ts`
+  urlencoded(100kb) (form-encoded providers) + router mounts.
+  **No new scheduler tick** - K-I3 unchanged (4 ticks:
+  reminder, no-show, recall, review-request).
+- Tests: `tests/m12.integration.test.ts` - 12 live-DB tests;
+  **12/12 on the second run (1 test iteration)**.
+
+### Plan cross-check (acceptance self-check)
+
+- S5 M12 9 scenarios all mapped: answered call recorded (tests
+  1, 7 - answered webhook 200, event RECORDED, no recovery);
+  missed call + response (test 2 - lead created, SENT message,
+  rendered body); rejected -> REJECTED outcome (test 3);
+  duplicate webhook -> exactly one event/message, response
+  `duplicate` (test 4); invalid webhook -> 401/400/404/403 with
+  zero rows created (test 5); provider outage -> PARTIAL +
+  FAILED message + authenticated retry after outage clears
+  (test 8); unknown caller -> new MISSED_CALL lead (test 2);
+  existing patient -> patient_contacted, NO lead (test 6);
+  existing lead -> `lead_updated` + `call_missed` activity on
+  that lead (test 7). Extras: Twilio form-encoded statuses
+  (test 9), tenant binding + receptionist 403 + cross-org 404
+  (test 10), `automation_disabled` (test 11), retry without
+  message 409 (test 12).
+- S3 flow (call event -> webhook -> verification -> idempotency
+  -> lead -> automation -> message) executed in tests 2, 4, 6, 7.
+- MVP-14 missed-call response template: default
+  `missed_call_response`, rendered without `{{` residue
+  (test 2).
+- Scenario B (missed-call text-back) = tests 1-3, 6-8.
+- TEST 11/12 (milestone-wide tenant/roles) covered per-suite
+  (test 10 webhook org binding + retry role/tenant checks).
+- Plan gate "research current official provider documentation"
+  satisfied: research record above (Twilio Call resource +
+  webhook security, Vonage statuses, Bahrain pages), fetched
+  2026-09-28, cited.
+- PROPOSED interpretations recorded: recovery outcomes
+  MISSED/REJECTED/BUSY only (busy/rejected = unreached calls);
+  lead naming Unknown + caller phone; signing secret in global
+  app_meta (per-org UI at M16); NO generic lead-ack for
+  MISSED_CALL (its default sources ['WEBSITE'] excludes the
+  channel - no double send); webhook always 200 after
+  verification (outages become events, not 5xx); disposition
+  policy (failure keeps PARTIAL + last_error until retry);
+  quiet hours NOT applied (D4 precedent).
+
+### Falsification review
+
+Attempted to break the claims, results:
+
+- Replay/duplicate webhook: UNIQUE (provider, eventId) ->
+  `duplicate`, one row, one message; recovery re-driven only
+  from RECORDED (test 4). Required because the documented HMAC
+  scheme has no replay window (research record).
+- Signature bypass: wrong signature 401; empty signing secret
+  401 (test 5); `timingSafeEqual` in signature.ts; unknown
+  provider answered with 404 before signature handling, no row
+  created.
+- Tenant escape: webhook bound to :orgId (unknown org 404,
+  zero rows); retry requires auth + org membership (receptionist
+  403, foreign org 404 - test 10).
+- Recovery abuse: answered events never create leads (test 7);
+  patient caller links the patient with NO lead (test 6);
+  smsOptOut suppresses the response (consent_suppressed) while
+  the event is still recorded (test 6); disabled config ->
+  automation_disabled, no message (test 11).
+- Provider outage: 200 + PARTIAL + FAILED message, never a 5xx;
+  owner retry after the outage clears sends and flips PROCESSED;
+  later retries are no-op duplicates (test 8).
+- Concurrency: ER_DUP_ENTRY insert guard + optimistic re-drive
+  under the same single-process assumption as M8-M10 (no new
+  scheduler).
+- No new product defects found.
+
+### Defects
+
+- **Candidate defect 26 (M3 scope, observed while authoring M12
+  tests, NOT fixed):** `createPatient` validates `smsOptOut` on
+  create but omits it from the INSERT - create-time opt-out is
+  silently dropped (PATCH works). Owner decision required before
+  touching M3 code; the M12 test works around it via PATCH.
+  (26 provisional: M11 produced no defects.)
+- Smoke-script fixes x2 (tooling, not product): PS 5.1
+  `New-Object HMACSHA1(byte[])` unrolls the byte array into
+  constructor arguments -> replaced with `[HMACSHA1]::new()`;
+  config-seed JSON line re-quoted as a single-quoted PS string.
+- Environment incident: Docker Desktop engine died mid-session
+  (mysql container exit 137, connection refused) - engine +
+  `dentalistics-mysql` restarted and the DB re-verified before
+  the final smoke run. Not an application defect.
+
+### Gate results
+
+- migrate: 0013 applied to dev DB (1 applied, 12 skipped), exit 0.
+- M12 suite isolation: **12/12** (2nd run; 1 test iteration).
+- `npm run verify`: exit 0 - lint 0, typecheck 0, **208/208
+  tests (21 suites, 0 skipped)**, build 0.
+- Extended smoke: **97/97 PASS, 0 FAIL, SMOKE_PASS, exit 0**
+  (97 `Check` calls verified; 12 new M12 checks).
+
+### Git state produced
+
+| Commit | Contents |
+|---|---|
+| (hash appended after push) | M12 source (0013 migration, `src/telephony/*`, `src/automation/missedCall.ts`, `src/services/callEvents.ts`, webhook + retry routes, template/leads/rateLimit/app wiring), `tests/m12.integration.test.ts`, docs rev 31 (PROJECT_STATE, audit M11/M12/K-I2/K-I4 rows, this entry) |
+
+### Durable doc updates
+
+- `PROJECT_STATE.md` -> revision 31 (CURRENT_STATUS: M11 PASSED
+  + M12 implementation complete awaiting acceptance; M12
+  implementation entry; evidence rows x4; phase note; changelog
+  row 31).
+- `M0_Project_Audit.md` -> M11 PASSED, M12
+  implementation-complete awaiting acceptance, K-I2/K-I4 status
+  cells updated.
+- `SESSION_LOG.md` -> this entry.
+
+### Session end state
+
+- M12 implementation complete; gates green: verify exit 0
+  (208/208, 21 suites, 0 skipped), lint 0, typecheck 0, build 0,
+  migrate idempotent (0013), extended smoke 97/97 PASS.
+- Next: M12 status report -> STOP for owner acceptance.
+  M13 NOT_STARTED (gate: M12 PASSED).
+
+### Decisions the owner has not yet made
+
+1. Accept (or reject) the M12 report - gate on M13.
+2. PROPOSED M12 design points: recovery outcomes
+   MISSED/REJECTED/BUSY only; lead naming Unknown + caller
+   phone; telephony signing secret in global app_meta (per-org
+   UI at M16); no generic lead-ack for MISSED_CALL; webhook
+   always returns 200 after verification; disposition policy
+   (PARTIAL + last_error until retry); quiet hours NOT applied
+   (D4 precedent - say the word to add them); webhook rate
+   limit implemented at 200/min/IP vs the 120/min design note.
+3. Candidate defect 26 (M3 createPatient drops smsOptOut) -
+   authorize a fix or defer.
+4. K-I2: public HTTPS/DNS still not provisioned (PROPOSED
+   re-gate M22); K-I4: real provider accounts not opened
+   (fact-gate at M13); Bahrain local-carrier capabilities
+   NOT_VERIFIED (Twilio two-way SMS = No is verified).

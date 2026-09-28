@@ -8,10 +8,12 @@ import { attachSession } from './middleware/auth';
 import { createAdminRouter } from './routes/admin';
 import { createAppointmentsRouter } from './routes/appointments';
 import { createAuthRouter } from './routes/auth';
+import { createCallEventsRouter } from './routes/callEvents';
 import { createLeadsRouter } from './routes/leads';
 import { createOrganizationsRouter } from './routes/organizations';
 import { createPatientsRouter } from './routes/patients';
 import { createPublicRouter } from './routes/public';
+import { createWebhookRouter } from './routes/webhooks';
 import {
   createRateLimiter,
   LOGIN_RATE_LIMIT,
@@ -19,6 +21,8 @@ import {
   PUBLIC_LEAD_IP_LIMIT,
   PUBLIC_LEAD_KEY_LIMIT,
   PUBLIC_LEAD_RATE_WINDOW_MS,
+  TELEPHONY_WEBHOOK_IP_LIMIT,
+  TELEPHONY_WEBHOOK_RATE_WINDOW_MS,
 } from './security/rateLimit';
 
 export type DatabaseStatus = 'up' | 'down' | 'unconfigured';
@@ -42,6 +46,7 @@ export function createApp(deps: AppDeps = {}): Express {
 
   app.disable('x-powered-by');
   app.use(express.json({ limit: '100kb' }));
+  app.use(express.urlencoded({ extended: false, limit: '100kb' }));
 
   app.use((req: Request, res: Response, next) => {
     const start = process.hrtime.bigint();
@@ -111,6 +116,16 @@ export function createApp(deps: AppDeps = {}): Express {
           publicRate?.perKey ?? PUBLIC_LEAD_KEY_LIMIT,
           publicRate?.windowMs ?? PUBLIC_LEAD_RATE_WINDOW_MS,
         ),
+      }),
+    );
+
+    app.use('/api/organizations', createCallEventsRouter({ db, logger }));
+    app.use(
+      '/api/webhooks',
+      createWebhookRouter({
+        db,
+        logger,
+        ipLimiter: createRateLimiter(TELEPHONY_WEBHOOK_IP_LIMIT, TELEPHONY_WEBHOOK_RATE_WINDOW_MS),
       }),
     );
   }

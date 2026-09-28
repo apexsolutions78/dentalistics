@@ -156,6 +156,17 @@ async function writeActivity(
   logger.info('lead activity recorded', { leadId, action });
 }
 
+export async function recordLeadActivity(
+  db: Pool,
+  logger: Logger,
+  leadId: number,
+  actorId: number | null,
+  action: string,
+  detail: string | null,
+): Promise<void> {
+  await writeActivity(db, logger, leadId, actorId, action, detail);
+}
+
 export interface CreateLeadInput {
   organizationId: number;
   actorId: number;

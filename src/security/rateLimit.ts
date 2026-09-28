@@ -9,6 +9,9 @@ export const PUBLIC_LEAD_IP_LIMIT = 30;
 export const PUBLIC_LEAD_KEY_LIMIT = 120;
 export const PUBLIC_LEAD_RATE_WINDOW_MS = 60_000;
 
+export const TELEPHONY_WEBHOOK_IP_LIMIT = 200;
+export const TELEPHONY_WEBHOOK_RATE_WINDOW_MS = 60_000;
+
 interface Bucket {
   count: number;
   resetAt: number;
