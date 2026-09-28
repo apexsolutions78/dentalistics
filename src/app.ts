@@ -1,6 +1,9 @@
 import express from 'express';
 import type { Express, Request, Response } from 'express';
 import type { Pool } from 'mysql2/promise';
+import { loadWhatsAppConfig } from './communications/whatsappConfig';
+import { WhatsAppProvider } from './communications/whatsappProvider';
+import { registerProvider } from './communications/registry';
 import { errorHandler, notFoundHandler } from './errors';
 import { createLogger } from './logger';
 import type { Logger } from './logger';
@@ -9,11 +12,13 @@ import { createAdminRouter } from './routes/admin';
 import { createAppointmentsRouter } from './routes/appointments';
 import { createAuthRouter } from './routes/auth';
 import { createCallEventsRouter } from './routes/callEvents';
+import { createConversationStateRouter } from './routes/conversationState';
 import { createLeadsRouter } from './routes/leads';
 import { createOrganizationsRouter } from './routes/organizations';
 import { createPatientsRouter } from './routes/patients';
 import { createPublicRouter } from './routes/public';
 import { createWebhookRouter } from './routes/webhooks';
+import { createWhatsAppWebhookRouter } from './routes/whatsappWebhook';
 import {
   createRateLimiter,
   LOGIN_RATE_LIMIT,
@@ -23,6 +28,8 @@ import {
   PUBLIC_LEAD_RATE_WINDOW_MS,
   TELEPHONY_WEBHOOK_IP_LIMIT,
   TELEPHONY_WEBHOOK_RATE_WINDOW_MS,
+  WHATSAPP_WEBHOOK_IP_LIMIT,
+  WHATSAPP_WEBHOOK_RATE_WINDOW_MS,
 } from './security/rateLimit';
 
 export type DatabaseStatus = 'up' | 'down' | 'unconfigured';
@@ -45,7 +52,14 @@ export function createApp(deps: AppDeps = {}): Express {
   const secureCookies = deps.secureCookies ?? false;
 
   app.disable('x-powered-by');
-  app.use(express.json({ limit: '100kb' }));
+  app.use(
+    express.json({
+      limit: '100kb',
+      verify: (req, _res, buf) => {
+        (req as Request & { rawBody?: Buffer }).rawBody = buf;
+      },
+    }),
+  );
   app.use(express.urlencoded({ extended: false, limit: '100kb' }));
 
   app.use((req: Request, res: Response, next) => {
@@ -126,6 +140,26 @@ export function createApp(deps: AppDeps = {}): Express {
         db,
         logger,
         ipLimiter: createRateLimiter(TELEPHONY_WEBHOOK_IP_LIMIT, TELEPHONY_WEBHOOK_RATE_WINDOW_MS),
+      }),
+    );
+
+    registerProvider(
+      new WhatsAppProvider(async () => {
+        const config = await loadWhatsAppConfig(db);
+        if (config.graph.accessToken === '' || config.graph.phoneNumberId === '') {
+          return null;
+        }
+        return config.graph;
+      }),
+    );
+
+    app.use('/api/organizations', createConversationStateRouter({ db, logger }));
+    app.use(
+      '/api/webhooks',
+      createWhatsAppWebhookRouter({
+        db,
+        logger,
+        ipLimiter: createRateLimiter(WHATSAPP_WEBHOOK_IP_LIMIT, WHATSAPP_WEBHOOK_RATE_WINDOW_MS),
       }),
     );
   }

@@ -2220,3 +2220,259 @@ Session 12.
 
 **Stop condition:** M13 report -> STOP; M14 gated on owner
 acceptance of M13.
+
+### Provider capability research (executed 2026-09-28, official docs - plan gate "Only implement after current official WhatsApp/Meta/provider requirements have been verified")
+
+All sources fetched today from Meta/WhatsApp official documentation:
+
+1. **Create a webhook endpoint** (developers.facebook.com/documentation/business-messaging/whatsapp/webhooks/create-webhook-endpoint): GET verification handshake =
+   `?hub.mode=subscribe&hub.challenge=<str>&hub.verify_token=<str>` -
+   compare `hub.verify_token` to the string stored on our server
+   (mismatch = invalid). POST events arrive as JSON with header
+   `X-Hub-Signature-256: sha256=<hash>` where `<hash>` = **HMAC-SHA256**
+   of the payload using the **app secret** as key; validate by
+   recomputing and comparing everything after `sha256=`; mismatch =
+   invalid payload.
+2. **messages webhook reference**
+   (developers.facebook.com/documentation/business-messaging/whatsapp/webhooks/reference/messages,
+   updated 2025-10-22): incoming messages =
+   `object: whatsapp_business_account` -> `entry[].changes[].value`
+   with `contacts[]` (`wa_id`, `profile.name`) + `messages[]`
+   (`from`, `id` = `wamid...`, `timestamp`, `type`, `text.body`),
+   `field: "messages"`. Outgoing statuses in `value.statuses[]`
+   (`id` = wamid of our sent message, `status` one of
+   `sent|delivered|read|failed`, `timestamp`, `recipient_id`,
+   optional `conversation`, `pricing`, `errors[]` - sample error
+   code 131050). One outgoing message can produce up to three
+   status webhooks (sent, delivered, read).
+3. **Status messages webhook reference** (same docs tree, updated
+   2026-05-21): same shape re-confirmed; `conversation` object
+   omitted on v24.0+ except free entry point windows.
+4. **Webhooks overview** (developers.facebook.com/docs/whatsapp/cloud-api/guides/set-up-webhooks,
+   updated 2026-06-26; documentation/.../webhooks/overview): webhooks
+   carry incoming messages + outgoing statuses; **Meta retries
+   deliveries -> duplicate webhook notifications are expected**
+   (documented) -> idempotency mandatory. mTLS is an optional
+   additional layer; app-level HMAC remains required.
+5. **Service messages** (developers.facebook.com/docs/whatsapp/cloud-api/guides/send-messages,
+   updated 2026-05-21): free-form (service) messages may be sent
+   **only inside the 24-hour customer service window** that starts
+   when the user messages/calls the business and resets on each new
+   user message. When the window closes, **only pre-approved
+   template messages** may be sent. Send acceptance response != 
+   delivery; delivery/read arrive via status webhooks. Default
+   message TTL 30 days (if no `delivered` status before TTL, assume
+   dropped). Opt-in required before messaging.
+6. **Template fundamentals**
+   (developers.facebook.com/docs/whatsapp/message-templates/guidelines):
+   template messages are WABA assets requiring pre-approval
+   (review up to 24h) and are "the only type of message that can be
+   sent outside of a customer service window"; messaging limits,
+   template pacing/pausing apply to template sends.
+7. **Opt-in** (developers.facebook.com/docs/whatsapp/overview/getting-opt-in,
+   updated 2026-06-16) + **WhatsApp Business Messaging Policy**
+   (whatsapp.com/legal/business-policy): opt-in required; businesses
+   "must respect all requests ... to block, discontinue, or
+   otherwise opt out" and must provide clear opt-out instructions.
+   (Block Users API: messaging a blocked user returns an error -
+   developers.facebook.com/documentation/business-messaging/whatsapp/block-users.)
+8. **Message API** (developers.facebook.com/documentation/business-messaging/whatsapp/reference/whatsapp-business-phone-number/message-api):
+   `POST https://graph.facebook.com/{Version}/{Phone-Number-ID}/messages`;
+   official examples on current pages use `v26.0`/`v25.0`.
+
+NOT VERIFIED (stated): live end-to-end behavior of any of the above
+(no Meta app/WABA account exists - K-I4; plan forbids fake
+integrations); exact per-scenario error codes beyond the documented
+samples; whether local/alternative WhatsApp providers match this
+scheme (not researched - Meta Cloud API is the documented target).
+
+### Design decisions (PROPOSED - M13 build)
+
+1. **No migration.** `communication_messages` already carries
+   channel ENUM('SMS','WHATSAPP'), status lifecycle (incl.
+   DELIVERED/UNDELIVERED/RECEIVED), direction, template, provider
+   fields (M4), and `handleInboundMessage`/`applyProviderStatus`
+   already exist (M6) - M13 adds the missing HTTP transport,
+   provider, config and window state. Conversation window is
+   **derived, not stored**.
+2. Config `whatsapp_config` in global app_meta (like
+   `telephony_config`): `enabled` default false, `verifyToken`,
+   `appSecret`, `graph { accessToken, phoneNumberId, apiVersion
+   default "v26.0" }`; shape-guarded, corrupt -> defaults; secrets
+   deployment-global (M16 per-org UI flagged).
+3. Endpoints: `GET|POST /api/webhooks/whatsapp/:orgId` in
+   `src/routes/whatsappWebhook.ts` (M12 webhooks.ts untouched);
+   dedicated IP limiter constants `WHATSAPP_WEBHOOK_IP_LIMIT`
+   (200/60s, same posture as telephony).
+4. Raw-body HMAC: global `express.json` gains a `verify` hook that
+   stashes the raw Buffer on the request (`rawBody`) before parse;
+   signature computed over those exact bytes with `timingSafeEqual`
+   after the `sha256=` prefix; missing header / empty configured
+   appSecret / mismatch -> 401.
+5. GET handshake: unknown org 404; `hub.verify_token` equals
+   configured non-empty `verifyToken` -> 200 `text/plain` challenge
+   echo, else 403. `enabled` is NOT required for GET (handshake
+   precedes activation) - asserted in tests.
+6. POST pipeline (M12 precedent: always 200 after verification,
+   never 5xx): limiter -> org 404 -> `enabled` false 403 -> bad
+   signature 401 -> non-JSON body 400 -> process -> 200
+   `{status: ok|duplicate|ignored}`. Processing errors after
+   signature are logged, counted, never 5xx.
+7. Inbound `type: text` -> existing `handleInboundMessage`
+   (channel WHATSAPP, messageType `patient_reply`, status
+   RECEIVED, active-lead auto-link by phone), idempotency key
+   `whatsapp:<wamid>` (unique per org -> duplicate webhook =
+   one row, `{status:"duplicate"}`). Non-text types ->
+   `ignored` (counted; media/interactive = post-MVP).
+8. Statuses -> our enum (PROPOSED mapping): `delivered`/`read`
+   -> DELIVERED (from SENT only; already-DELIVERED or other
+   states -> `ignored`, making repeats idempotent - no 409),
+   `failed` -> UNDELIVERED (from SENT), `sent` -> ignored (row is
+   already SENT at dispatch time), unknown status -> ignored
+   (forward compatible). Correlation by
+   `(organization_id, provider_message_id)` = wamid; unknown
+   wamid -> `ignored`.
+9. `WhatsAppProvider` (key `whatsapp`, `src/communications/whatsappProvider.ts`):
+   lazy credential loader (registered in `createApp` with the
+   request db pool); missing config -> `ProviderSendError
+   ('whatsapp_not_configured')` with NO network call; configured ->
+   documented `POST /{version}/{phone_number_id}/messages`
+   `type: "text"`; non-2xx -> `ProviderSendError('whatsapp_api_error')`;
+   success -> `messages[0].id` (wamid) as providerMessageId.
+   **Known limitation (PROPOSED):** free-form text is policy-valid
+   only inside the customer-service window (cited above);
+   business-initiated automation sends outside it require
+   pre-approved Meta templates - mapping internal MVP-14 template
+   names to Meta template assets needs the owner's WABA account
+   (K-I4) and is deferred to the production/provider gate (M22
+   report). Mock provider remains the development path per plan.
+10. **Conversation state interpretation (PROPOSED):** the plan's
+    "Conversation state" test item = the official 24-hour customer
+    service window state: derived from the newest INBOUND
+    `channel='WHATSAPP'` message per recipient (`created_at` =
+    arrival time; window = last inbound + 24h, resets on each new
+    inbound per docs). Surface: authenticated
+    `GET /api/organizations/:orgId/conversation-state?phone=`
+    -> `{phone, lastInboundAt, windowExpiresAt, windowOpen}`
+    (all staff roles may read; 401 unauth, 400 bad phone, 404
+    unknown/foreign org). Alternative interpretation (inbound reply
+    simply visible per MVP-10) is covered by the inbound test
+    anyway. Endpoint also gives TEST 12 (role authorization)
+    surface: receptionist/owner/admin 200, foreign-org 404,
+    unauth 401.
+11. Opt-out: no code change - existing `smsOptOut` suppression is
+    channel-agnostic; asserted on the WHATSAPP path in tests.
+12. Provider failure: existing `sendMessage` FAILED +
+    `provider_error` capture asserted on the WHATSAPP path via
+    mock `failOn`; plus the `whatsapp_not_configured` guard test.
+13. No new scheduler tick (synchronous webhooks only; K-I3
+    unchanged at 4 ticks).
+
+### Session 13 - M13 implementation record (2026-09-28, same session)
+
+**Instruction executed:** owner "save session log, commit, push and proceed to M13"
+(= M12 accepted at `4a79181`; rev 32 recorded). M13 research + design recorded
+above; implementation, gates and docs rev 33 completed in the same session.
+
+**Implementation (CONFIRMED - tool inspection + executed tests):**
+- No migration: 0004/0006 already provide channel ENUM('SMS','WHATSAPP'),
+  status incl. RECEIVED, direction, template, provider columns
+  (migrate applied 0 / skipped 13, idempotent x2).
+- New: `src/communications/whatsappConfig.ts` (app_meta `whatsapp_config`,
+  shape-guarded, corrupt -> defaults), `whatsappSignature.ts` (raw-body
+  HMAC-SHA256 `sha256=<hex>`, timing-safe compare), `whatsappPayload.ts`
+  (entry/changes/value parser), `whatsappProvider.ts` (key `whatsapp`),
+  `src/routes/whatsappWebhook.ts` (GET|POST `/api/webhooks/whatsapp/:orgId`),
+  `src/routes/conversationState.ts` (GET
+  `/api/organizations/:orgId/conversation-state?phone=`),
+  `tests/m13.integration.test.ts` (8 tests).
+- Modified: `src/app.ts` (express.json `verify` hook -> rawBody Buffer;
+  WhatsAppProvider registered with config loader when `deps.db` present;
+  router mounts with dedicated limiters), `src/security/rateLimit.ts`
+  (`WHATSAPP_WEBHOOK_IP_LIMIT` 200 / `WHATSAPP_WEBHOOK_RATE_WINDOW_MS` 60000).
+- All 13 PROPOSED decisions above implemented as written; none changed.
+
+**Plan cross-check (test list L1108-1117 + TEST 12):**
+- Template messaging -> "sends a WhatsApp template message and records the
+  provider contract" (stubbed fetch: URL `graph.facebook.com/v26.0/424242/
+  messages`, Bearer auth, messaging_product/type/to/text.body; row: channel
+  WHATSAPP, OUTBOUND, SENT, template `greeting_v1`, provider_key `whatsapp`,
+  provider_message_id = `messages[0].id`, sent_at set) + automation path
+  (missed-call channel=WHATSAPP -> SENT, message_type missed_call_response).
+- Delivery -> "applies delivery statuses from webhook events with idempotent
+  handling": delivered -> DELIVERED + delivered_at; failed -> UNDELIVERED
+  (delivered_at null); sent -> ignored (stays SENT); read -> DELIVERED;
+  duplicate delivered -> applied 0 / ignored 1 (no 409); unknown wamid ->
+  ignored.
+- Incoming response -> "stores an incoming WhatsApp reply and links the active
+  lead": 200, inbound.created 1; row RECEIVED / patient_reply / WHATSAPP /
+  INBOUND / recipient normalized; active lead auto-linked (lead_id); non-text
+  (type image) -> ignored, no row.
+- Webhook verification -> "verifies webhook setup and rejects invalid
+  signatures": GET 200 text/plain challenge; wrong token 403; missing
+  challenge 400; unknown org 404; POST valid 200; garbage sig 401;
+  wrong-secret sig 401; missing header 401; empty configured appSecret 401;
+  malformed payload 400; disabled 403; unknown org 404.
+- Duplicate webhook -> "ignores duplicate inbound webhooks without
+  reprocessing": second POST inbound.created 0 / duplicate 1; DB count for
+  `whatsapp:<wamid>` = 1.
+- Opt-out -> "suppresses outbound WhatsApp automation for opted-out patients":
+  patient smsOptOut + missed-call automation channel=WHATSAPP ->
+  consent_suppressed, zero message rows; opted-in patient -> channel WHATSAPP
+  SENT (config restored to SMS after).
+- Provider failure -> "records provider failure for unconfigured WhatsApp and
+  provider errors": `getProvider('whatsapp')` unconfigured -> FAILED,
+  provider_error contains `whatsapp_not_configured` (no network call);
+  mock failOn on WHATSAPP -> FAILED, `mock_recipient_failure`; stubbed fetch
+  503 -> FAILED, `whatsapp_api_error`.
+- Conversation state -> "returns WhatsApp conversation state with role
+  authorization": open window + windowExpiresAt - lastInboundAt = 24h;
+  backdated 25h -> windowOpen false, expiresAt < now; no history -> nulls +
+  false; 401 unauth, 400 bad phone, 404 unknown org, 404 foreign member;
+  200 owner + receptionist + administrator.
+- TEST 12 -> same surfaces cover Owner/Receptionist/Administrator appropriate
+  reads and unauthorized actions (401 unauth, 404 cross-org, webhook 401/403).
+- MVP-4 fields (recipient, provider, providerMessageId, status, template,
+  timestamp/sent_at, lead) asserted in template + delivery tests; MVP-10
+  INBOUND patient_reply handled by existing service via the new webhook.
+
+**Gates executed (2026-09-28):**
+- `npm run verify` -> exit 0: lint 0, typecheck 0, **216/216 tests, 22
+  suites, 0 skipped**, build 0 (new file: m13.integration.test.ts 8/8).
+- `npm run migrate` run twice -> applied 0, skipped 13, exit 0 both
+  (no M13 migration - expected).
+- Extended smoke (`m3-smoke.ps1`, +18 M13 checks: config seeded, handshake
+  200/challenge/403/404, inbound 200/RECEIVED/WHATSAPP/duplicate 1, outbound
+  seeded, delivery 200/DELIVERED, bad sig 401, disabled 403, conversation
+  state 200/open/401/400) -> **115/115 PASS, 0 FAIL, SMOKE_PASS, exit 0**
+  (log: `%TEMP%\opencode\m13-smoke-run1.log`).
+
+**Falsification review:**
+1. "GET handshake might require enabled" - no; design + docs: GET validates
+   only org + verify_token. Disabled tested on POST (403). Documented.
+2. "Duplicate status webhook might 409" - pre-check SENT-only returns
+   `ignored` (tested: applied 0, ignored 1, status unchanged).
+3. "Signature might be computed over re-serialized JSON" - tests POST the
+   exact raw bytes they sign; smoke signs the exact file bytes curl sends;
+   raw body captured via express.json `verify` hook; empty rawBody -> invalid.
+4. "Conversation-window interpretation might be wrong" - PROPOSED,
+   source-cited (24h customer service window), derived from newest inbound
+   WHATSAPP message; alternative (MVP-10 visibility) covered by inbound test
+   anyway. Awaiting owner confirmation at acceptance.
+5. "Provider tests might touch the network" - WhatsAppProvider tests use
+   stubbed fetch (success + 503); not_configured path is no-network by
+   design. Live Meta behavior remains NOT VERIFIED (no account, K-I4).
+- No new defects found. Candidate defect 26 (M3 `createPatient` drops
+  `smsOptOut` in INSERT) remains open - M3 scope, owner decision pending.
+
+**Defects:** none new in M13. Candidate 26 still open (not fixed).
+
+**Git:** working-tree changes = 6 new src files + 1 new test + `app.ts` +
+`rateLimit.ts` + `PROJECT_STATE.md` (rev 33) + `M0_Project_Audit.md` +
+`SESSION_LOG.md` (this entry). Commit + push + MATCH check recorded in the
+M13 report.
+
+**Status:** M13 implementation complete; report delivered; awaiting owner
+acceptance. M14 must not begin until the owner accepts the M13 report.
+
+**Session end** - 2026-09-28.

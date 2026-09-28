@@ -11,6 +11,8 @@ export const PUBLIC_LEAD_RATE_WINDOW_MS = 60_000;
 
 export const TELEPHONY_WEBHOOK_IP_LIMIT = 200;
 export const TELEPHONY_WEBHOOK_RATE_WINDOW_MS = 60_000;
+export const WHATSAPP_WEBHOOK_IP_LIMIT = 200;
+export const WHATSAPP_WEBHOOK_RATE_WINDOW_MS = 60_000;
 
 interface Bucket {
   count: number;
