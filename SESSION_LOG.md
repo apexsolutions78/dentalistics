@@ -2692,3 +2692,50 @@ scheduler changes, no new config keys in M14.
 
 **Status:** report delivered; M14 awaiting owner acceptance; M15 does not begin
 until the owner accepts the M14 report.
+
+### Session 15 - M14 accepted (PASSED), M15 start
+
+**Owner conditional instruction (2026-09-28):** "save session log, commit, push
+current progress and then proceed to M15" -> **M14 (Owner Dashboard) PASSED**
+(proposal of record accepted: metrics API only, no frontend; fixture verification
+as the plan's verification; receptionist-403 owner/admin read). Gates at pass
+unchanged from completion: verify 228/228 (23 suites, 0 skipped), no M14
+migration (applied 0 / skipped 13 idempotent), extended smoke 126/126 PASS.
+Docs: rev 36. M15 begins under the standing gate rule (owner instructed).
+
+**M15 scope research (plan anchors read - CONFIRMED text):**
+- Plan L1144-1160 (MILESTONE 15 - RECEPTIONIST WORKSPACE): "Design a
+  workflow-oriented receptionist interface. Prioritize: New leads, Missed calls,
+  Patient replies, Upcoming appointments, No-shows, Recall opportunities, Tasks
+  requiring action. The interface should minimize clicks. Test usability
+  manually." No numbered TEST item exists for M15 (test list ends at TEST 12 +
+  MVP UX acceptance).
+- Plan L311-321 (Receptionist needs): new leads, missed calls, patient replies,
+  appointments requiring action, follow-ups, simple patient history, clear next
+  actions.
+- Plan L1689-1701 (MVP USERS Receptionist): view leads, add leads manually, view
+  patient/contact information, update lead status, view appointments, confirm
+  appointments, mark no-shows, rebook patients, view patient communication
+  history - all already implemented as APIs (M3/M5/M7/M12/M13), none delivered
+  as UI.
+- Plan L276-295 (UX requirements: clean, professional, fast, simple, low
+  cognitive load, accessible, consistent, easy to learn without training,
+  design around actual clinic workflows), L2727-2744 (MVP UX acceptance: 10
+  receptionist tasks straightforward), L311-321.
+- Plan L378 (technical principles): "Identify frontend architecture" - **no
+  frontend exists anywhere in the repository (CONFIRMED by inspection across
+  M0-M14)**; backend = Express + TypeScript + MySQL + vitest.
+- Plan L1302-1324 (M21 UX REVIEW) explicitly includes "Receptionist workflow"
+  in its audit list - deep UX audit is the M21 gate, not M15.
+
+**M15 delivery-mode question (frontend architecture decision, owner-reserved per
+accepted rev 33/35 docs):** M15 asks for an interface + manual usability testing
+while the repository has no frontend architecture. The decision is put to the
+owner before UI code is written (options recorded in the report/question): (a)
+workspace API + defer visual UI/usability to the owner's future UI phase / M21;
+(b) minimal server-served static HTML workspace (no framework; clickable;
+manually testable; keeps stack decision open); (c) owner specifies a frontend
+stack now and a real frontend is scaffolded. Under every option the same
+underlying piece is needed first: a single workspace aggregation endpoint
+returning the 7 prioritized queues (one request = "minimize clicks" at the data
+level). Design decisions for M15 are recorded after the owner answers.
