@@ -1372,3 +1372,40 @@ re-POST is blocked by 409 so a manual recovery path would be needed).
 **Status: M9 implementation complete - report delivered, STOPPED awaiting
 owner acceptance. M10 (Recall automation) does not begin until the owner
 accepts the M9 report.**
+
+---
+
+### Session 9 addendum - M9 open items resolved per owner instruction (same session)
+
+**Owner instruction:** "Resolve M9 unresolved issues as proposed."
+
+**Recorded as (docs-only, no code change, rev 26):**
+
+- **D4** - (a) quiet hours NOT applied to M9 no-show messages (M8
+  reminders keep quiet hours; plan L594 automation-considerations list
+  acknowledged); (b) lazy rebook detection semantics approved as built
+  (day granularity `appointment_date >= today` at UTC-date basis; any
+  active future booking - including one predating the no-show - closes
+  REBOOKED and stops automation, conservative anti-spam choice).
+- **D5** - K-I3 handling adopted from the M8 report: confirm DirectAdmin
+  process persistence BEFORE production (mapped to M22); status remains
+  UNKNOWN until verified; in-process scheduler (`REMINDER_TICK_MS`
+  driving reminder + no-show ticks) accepted for plan milestones;
+  delivery stops if the process stops.
+- **D6** - integration pattern: server-side proxy adopted; CORS stays
+  unimplemented by design (adopting the M5 report's proposal);
+  browser-direct third-party embedding reopens it only if requested.
+
+**Not resolvable by proposal (reported honestly, unchanged):** K-I2
+(inbound HTTPS posture - requires server/owner answer; M12 gate), K-I4
+(provider accounts - requires owner-created accounts; M12/M13), B4/K-I5
+(consent/retention/position - requires owner legal answer; M22). Audit
+rows annotated accordingly.
+
+**Durable doc updates:** `PROJECT_STATE.md` rev 26 (CURRENT_STATUS,
+phase note, DECISIONS D4-D6, changelog row 26); `M0_Project_Audit.md`
+K-I2/K-I3/K-I4/K-I5 rows; this entry.
+
+**Status:** M9 still awaiting owner acceptance; M10 gate unchanged.
+Docs-only change - no code touched; M9 gates stand as reported
+(verify 173/173, smoke 59/59).
