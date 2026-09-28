@@ -1450,3 +1450,136 @@ changelog row 27; audit M9 PASSED + M10 IN_PROGRESS; this entry).
   instruction to inspect the existing application first.
 - M16 owns recall settings UI; M14 owns recall dashboard metrics - M10
   ships app_meta config like M6/M8/M9 (no HTTP config endpoint).
+
+### Implementation record (rev 28)
+
+- Migration `0011_recall.sql` applied to dev DB (exit 0, idempotent):
+  `recalls` (DUE/CONTACTED/BOOKED/COMPLETED/CLOSED lifecycle,
+  UNIQUE anchor_appointment_id for duplicate-cycle idempotency,
+  rebooked/anchor appointment FKs SET NULL) + `recall_messages`
+  (UNIQUE (recall_id, phase), idx (status, scheduled_at)).
+- `src/automation/recallConfig.ts` - app_meta `recall_config`:
+  enabled / channel / provider / intervalDays (default 180,
+  guard 1-3650) / followUpDelayHours (default 72, guard 1-168) /
+  templates initial+followUp / maxAttempts 3; shape guard, corrupt
+  JSON -> `DEFAULT_RECALL_CONFIG`; no HTTP endpoint (M16 owns UI).
+- `src/automation/recall.ts` - `createRecallForCompletedAppointment`
+  (config gate; COMPLETED required; open-recall check ->
+  `already_exists`; INSERT IGNORE on anchor; INITIAL due_date
+  00:00 UTC + FOLLOW_UP +delay; synchronous send when already
+  overdue; compensating delete), `closeRecall` (DUE/CONTACTED
+  only; statusForReason booked/rebooked->BOOKED,
+  visit_completed/completed->COMPLETED, else CLOSED; cancels live
+  messages), `closeRecallsForPatientOnBooking` (eager,
+  SCHEDULED/CONFIRMED only), `closeRecallOnVisitCompleted` (flip
+  BOOKED->COMPLETED + close open as visit_completed),
+  `runRecallTick` (stale SENDING reclaim >600s, lazy booking
+  close `appointment_date >= today`, due drain with
+  attempts < maxAttempts + optimistic claim, batch 100),
+  `markContacted`; backoff `60s * 2^(n-1)`; idempotency
+  `recall:<id>`; messageTypes recall_message/recall_follow_up;
+  opt-out -> SUPPRESSED `communication_not_permitted`; variables
+  first_name/clinic_name/due_date/interval_days/recall_type
+  (organizations has no phone column -> no clinic_phone).
+- Routes (`src/routes/appointments.ts`, never-throw wrappers):
+  completion closes the prior cycle then creates the next;
+  booking create/reschedule/rebook eager-close;
+  new `POST /api/organizations/:orgId/recalls/:recallId/close`
+  (assertCanManageMembers; optional reason, default
+  `staff_closed`; nothing open -> 404; cross-org -> 404 via
+  org guard). `src/index.ts`: third job under the same
+  `REMINDER_TICK_MS` interval (own catch log).
+- Tests: `tests/m10.integration.test.ts` - 13 live-DB tests;
+  **13/13 on the first run (0 test-iteration defects)**.
+
+### Plan cross-check (acceptance self-check)
+
+- §5 M10 line items all mapped to executed tests: eligibility
+  (COMPLETED visit + config gate + no open cycle - tests 8, 3),
+  recall date (appointment date + intervalDays, due at 00:00 UTC
+  - tests 1, 2), recall status (all 5 states + transitions -
+  tests 1-8), reminder sequence (INITIAL at due, FOLLOW_UP
+  +delay, backoff, stop at maxAttempts - tests 1, 2, 12),
+  rebooking (eager route close + lazy out-of-band booking close -
+  tests 4, 5), closure (manual staff close + visit-completion
+  close - tests 6, 7), date calculations + duplicate prevention
+  (tests 2, 3; anchor UNIQUE + service idempotency).
+- MVP-9 fields: patient, recall type, due date, status, last
+  contacted, appointment if rebooked - all present in the table;
+  the 5 statuses are exactly those named; workflow
+  overdue -> message -> follow-up -> books -> closes covered
+  end-to-end by TEST 9 (test 1); no complex clinical logic
+  (single default 'hygiene' type; recall-type taxonomy remains
+  M16 settings scope).
+- TEST 9 (L2659) executed with synthetic overdue dates - the
+  plan explicitly notes test date calculations, so no real-clock
+  dependency.
+- §6 categories (hygiene / routine check-up / treatment
+  follow-up / other): PROPOSED to expose as configurable types
+  at M16; M10 stores a free `recall_type` column defaulting to
+  'hygiene' (open - see decisions below).
+
+### Falsification review
+
+Attempted to break the claims, results:
+
+- Disabled config bypass: config gate covers create AND tick -
+  verified by test 8 (0 rows, no-op tick).
+- Duplicate cycle while one is open: service `already_exists`
+  and repeat-complete 409 both verified (tests 1, 3); anchor
+  UNIQUE is the database-level backstop.
+- Manual close abuse: only DUE/CONTACTED closable; repeat 404;
+  cross-org 404 (test 6). BOOKED recalls are intentionally not
+  manually closable (mirrors M9 OPEN-only close) - recorded as
+  PROPOSED semantics.
+- Opt-out leak: both phases SUPPRESSED, zero messages (test 11).
+- Backoff runaway: attempts capped at 3, tick stops processing
+  the row (test 12).
+- Corrupt config: falls back to defaults (test 9).
+- **No new defects found.**
+
+### Defects
+
+- **None new in M10** (next defect number remains 26). All
+  rounds green on first execution: M10 suite 13/13 first run,
+  verify 186/186 first run, smoke 72/72 first run.
+
+### Git state produced
+
+| Commit | Contents |
+|---|---|
+| (hash appended after push) | M10 source (0011 migration, `src/automation/{recallConfig,recall}.ts`, appointments route wiring + recall close endpoint, index third tick), `tests/m10.integration.test.ts`, docs rev 28 (PROJECT_STATE, audit M10 row, this entry) |
+
+### Durable doc updates
+
+- `PROJECT_STATE.md` -> revision 28 (CURRENT_STATUS, M10
+  implementation entry, evidence rows x4, phase note, changelog
+  row 28).
+- `M0_Project_Audit.md` -> M10 row implementation-complete
+  awaiting acceptance; M9 row scheduler note amended (recall
+  tick added).
+- `SESSION_LOG.md` -> this entry.
+
+### Session end state
+
+- M10 implementation complete; gates green: verify exit 0
+  (186/186, 19 suites, 0 skipped), lint 0, typecheck 0, build 0,
+  migrate idempotent (0011), extended smoke 72/72 PASS.
+- Next: M10 status report -> STOP for owner acceptance.
+  M11 (Review requests) NOT_STARTED (gate: M10 PASSED).
+
+### Decisions the owner has not yet made
+
+1. Accept (or reject) the M10 report - gate on M11.
+2. PROPOSED M10 design points: intervalDays default 180 /
+   followUpDelayHours default 72; due date driven by the latest
+   completed visit (completion closes the prior cycle, then
+   opens the next); single 'hygiene' recall type until M16
+   settings; FOLLOW_UP template added beyond MVP-14's single
+   "Recall message" line; no HTTP read endpoints for recalls
+   (dashboard view belongs to M14/M15); no `clinic_phone`
+   variable (no phone column on organizations); BOOKED recalls
+   not manually closable.
+3. K-I3 unchanged (D5): confirm DirectAdmin process persistence
+   before production (M22) - three automation ticks now ride
+   the in-process scheduler.

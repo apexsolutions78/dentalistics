@@ -1,0 +1,46 @@
+CREATE TABLE IF NOT EXISTS recalls (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  organization_id BIGINT UNSIGNED NOT NULL,
+  patient_id BIGINT UNSIGNED NOT NULL,
+  recall_type VARCHAR(64) NOT NULL DEFAULT 'hygiene',
+  due_date DATE NOT NULL,
+  status ENUM('DUE', 'CONTACTED', 'BOOKED', 'COMPLETED', 'CLOSED') NOT NULL DEFAULT 'DUE',
+  last_contacted_at DATETIME NULL,
+  rebooked_appointment_id BIGINT UNSIGNED NULL,
+  anchor_appointment_id BIGINT UNSIGNED NULL,
+  close_reason VARCHAR(64) NULL,
+  opened_at DATETIME NOT NULL,
+  closed_at DATETIME NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_recalls_organization FOREIGN KEY (organization_id) REFERENCES organizations (id),
+  CONSTRAINT fk_recalls_patient FOREIGN KEY (patient_id) REFERENCES patients (id) ON DELETE CASCADE,
+  CONSTRAINT fk_recalls_rebooked FOREIGN KEY (rebooked_appointment_id) REFERENCES appointments (id) ON DELETE SET NULL,
+  CONSTRAINT fk_recalls_anchor FOREIGN KEY (anchor_appointment_id) REFERENCES appointments (id) ON DELETE SET NULL,
+  UNIQUE KEY uq_recalls_anchor (anchor_appointment_id),
+  INDEX idx_recalls_org_status (organization_id, status),
+  INDEX idx_recalls_due (status, due_date),
+  INDEX idx_recalls_patient_type (patient_id, recall_type, status)
+);
+
+CREATE TABLE IF NOT EXISTS recall_messages (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  recall_id BIGINT UNSIGNED NOT NULL,
+  organization_id BIGINT UNSIGNED NOT NULL,
+  phase ENUM('INITIAL', 'FOLLOW_UP') NOT NULL,
+  status ENUM('PENDING', 'SENDING', 'SENT', 'FAILED', 'SUPPRESSED', 'CANCELLED')
+    NOT NULL DEFAULT 'PENDING',
+  scheduled_at DATETIME NOT NULL,
+  sent_at DATETIME NULL,
+  message_id BIGINT UNSIGNED NULL,
+  attempts INT NOT NULL DEFAULT 0,
+  last_error VARCHAR(1000) NULL,
+  suppression_reason VARCHAR(64) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_recall_messages_recall FOREIGN KEY (recall_id) REFERENCES recalls (id) ON DELETE CASCADE,
+  CONSTRAINT fk_recall_messages_organization FOREIGN KEY (organization_id) REFERENCES organizations (id),
+  CONSTRAINT fk_recall_messages_message FOREIGN KEY (message_id) REFERENCES communication_messages (id) ON DELETE SET NULL,
+  UNIQUE KEY uq_recall_messages_recall_phase (recall_id, phase),
+  INDEX idx_recall_messages_due (status, scheduled_at)
+);
