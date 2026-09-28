@@ -2739,3 +2739,176 @@ stack now and a real frontend is scaffolded. Under every option the same
 underlying piece is needed first: a single workspace aggregation endpoint
 returning the 7 prioritized queues (one request = "minimize clicks" at the data
 level). Design decisions for M15 are recorded after the owner answers.
+
+### Session 15 - design decisions (M15 workspace API)
+
+**Owner decision (2026-09-28, question answered):** deliver M15 as
+**workspace API only** - the visual UI and the plan's "test usability manually"
+step are deferred to the owner's future UI phase / M21 UX review (M14
+precedent). Frontend architecture (plan L378) stays UNKNOWN. CONFIRMED.
+
+PROPOSED details recorded before code:
+
+1. **Endpoint:** `GET /api/organizations/:orgId/receptionist/workspace` -
+   returns the plan's 7 prioritized queues in ONE payload (single request =
+   "minimize clicks" at the data level): new leads, missed calls, patient
+   replies, upcoming appointments, no-shows, recall opportunities, tasks
+   requiring action. No query params (today-oriented operational view).
+2. **Authorization:** `requireAuth` + `assertOrgExists` (ANY authenticated
+   member of the org - the workspace is FOR the receptionist per MVP USERS
+   L1689-1701; owner and platform Administrator also 200; foreign-org member
+   404; unauthenticated 401). Differs from M14's owner-only dashboard -
+   PROPOSED reading of MVP USERS.
+3. **Date basis:** `date` and all day-granularity anchors use the CLINIC-local
+   calendar date (`organizations.timezone`, IANA, computed with
+   `Intl.DateTimeFormat('en-CA', {timeZone})`; corrupt/invalid timezone falls
+   back to UTC). Instant windows use UTC instants. `date` and `timezone` are
+   echoed in the response. (Improvement over D4's UTC-date basis because the
+   clinic timezone column exists since M7; documented in definitions.)
+4. **Queue scopes (each documented in `definitions`):**
+   - `newLeads`: leads with status 'NEW' (any age), ordered created_at ASC
+     (waiting longest first).
+   - `missedCalls`: call_events with call_outcome IN
+     ('MISSED','REJECTED','BUSY') - the RECOVERY_OUTCOMES set - with
+     occurred_at in the last 30 days, ordered occurred_at DESC. ANSWERED calls
+     excluded (no action needed).
+   - `patientReplies`: INBOUND messages with created_at in the last 30 days,
+     ordered created_at DESC; item `body` truncated to 160 chars + '...'.
+   - `upcomingAppointments`: appointments with appointment_date >= clinic
+     today AND status IN ('SCHEDULED','CONFIRMED'), ordered date ASC, time
+     ASC; item flag `needsConfirmation` = (status === 'SCHEDULED').
+   - `noShows`: appointments with status 'NO_SHOW' AND appointment_date in
+     [clinic today - 30 days, clinic today], ordered appointment_date DESC.
+   - `recallOpportunities`: recalls with status 'DUE' (any due_date), ordered
+     due_date ASC; item `daysSinceDue` = (clinic date - due_date) in days,
+     signed (positive = overdue).
+   - `tasks` (documented derivation, plan L1156 "Tasks requiring action"):
+     the union of actionable subsets in the plan's own priority order - NEW
+     leads; missed calls (30d); patient replies (30d); appointments
+     needing confirmation (status 'SCHEDULED', appointment_date in [today,
+     tomorrow]); no-shows (30d); recalls status 'DUE' with due_date <= clinic
+     today. Each item = {queue, type, id, label, at}. Ordered: leads block,
+     missed block, replies block, appointment block, no-show block, recall
+     block (plan L1150-1156 order), within each block using the queue's own
+     ordering.
+5. **Caps (documented):** 20 items per queue, 50 items for tasks; `count` is
+   always the full uncapped count. Item lists are sliced in JS after small
+   org-scoped SQL fetches (MVP scale; M19 is the performance gate).
+6. **Queries:** 7 total per request (org timezone; NEW leads; missed-call
+   events; INBOUND messages; upcoming appointments w/ patient join; no-shows
+   w/ patient join; DUE recalls w/ patient join) - assembled in JS.
+7. **Response shape:** `{date, timezone, generatedAt, queues: {newLeads,
+   missedCalls, patientReplies, upcomingAppointments, noShows,
+   recallOpportunities, tasks}, definitions}` where each queue = {count,
+   items} and `definitions` is a flat Record<string,string> covering every
+   queue scope + dateBasis + windows + caps (M14-style documented
+   calculations; MVP-12 "explicit calculation definitions").
+8. **Structure:** no migration; `src/services/workspace.ts`,
+   `src/routes/workspace.ts` (mounted at `/api/organizations`), app.ts mount;
+   `tests/m15.integration.test.ts` fixture-verifies every queue (counts,
+   ordering, in/out-of-window exclusions, task composition, caps, truncation,
+   timezone echo, roles 200/404/401, definitions); smoke extended with M15
+   checks; no scheduler/config changes.
+
+### Session 15 - M15 implementation, gates, completion
+
+**Delivered (owner decision D7 - workspace API only; owner acceptance pending):**
+
+- `src/services/workspace.ts`:
+  - `getReceptionistWorkspace(db, orgId)` - 7 org-scoped queries per request;
+    returns `{date, timezone, generatedAt, queues{...}, definitions}` with the
+    plan's 7 priority queues in one payload (single request = "minimize clicks"
+    at the data level).
+  - Caps `WORKSPACE_ITEM_CAP` 20 / `WORKSPACE_TASK_CAP` 50 items in the payload
+    with the FULL uncapped `count` beside them; caps documented in `definitions`.
+  - Date basis: clinic-local calendar date via
+    `Intl.DateTimeFormat('en-CA', {timeZone})`, invalid/missing timezone falls
+    back to UTC; instant windows (30 days) are UTC instants; `date`/`timezone`
+    echoed in the response (design decision 3 above, as built).
+  - Queue scopes exactly as designed: newLeads (status NEW any age, created_at
+    ASC); missedCalls (RECOVERY_OUTCOMES MISSED/REJECTED/BUSY, 30d, occurred_at
+    DESC; ANSWERED excluded); patientReplies (INBOUND 30d DESC, body truncated
+    to 160 chars + `...`); upcomingAppointments (appointment_date >= clinic
+    today, SCHEDULED|CONFIRMED, date/time ASC, `needsConfirmation` = SCHEDULED);
+    noShows (NO_SHOW, date in [today-30, today], DESC); recallOpportunities
+    (DUE, due_date ASC, signed `daysSinceDue`); tasks = documented union in
+    plan priority order - leads -> missed -> replies -> SCHEDULED appointments
+    with date in [today, tomorrow] -> no-shows -> recalls due_date <= today,
+    each item `{queue, type, id, label, at}`.
+  - `DATE_FORMAT`/`TIME_FORMAT` string keys throughout (M14 defect-27 pattern
+    applied proactively - no JS Date keys anywhere); `WORKSPACE_DEFINITIONS`
+    flat record: dateBasis + windows + caps + 7 queue keys (10 keys total).
+- `src/routes/workspace.ts` + `src/app.ts` mount: GET
+  `/api/organizations/:orgId/receptionist/workspace` behind `requireAuth` +
+  `assertOrgExists` (receptionist/owner/admin 200; foreign-org member 404;
+  unauthenticated 401). All-member read - contrasts M14's owner/admin-only
+  dashboard, matching MVP USERS capability split (receptionist has no dashboard
+  capability but owns all 7 workspace queues; PROPOSED reading recorded in the
+  design block).
+- `tests/m15.integration.test.ts` - **9 tests, fixture-verified**: 7-queue
+  counts + ordered ids + in/out-of-scope exclusions (30-day boundaries, past /
+  future / wrong-status appointments, non-NEW leads, non-recovery call outcomes,
+  CLOSED recalls); 160-char truncation proof; task union exact queue+type
+  sequence (10 items) with labels; caps 20/50 against count 55; definitions
+  exact keys + equality with the source constant; date/timezone echo UTC +
+  Pacific/Kiritimati + invalid timezone `Not/AZone` -> UTC date fallback;
+  roles (receptionist 200, owner 200, admin 200, foreign 404, unauth 401).
+- Smoke: +8 M15 checks inserted before cleanup -> **134 total** (receptionist
+  200, owner 200, unauth 401, foreign 404, API-vs-SQL cross-check for newLeads
+  and upcomingAppointments, definitions key present, tasks present).
+
+**Gate results (actual, executed):**
+- `npm run verify` = lint 0 + typecheck 0 + test **237/237 passed, 24 suites,
+  0 failed, 0 skipped** + build 0; exit 0.
+- `npm run migrate` x2: applied 0 / skipped 13, exit 0 both runs (no M15
+  migration - all source tables pre-date M15).
+- Extended smoke: **134/134 PASS, 0 FAIL, SMOKE_PASS, exit 0** (log
+  `m15-smoke-run1.log`; passed on the first run).
+
+**Falsification review (results):**
+- Plan "test usability manually" CHALLENGED as not executable under D7 (no UI
+  exists) - resolved by the owner's delivery decision: manual usability of the
+  interface moves to the owner's UI phase / M21; API-level usability exercised
+  as the receptionist via smoke (session cookie, one request) and the fixture
+  suite.
+- Two documented-but-untested claims found and closed with executed tests:
+  (a) task horizon boundary - a SCHEDULED appointment TODAY is included
+  (fixture A8; task count 9 -> 10, sequence assertions updated, passed);
+  (b) definitions claim "invalid or missing timezone falls back to UTC" - org C
+  created with `Not/AZone`, response `date` asserted equal to the UTC date -
+  passed (also proves no SQL-level constraint on `organizations.timezone`).
+- First iteration hit TS2339 x6: mysql2 `db.query<T>()` returns a tuple -
+  `.map` must run on `[0]`, not the deconstructed tuple (test-iteration fix,
+  no product defect); one test-scope error (`ws` vs `wsA`) fixed. Re-ran lint
+  0 / tsc 0 / suite 9/9.
+- PS 5.1 expandable-string trap avoided during the tuple fix: replacement used
+  `"$n[0].map("` - PowerShell keeps `$n` as the whole variable and `[0]` as
+  literal text (verified by grep: all six sites are `xxx[0].map(`).
+- Route conflicts (two-segment literal paths vs other routers), SQL
+  parametrization, caps arithmetic, queue ordering, tenant scoping, definitions
+  completeness: all covered by passing tests; no further issues found.
+
+**Plan cross-check:** L1144-1160 (workflow-oriented receptionist interface;
+7 priority queues exactly as listed; minimize clicks -> one-request
+aggregation; test usability manually -> deferred per D7); L311-321
+receptionist needs (all capabilities already API-implemented M3/M5/M7/M12/M13);
+MVP USERS receptionist L1689-1701 -> all-member workspace read (PROPOSED
+reading; receptionist 200 asserted); MVP UX acceptance L2727-2744 + UX
+requirements L276-295 -> deferred to the owner's UI phase / M21 per D7; no
+TEST 15 exists (test list ends at TEST 12) -> fixture verification governs;
+M21 L1302-1324 owns the "Receptionist workflow" audit (L1322).
+
+**Unresolved / carried:** frontend stack decision UNKNOWN (plan L378; D7 keeps
+the stack decision with the owner; M21 UX review owns usability); defect 26
+candidate (M3 `createPatient` drops `smsOptOut`) unchanged, owner decision
+pending; K-I2 UNKNOWN (re-gate M22); K-I4 open (re-gate M22); K-I3 UNKNOWN
+(D5 -> M22); B4 -> M22. No migration, no scheduler changes (4 ticks unchanged),
+no new config keys in M15.
+
+**Docs:** rev 37 - PROJECT_STATE (L9 revision 37; L5 M15 PASSED + M16
+NOT_STARTED + stopping rule; new D7 decision row; phase note rev 37; changelog
+row 37) and `M0_Project_Audit.md` M15 row IN_PROGRESS -> PASSED with gate
+numbers; this completion entry.
+
+**Status:** report delivered; M15 awaiting owner acceptance; M16 does not begin
+until the owner accepts the M15 report.

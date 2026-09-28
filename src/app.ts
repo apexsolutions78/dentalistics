@@ -20,6 +20,7 @@ import { createPatientsRouter } from './routes/patients';
 import { createPublicRouter } from './routes/public';
 import { createWebhookRouter } from './routes/webhooks';
 import { createWhatsAppWebhookRouter } from './routes/whatsappWebhook';
+import { createWorkspaceRouter } from './routes/workspace';
 import {
   createRateLimiter,
   LOGIN_RATE_LIMIT,
@@ -117,6 +118,7 @@ export function createApp(deps: AppDeps = {}): Express {
     app.use('/api/organizations', createPatientsRouter({ db, logger }));
     app.use('/api/organizations', createAppointmentsRouter({ db, logger }));
     app.use('/api/organizations', createDashboardRouter({ db, logger }));
+    app.use('/api/organizations', createWorkspaceRouter({ db, logger }));
 
     const publicRate = deps.publicLeadRate;
     app.use(
