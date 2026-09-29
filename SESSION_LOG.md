@@ -2992,3 +2992,267 @@ Implications for M16 design (noted, to be resolved in the design block):
   must never be readable through any API - write-only set, redacted read.
 - FrontEnd §18 settings categories (Clinic, Users, Communication, Templates,
   Appointments, Recall, Reviews, Automation) bound the M16 endpoint grouping.
+
+### Session 16 - design decisions (PROPOSED - M16 build)
+
+All decisions below are PROPOSED design points of record (M14 precedent):
+built as described, tested, reported for owner acceptance with the M16 report.
+
+1. **Scope = backend only (D8).** Settings + templates API, migration 0014,
+   automation-effect tests (plan L1178). No UI in M16; F1 (next phase) builds
+   the Settings/Templates screens per `FrontEnd_Planning.md`.
+2. **Per-org config storage with deployment fallback (resolves the standing
+   M8/M10/M11/M12/M13 "per-org settings at M16" flag).** New table
+   `organization_settings` (organization_id FK, meta_key, meta_value TEXT,
+   UNIQUE(org, key), ON DELETE CASCADE). Precedence at load:
+   **org row -> global `app_meta` row -> built-in defaults**; a corrupt org
+   row falls through to the global row (then defaults), never to defaults
+   first. Existing global rows keep working unchanged (all current tests
+   exercise the fallback path). Org-scoped configs: reminder, noshow, recall,
+   review, ack, missed_call, telephony, whatsapp.
+3. **Loader signature:** `loadXConfig(db, orgId?)` - with orgId tries the org
+   row first (shape-guarded, same validators as today); without orgId behaves
+   exactly as before. Every current call site has org context available
+   (verified by grep: triggers carry organizationId; ticks' rows carry
+   organization_id; webhooks take :orgId). Ticks group due rows by
+   organization_id and resolve config once per org per run (Map cache).
+   Existing tests untouched (global fallback preserves behavior).
+   **Tick-boundary semantics (determined from runReminderTick inspection):**
+   `maxAttempts` stays DEPLOYMENT-GLOBAL (not in the plan's M16 list - only
+   timing/settings are; it is the SQL fetch bound `attempts < ?` and cannot
+   be per-org in one query) - documented in definitions. Ticks no longer
+   early-return on the global `enabled` flag: the fetch keeps the global
+   bound, and each row is gated by its ORG's effective config - org disabled
+   => rows are skipped and stay PENDING (a pause that resumes on re-enable,
+   matching today's global-disabled outcome where rows are left untouched).
+   Creation paths (schedule/start/create) gate on the org's config fully, so
+   a disabled org gets no new rows.
+4. **Clinic profile fields (MVP-13).** Migration 0014 adds to `organizations`:
+   `phone` VARCHAR(32), `email` VARCHAR(254), `address` VARCHAR(255),
+   `logo_url` VARCHAR(512), `business_hours` TEXT (all NULL default).
+   Validation: phone via existing `normalizePhone` (canonical digits -
+   consistency with M3; PROPOSED), email via `optionalEmail`, address
+   optionalText(200), logoUrl = absolute http/https <=512 (same rule as
+   reviewUrl; no binary upload endpoint - hosting/storage UNKNOWN, MVP-13
+   says "Logo if appropriate"), businessHours = `parseBusinessHours`: object
+   with exactly the 7 day keys mon..sun, each null (closed) or
+   {open:'HH:MM', close:'HH:MM'} with open < close.
+5. **Endpoint set (grouped per FrontEnd §18 categories):**
+   - `GET /api/organizations/:orgId/settings` -> one-shot load for F1:
+     `{clinic, automations, providers, templates, definitions}`.
+   - `PATCH .../settings/clinic` -> name, phone, email, address, logoUrl,
+     businessHours, timezone, reviewUrl (timezone/reviewUrl also remain on
+     the legacy `PATCH /:orgId` - M7/M11 compatibility untouched).
+   - `PATCH .../settings/automations/:key` where key in
+     reminder|noShow|recall|review|leadAck|missedCall -> body = partial config
+     merged onto the EFFECTIVE config (org ?? global ?? defaults), then
+     full-shape validated (the existing `is*Config` guards), then written as
+     a complete JSON org row (self-contained rows; no merge at load time).
+   - `PATCH .../settings/providers/:key` where key in telephony|whatsapp ->
+     same merge/validate/upsert.
+   - `PATCH .../settings/templates/:templateName` with `{body}` ->
+     locates the owning automation config, replaces the template string,
+     revalidates the full config, upserts the org row.
+   - `POST .../settings/templates/preview` with `{body, variables?}` ->
+     server-side render (reuses `renderTemplate`; FrontEnd §38: no business
+     logic duplicated client-side) with sample variables (first_name 'Sarah',
+     clinic_name = org.name, appointment_date '14 October',
+     appointment_time '15:00', clinic_phone = org.phone ?? '',
+     booking_link '') merged under caller-provided `variables`; returns
+     `{rendered, unknownVariables}` (FrontEnd §19: identify invalid
+     variables). New helper `listTemplateVariables(text)` in template.ts.
+   All settings routes: `requireAuth` + `assertCanManageMembers`
+   (owner/admin 200; **receptionist 403** - MVP USERS gives receptionist no
+   configure capability; foreign-org 404; unauth 401).
+6. **Secrets are write-only (FrontEnd §18/§39).** Providers GET returns
+   `{enabled, configured: {signingSecret|verifyToken|appSecret|accessToken:
+   boolean}, ...non-secret fields}` and `source`; secret VALUES are never in
+   any response (tested by substring assertion), PATCH accepts string to set
+   / null to clear. Logger already redacts secret-like keys (M1).
+7. **Templates surface (MVP-14).** Expose 10 named slots (MVP-14's 9 +
+   recall follow-up): lead_acknowledgement, missed_call_response,
+   appointment_reminder_48h|24h|2h, no_show_message, no_show_follow_up,
+   recall_message, recall_follow_up, review_request - each mapped to its
+   existing config path (ack.template, missedCall.template,
+   reminder.templates['48'|'24'|'2'], noShow.templates.initial|followUp,
+   recall.templates.initial|followUp, review.template). GET templates =
+   effective bodies; PATCH validates name in set + non-empty <=2000 chars.
+   Templates stay embedded in their automation configs (no new template
+   table) - the settings API is the editing surface. Senders unchanged in
+   how they obtain text (config.templates), so all M8-M11 custom-template
+   tests keep passing.
+8. **Template variables.** Supported set documented in `definitions`:
+   first_name, clinic_name, appointment_date, appointment_time,
+   clinic_phone (NEW source: organizations.phone), booking_link (NO source
+   exists - patient self-service booking out of scope; renders empty,
+   documented). clinic_phone wired into sender variable maps where clinic_name
+   is produced (extend the same SELECT/payload with the org phone);
+   tested at least on the reminder send path + preview.
+9. **User permissions = existing role model (MVP-13 "no large configuration
+   system").** No new ACL system: owner/admin manage users via existing
+   member endpoints; settings authz = assertCanManageMembers; role matrix
+   documented in settings `definitions` for F1 navigation (backend stays
+   authoritative per FrontEnd §5/§39).
+10. **Effect test (plan L1178)** - fixtures must prove configuration changes
+    change automation: (a) PATCH reminder offsets [5] -> schedule creates
+    exactly offset-5 rows; (b) PATCH reminder enabled:false -> no rows;
+    (c) PATCH template body -> rendered message contains new text; (d) org A
+    PATCH does not affect org B (isolation via fallback precedence);
+    (e) PATCH noShow delay -> follow-up row scheduled at new delay;
+    (f) corrupt org config row -> automation still runs on global/default
+    (loader fall-through), settings GET stays 200 with source reported.
+11. **Audit + logging.** Settings writes: `logger.info` (field keys only) +
+    `recordAudit(action:'settings_updated', detail: field keys - never
+    values of secrets)`.
+12. **No migration of existing data.** app_meta rows stay global (they
+    become the deployment-default layer); organization_settings starts empty
+    (source='deployment'/'default' visible in GET until an org PATCH).
+
+Route-conflict note: settings paths are two+ segments under
+`/api/organizations` (`/:orgId/settings/...`) - no existing router matches
+them (verified: `GET/PATCH /:orgId` are single-segment; leads/patients/
+appointments use literal second segments).
+
+### Session 16 - M16 implementation complete (gates green; report delivered, acceptance PENDING)
+
+**What was completed (all 12 design decisions built as recorded, PROPOSED for
+acceptance with the M16 report):**
+
+- **Migration 0014** `migrations/0014_org_settings_and_profile.sql`:
+  `organizations` gains phone / email / address / logo_url / business_hours
+  (all NULL default); new `organization_settings` (organization_id FK,
+  meta_key, meta_value TEXT, UNIQUE(org, meta_key), ON DELETE CASCADE).
+  Applied to dev DB (run 1: applied 1; run 2: applied 0 / skipped 14).
+- **`src/db/orgMeta.ts`**: `loadOrgSetting` + `loadOrgEnabledFilter`
+  (global-disabled fast path preserved via IN/NOT IN org list; corrupt org
+  rows inherit the global state).
+- **8 config loaders** converted to `loadXConfig(db, organizationId?)` with
+  org -> app_meta -> default precedence and shape-guarded corrupt fall-through
+  (reminderConfig, noShowConfig, recallConfig, reviewConfig, automation
+  config, missedCall, telephony/config, whatsappConfig). All 8 `is*Config`
+  guards exported. Call sites converted (triggers, webhooks, ticks, app.ts
+  WhatsApp factory `(organizationId) => loadWhatsAppConfig(db, organizationId)`,
+  whatsappProvider credentials loader now takes organizationId).
+- **All 4 ticks** (reminders, noShow, recall, review) converted: global config
+  stays the fetch bound only; `loadOrgEnabledFilter` gates due/open-row
+  queries; per-row `orgCfgCache` Map resolves effective config once per org
+  per run; each row gated by its ORG's config (disabled -> skipped, stays
+  PENDING). `maxAttempts` remains deployment-global (decision 3). Trigger
+  code reordered so context is read before config (reason priorities
+  preserved).
+- **clinic_phone wired** into lead ack, missed-call (input + callEvents
+  provider path), reminder, recall, review and no-show sender variable maps
+  (interface + SELECT + variables in each; found missing by m16 test 4).
+- **`src/services/settings.ts`** (settings service): `getSettings` (clinic,
+  automations, providers redacted, templates, definitions incl. role matrix +
+  supported template variables), `patchClinic` (name/phone/email/address/
+  logoUrl/businessHours/timezone/reviewUrl with parseBusinessHours,
+  normalizePhone, optionalEmail, parseReviewUrl, parseTimezone),
+  `patchAutomation` (6 keys, partial merge onto effective config, full-shape
+  revalidate, complete org row upsert), `patchProvider` (telephony/whatsapp;
+  secrets write-only, GET exposes only `configured` booleans + non-secret
+  graph fields), `patchTemplate` (10 slots, unknown name 400, path guard),
+  `previewTemplate` (server-side renderTemplate; samples incl. org.name and
+  org.phone; caller variables outside SUPPORTED -> 400; template variables
+  outside SUPPORTED reported in `unknownVariables`), `auditSettingsUpdate`
+  (logger.info + recordAudit `settings_updated`, field keys never secret
+  values).
+- **`src/routes/settings.ts`**: `createSettingsRouter` - GET /:orgId/settings,
+  PATCH clinic | automations/:key | providers/:key | templates/:templateName,
+  POST templates/preview; all `{ settings }` wrapper (preview returns object
+  directly); `requireAuth` + `assertCanManageMembers` (owner/admin 200,
+  receptionist 403, foreign 404, unauth 401); mounted in app.ts after
+  workspace (no route conflicts - verified segment shapes).
+- **Helpers**: `parseBusinessHours` (+BUSINESS_HOUR_DAYS/BusinessHours/
+  BUSINESS_TIME_PATTERN) in validate.ts; `listTemplateVariables` in
+  template.ts.
+- **Tests**: `tests/m16.integration.test.ts` 10 tests = plan L1178 effect set
+  (authz matrix; clinic profile incl. phone normalization + businessHours
+  400s; reminder offsets [5] scheduling + disabled pause + creation gate;
+  patched template rendered on the send path; org A/B isolation; no-show
+  delay from org config; corrupt org row fall-through; validation + partial
+  merge semantics; provider secrets write-only/redacted incl. audit detail
+  scrub; preview samples + unknownVariables) plus unit tests appended to
+  validate.test.ts (parseBusinessHours) and template.test.ts
+  (listTemplateVariables).
+
+**Gates executed (2026-09-29):**
+
+- `npm run verify` exit 0: eslint 0, tsc 0, vitest **256/256 (25 suites, 0
+  skipped)**, build 0.
+- `npm run migrate` x2: run 1 applied `0014` (applied 1 / skipped 13); run 2
+  applied 0 / skipped 14 (idempotent).
+- Extended smoke **153/153 PASS, SMOKE_PASS, exit 0** (19 new M16 checks;
+  log `%TEMP%\opencode\m16-smoke-run2.log`). Smoke run 1 had 1 FAIL: the
+  audit-row check expected exactly 1 row while the block deliberately PATCHes
+  twice (status + body) -> corrected the CHECK to presence semantics (IF
+  COUNT>=1); run 2 clean. `Write-JsonFile` gained `-Depth 8` (PS 5.1 default
+  depth 2 would truncate nested businessHours) - existing flat call sites
+  unaffected.
+
+**Test iterations (defects fixed during the build):**
+
+- m16 test 4 initially failed: `clinic_phone` was empty on the reminder send
+  path -> reminders/recall/reviewRequests lacked the variable -> wired (3
+  files x interface/SELECT/variables) -> 10/10.
+- tsc `noUncheckedIndexedAccess` on `rows[0].message_id` in test 4 -> optional
+  access. eslint unused `runNoShowTick` import removed.
+- Earlier iterations (before the final run): phone-normalization expectation,
+  schedule gate added to `scheduleRemindersForAppointment`, corrupt-row test
+  had to INSERT (upsert semantics), DEFAULT_REVIEW_CONFIG.maxAttempts for
+  round-trip.
+
+**Design amendments / notes (vs the design block above):**
+
+1. Recall template slot maps to `templates.recall` (code truth of the recall
+   config shape); the design block's `recall.templates.initial` was a typo -
+   code follows the existing config shape, no product change.
+2. `scheduleRemindersForAppointment` historically had NO enabled gate (only
+   the tick gated). Per decision 3 ("creation paths gate on the org's config
+   fully") the org-config gate was added -> appointments created while
+   reminder-disabled now get NO rows (previously rows were created and left
+   PENDING, resuming on re-enable). Recorded as new behavior; full suite
+   re-run green (256/256) - no existing test relied on the old behavior.
+3. PATCH semantics as recorded in decision 5: an org PATCH snapshots the
+   effective config into a self-contained org row; later deployment-level
+   changes to that section no longer flow to that org (by design).
+
+**Falsification / plan cross-check executed:**
+
+- `resolveJson` returns `structuredClone` on all 3 paths (org/deployment/
+  default) and `mergeSection` clones - PATCH mutation cannot corrupt shared
+  module defaults (checked because patchTemplate mutates in place).
+- GET redaction after a secret write is covered by the same `getSettings`
+  serializer returned from every PATCH (settings.ts return path) and asserted
+  by substring in m16 test 9 + smoke.
+- Plan cross-check: MILESTONE 16 L1164-1178 all 9 bullets + L1178 test
+  directive, MVP-13 L2194-2209 (all 10 profile items, "no large config
+  system"), MVP-14 L2213-2246 (9 named templates - 10 slots exposed, superset
+  incl. recall follow-up; 6 variables; safe missing vars M6), MVP USERS
+  (owner/admin configure, receptionist none -> 403, admin passes
+  assertCanManageMembers) - all mapped.
+- Effect coverage: (a) offsets [5] -> exactly offset-5 rows; (b) disabled ->
+  no rows; (c) template PATCH -> new text on send path; (d) org A does not
+  affect org B; (e) no-show delay honored; (f) corrupt row -> global/default
+  + source reported. Recall/review creation org-gates use the identical
+  pattern (code inspection; regression green) but are not fixture-tested
+  individually - stated as coverage boundary.
+
+**Files created:** migrations/0014_org_settings_and_profile.sql, src/db/
+orgMeta.ts, src/services/settings.ts, src/routes/settings.ts, tests/m16.
+integration.test.ts.
+**Files modified:** 8 config loaders, automation (leadCreated, reminders,
+noShow, recall, reviewRequests, missedCall/callEvents), whatsappProvider,
+app.ts, validate.ts, template.ts, tests/validate.test.ts,
+tests/template.test.ts, tests/m16.integration.test.ts (iterations).
+
+**Unresolved / carried:** booking_link has no source (renders empty,
+documented, design 8); candidate defect 26 (M3 createPatient drops smsOptOut)
+untouched per instruction; K-I2 / K-I4 / B4 unchanged (M22 re-gates); no UI
+in M16 (D8) - F1 builds Settings/Templates UI next.
+
+**Assumptions:** none beyond design decisions 1-12 (all PROPOSED, reported
+for acceptance with this report).
+
+**Recommended next phase:** F1 (application shell + Settings/Templates UI per
+`FrontEnd_Planning.md`), gated on owner acceptance of the M16 report (D8).

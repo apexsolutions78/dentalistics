@@ -7,7 +7,9 @@ export interface WhatsAppSendCredentials {
   apiVersion: string;
 }
 
-export type WhatsAppCredentialsLoader = () => Promise<WhatsAppSendCredentials | null>;
+export type WhatsAppCredentialsLoader = (
+  organizationId: number,
+) => Promise<WhatsAppSendCredentials | null>;
 
 export class WhatsAppProvider implements CommunicationProvider {
   readonly key = 'whatsapp';
@@ -19,7 +21,7 @@ export class WhatsAppProvider implements CommunicationProvider {
   }
 
   async send(message: OutboundMessage): Promise<ProviderSendResult> {
-    const credentials = await this.loadCredentials();
+    const credentials = await this.loadCredentials(message.organizationId);
     if (
       credentials === null ||
       credentials.accessToken === '' ||

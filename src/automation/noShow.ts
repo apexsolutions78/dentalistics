@@ -3,7 +3,8 @@ import type { Logger } from '../logger';
 import { getProvider } from '../communications/registry';
 import { sendTemplateMessage, sendMessage } from '../services/messages';
 import type { NoShowConfig } from './noShowConfig';
-import { loadNoShowConfig } from './noShowConfig';
+import { NO_SHOW_CONFIG_META_KEY, loadNoShowConfig } from './noShowConfig';
+import { loadOrgEnabledFilter } from '../db/orgMeta';
 
 const HOUR_MS = 3_600_000;
 
@@ -38,6 +39,7 @@ interface ContextRow extends RowDataPacket {
   appointment_date: string;
   appointment_time: string;
   org_name: string;
+  clinic_phone: string | null;
   patient_id: number;
   phone: string;
   first_name: string;
@@ -74,7 +76,7 @@ async function loadContext(db: Pool, caseId: number): Promise<ContextRow | null>
     `SELECT c.id AS case_id, c.status AS case_status,
        a.id AS appointment_id, a.organization_id, a.status,
        DATE_FORMAT(a.appointment_date, '%Y-%m-%d') AS appointment_date,
-       a.appointment_time, o.name AS org_name,
+       a.appointment_time, o.name AS org_name, o.phone AS clinic_phone,
        p.id AS patient_id, p.phone, p.first_name, p.sms_opt_out
      FROM no_show_cases c
      JOIN appointments a ON a.id = c.appointment_id
@@ -113,13 +115,17 @@ export async function startNoShowRecovery(
   const now = input.now ?? new Date();
   const appointmentId = input.appointmentId;
 
-  const cfg = await loadNoShowConfig(db);
+  const ctx = await loadContextByAppointment(db, appointmentId);
+  if (ctx === null) {
+    return { started: false, caseId: null, reason: 'appointment_not_no_show' };
+  }
+
+  const cfg = await loadNoShowConfig(db, ctx.organization_id);
   if (!cfg.enabled) {
     return { started: false, caseId: null, reason: 'disabled' };
   }
 
-  const ctx = await loadContextByAppointment(db, appointmentId);
-  if (ctx === null || ctx.status !== 'NO_SHOW') {
+  if (ctx.status !== 'NO_SHOW') {
     return { started: false, caseId: null, reason: 'appointment_not_no_show' };
   }
 
@@ -197,7 +203,7 @@ async function loadContextByAppointment(db: Pool, appointmentId: number): Promis
   const [rows] = await db.query<ContextRow[]>(
     `SELECT a.id AS appointment_id, a.organization_id, a.status,
        DATE_FORMAT(a.appointment_date, '%Y-%m-%d') AS appointment_date,
-       a.appointment_time, o.name AS org_name,
+       a.appointment_time, o.name AS org_name, o.phone AS clinic_phone,
        p.id AS patient_id, p.phone, p.first_name, p.sms_opt_out
      FROM appointments a
      JOIN organizations o ON o.id = a.organization_id
@@ -407,6 +413,7 @@ async function processNoShowMessage(
         variables: {
           first_name: ctx.first_name,
           clinic_name: ctx.org_name,
+          clinic_phone: ctx.clinic_phone ?? '',
           appointment_date: ctx.appointment_date,
           appointment_time: appointmentTime,
         },
@@ -526,7 +533,13 @@ export async function runNoShowTick(
   const result = emptyResult();
 
   const cfg = await loadNoShowConfig(db);
-  if (!cfg.enabled) {
+  const filter = await loadOrgEnabledFilter(
+    db,
+    NO_SHOW_CONFIG_META_KEY,
+    cfg.enabled,
+    'c.organization_id',
+  );
+  if (!filter.eligible) {
     return result;
   }
 
@@ -548,9 +561,9 @@ export async function runNoShowTick(
         ORDER BY r.appointment_date ASC, r.id ASC
         LIMIT 1) AS rebooked_id
      FROM no_show_cases c
-     WHERE c.status = 'OPEN'
+     WHERE c.status = 'OPEN'${filter.clause}
      LIMIT ?`,
-    [today, batchSize],
+    [today, batchSize, ...filter.params],
   );
   for (const openCase of openCases) {
     if (openCase.rebooked_id === null) {
@@ -574,13 +587,22 @@ export async function runNoShowTick(
      JOIN no_show_cases c ON c.id = m.case_id
      WHERE c.status = 'OPEN'
        AND (m.status = 'PENDING' OR (m.status = 'FAILED' AND m.attempts < ?))
-       AND m.scheduled_at <= ?
+       AND m.scheduled_at <= ?${filter.clause}
      ORDER BY m.scheduled_at ASC, m.id ASC
      LIMIT ?`,
-    [cfg.maxAttempts, now, batchSize],
+    [cfg.maxAttempts, now, batchSize, ...filter.params],
   );
+  const orgCfgCache = new Map<number, NoShowConfig>();
   for (const row of due) {
-    await processNoShowMessage(db, logger, cfg, row, now, result);
+    let orgCfg = orgCfgCache.get(row.organization_id);
+    if (orgCfg === undefined) {
+      orgCfg = await loadNoShowConfig(db, row.organization_id);
+      orgCfgCache.set(row.organization_id, orgCfg);
+    }
+    if (!orgCfg.enabled) {
+      continue;
+    }
+    await processNoShowMessage(db, logger, orgCfg, row, now, result);
   }
 
   if (result.processed > 0 || result.rebooked > 0) {

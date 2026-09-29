@@ -173,6 +173,65 @@ export function parseReviewUrl(value: unknown, name = 'reviewUrl'): string | nul
   return trimmed;
 }
 
+export const BUSINESS_HOUR_DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
+
+export type BusinessHourDay = (typeof BUSINESS_HOUR_DAYS)[number];
+
+export type BusinessHours = Record<BusinessHourDay, { open: string; close: string } | null>;
+
+const BUSINESS_TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+export function parseBusinessHours(value: unknown, name = 'businessHours'): BusinessHours | null {
+  if (value === undefined || value === null || value === '') {
+    return null;
+  }
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    throw new ValidationError('Invalid input', [`${name} must be an object`]);
+  }
+  const obj = value as Record<string, unknown>;
+  const keys = Object.keys(obj);
+  const invalidKeys = keys.filter((key) => !BUSINESS_HOUR_DAYS.includes(key as BusinessHourDay));
+  if (keys.length !== BUSINESS_HOUR_DAYS.length || invalidKeys.length > 0) {
+    throw new ValidationError('Invalid input', [
+      `${name} must contain exactly the keys ${BUSINESS_HOUR_DAYS.join(',')}`,
+    ]);
+  }
+  const out = {} as BusinessHours;
+  for (const day of BUSINESS_HOUR_DAYS) {
+    const slot = obj[day];
+    if (slot === null || slot === undefined) {
+      out[day] = null;
+      continue;
+    }
+    if (typeof slot !== 'object' || Array.isArray(slot)) {
+      throw new ValidationError('Invalid input', [
+        `${name}.${day} must be null or an object with open and close`,
+      ]);
+    }
+    const entry = slot as Record<string, unknown>;
+    const extra = Object.keys(entry).filter((key) => key !== 'open' && key !== 'close');
+    if (extra.length > 0) {
+      throw new ValidationError('Invalid input', [`${name}.${day} has unknown field: ${extra[0] ?? ''}`]);
+    }
+    const { open, close } = entry;
+    if (typeof open !== 'string' || !BUSINESS_TIME_PATTERN.test(open)) {
+      throw new ValidationError('Invalid input', [
+        `${name}.${day}.open must be HH:MM between 00:00 and 23:59`,
+      ]);
+    }
+    if (typeof close !== 'string' || !BUSINESS_TIME_PATTERN.test(close)) {
+      throw new ValidationError('Invalid input', [
+        `${name}.${day}.close must be HH:MM between 00:00 and 23:59`,
+      ]);
+    }
+    if (open >= close) {
+      throw new ValidationError('Invalid input', [`${name}.${day} open must be before close`]);
+    }
+    out[day] = { open, close };
+  }
+  return out;
+}
+
 export function parseListParams(query: Record<string, unknown>): {
   limit: number;
   offset: number;

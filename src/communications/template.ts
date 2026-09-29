@@ -10,6 +10,19 @@ export function renderTemplate(
   });
 }
 
+export function listTemplateVariables(text: string): string[] {
+  const names: string[] = [];
+  const pattern = new RegExp(TEMPLATE_PATTERN.source, TEMPLATE_PATTERN.flags);
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(text)) !== null) {
+    const name = match[1];
+    if (typeof name === 'string' && !names.includes(name)) {
+      names.push(name);
+    }
+  }
+  return names;
+}
+
 export const LEAD_ACK_TEMPLATE_NAME = 'lead_acknowledgement';
 
 export const DEFAULT_LEAD_ACK_TEMPLATE =

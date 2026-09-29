@@ -1,4 +1,5 @@
 import type { Pool, RowDataPacket } from 'mysql2/promise';
+import { loadOrgSetting } from '../db/orgMeta';
 
 export const TELEPHONY_CONFIG_META_KEY = 'telephony_config';
 
@@ -12,7 +13,7 @@ export const DEFAULT_TELEPHONY_CONFIG: TelephonyConfig = {
   signingSecret: '',
 };
 
-function isTelephonyConfig(value: unknown): value is TelephonyConfig {
+export function isTelephonyConfig(value: unknown): value is TelephonyConfig {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
     return false;
   }
@@ -20,7 +21,20 @@ function isTelephonyConfig(value: unknown): value is TelephonyConfig {
   return typeof cfg.enabled === 'boolean' && typeof cfg.signingSecret === 'string';
 }
 
-export async function loadTelephonyConfig(db: Pool): Promise<TelephonyConfig> {
+export async function loadTelephonyConfig(db: Pool, organizationId?: number): Promise<TelephonyConfig> {
+  if (organizationId !== undefined) {
+    const rawOrg = await loadOrgSetting(db, organizationId, TELEPHONY_CONFIG_META_KEY);
+    if (typeof rawOrg === 'string' && rawOrg !== '') {
+      try {
+        const parsedOrg: unknown = JSON.parse(rawOrg);
+        if (isTelephonyConfig(parsedOrg)) {
+          return parsedOrg;
+        }
+      } catch {
+        // corrupt org row - fall through to deployment-global config
+      }
+    }
+  }
   const [rows] = await db.query<RowDataPacket[]>(
     'SELECT meta_value FROM app_meta WHERE meta_key = ?',
     [TELEPHONY_CONFIG_META_KEY],

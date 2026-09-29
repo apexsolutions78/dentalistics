@@ -34,6 +34,7 @@ interface LeadAckRow extends RowDataPacket {
 interface OrgNameRow extends RowDataPacket {
   id: number;
   name: string;
+  phone: string | null;
 }
 
 interface AckStatusRow extends RowDataPacket {
@@ -69,7 +70,7 @@ export async function triggerLeadCreated(
       source: lead.source,
     });
 
-    const config = await loadAckConfig(db);
+    const config = await loadAckConfig(db, event.organizationId);
     if (!config.enabled) {
       logger.info('lead automation skipped', { ...event, reason: 'disabled' });
       return { action: 'skipped_disabled' };
@@ -80,7 +81,7 @@ export async function triggerLeadCreated(
     }
 
     const [orgRows] = await db.query<OrgNameRow[]>(
-      'SELECT id, name FROM organizations WHERE id = ?',
+      'SELECT id, name, phone FROM organizations WHERE id = ?',
       [event.organizationId],
     );
     const org = orgRows[0];
@@ -98,6 +99,7 @@ export async function triggerLeadCreated(
       variables: {
         first_name: lead.first_name,
         clinic_name: org.name,
+        clinic_phone: org.phone ?? '',
       },
       idempotencyKey: ackIdempotencyKey(event.leadId),
       leadId: event.leadId,
@@ -145,7 +147,7 @@ export async function retryLeadAcknowledgement(
       return { action: 'ack_duplicate', messageId: existing.id };
     }
 
-    const config = await loadAckConfig(db);
+    const config = await loadAckConfig(db, event.organizationId);
     const sent = await sendMessage(db, logger, getProvider(config.provider), event.organizationId, existing.id);
     const action = sent.outcome === 'sent' ? 'ack_sent' : 'ack_failed';
     logger.info('lead acknowledgement retry result', {

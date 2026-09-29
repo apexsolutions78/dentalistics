@@ -1,4 +1,5 @@
 import type { Pool, RowDataPacket } from 'mysql2/promise';
+import { loadOrgSetting } from '../db/orgMeta';
 
 export const REMINDER_CONFIG_META_KEY = 'reminder_config';
 
@@ -43,7 +44,7 @@ export const DEFAULT_REMINDER_CONFIG: ReminderConfig = {
   maxAttempts: 3,
 };
 
-function isReminderConfig(value: unknown): value is ReminderConfig {
+export function isReminderConfig(value: unknown): value is ReminderConfig {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
     return false;
   }
@@ -88,7 +89,20 @@ export function cloneReminderConfig(cfg: ReminderConfig): ReminderConfig {
   };
 }
 
-export async function loadReminderConfig(db: Pool): Promise<ReminderConfig> {
+export async function loadReminderConfig(db: Pool, organizationId?: number): Promise<ReminderConfig> {
+  if (organizationId !== undefined) {
+    const rawOrg = await loadOrgSetting(db, organizationId, REMINDER_CONFIG_META_KEY);
+    if (typeof rawOrg === 'string' && rawOrg !== '') {
+      try {
+        const parsedOrg: unknown = JSON.parse(rawOrg);
+        if (isReminderConfig(parsedOrg)) {
+          return cloneReminderConfig(parsedOrg);
+        }
+      } catch {
+        // corrupt org row - fall through to deployment-global config
+      }
+    }
+  }
   const [rows] = await db.query<RowDataPacket[]>(
     'SELECT meta_value FROM app_meta WHERE meta_key = ?',
     [REMINDER_CONFIG_META_KEY],

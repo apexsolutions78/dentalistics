@@ -37,6 +37,7 @@ interface LeadRow extends RowDataPacket {
 interface OrgRow extends RowDataPacket {
   id: number;
   name: string;
+  phone: string | null;
 }
 
 interface EventRow extends RowDataPacket {
@@ -141,7 +142,7 @@ async function recover(
   let messageId: number | null = null;
   let lastError: string | null = null;
 
-  const [orgRows] = await db.query<OrgRow[]>('SELECT id, name FROM organizations WHERE id = ?', [
+  const [orgRows] = await db.query<OrgRow[]>('SELECT id, name, phone FROM organizations WHERE id = ?', [
     organizationId,
   ]);
   const org = orgRows[0];
@@ -160,6 +161,7 @@ async function recover(
       to: phone,
       firstName,
       clinicName: org.name,
+      clinicPhone: org.phone,
       leadId,
     });
     if (response.messageId !== undefined) {

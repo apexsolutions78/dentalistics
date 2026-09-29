@@ -3,6 +3,7 @@ import {
   ValidationError,
   normalizePhone,
   optionalEmail,
+  parseBusinessHours,
   parseDateOnly,
   parseListParams,
   requireChoice,
@@ -80,5 +81,51 @@ describe('requireChoice', () => {
     expect(requireChoice('NEW', ['NEW', 'CLOSED'], 'status')).toBe('NEW');
     expectIssue(() => requireChoice('DONE', ['NEW', 'CLOSED'], 'status'), 'status must be one of');
     expectIssue(() => requireChoice(42, ['NEW'], 'status'), 'status must be one of');
+  });
+});
+
+describe('parseBusinessHours', () => {
+  const valid = {
+    mon: { open: '08:00', close: '17:00' },
+    tue: { open: '08:00', close: '17:00' },
+    wed: null,
+    thu: { open: '09:30', close: '16:30' },
+    fri: { open: '08:00', close: '12:00' },
+    sat: null,
+    sun: null,
+  };
+
+  it('accepts a full seven-day object and returns it unchanged', () => {
+    expect(parseBusinessHours(valid)).toEqual(valid);
+  });
+
+  it('treats null, undefined, and empty string as cleared hours', () => {
+    expect(parseBusinessHours(null)).toBeNull();
+    expect(parseBusinessHours(undefined)).toBeNull();
+    expect(parseBusinessHours('')).toBeNull();
+  });
+
+  it('rejects missing or extra day keys', () => {
+    expectIssue(() => parseBusinessHours({ mon: null }), 'exactly the keys');
+    expectIssue(
+      () => parseBusinessHours({ ...valid, holiday: null }),
+      'exactly the keys',
+    );
+  });
+
+  it('rejects malformed time slots', () => {
+    expectIssue(() => parseBusinessHours({ ...valid, wed: '08:00-17:00' }), 'wed must be null');
+    expectIssue(() => parseBusinessHours({ ...valid, wed: { open: '8:00', close: '17:00' } }), 'wed.open must be HH:MM');
+    expectIssue(() => parseBusinessHours({ ...valid, wed: { open: '24:00', close: '25:00' } }), 'wed.open must be HH:MM');
+    expectIssue(() => parseBusinessHours({ ...valid, wed: { open: '08:00' } }), 'wed.close must be HH:MM');
+  });
+
+  it('rejects open not before close and unknown slot fields', () => {
+    expectIssue(() => parseBusinessHours({ ...valid, wed: { open: '17:00', close: '08:00' } }), 'wed open must be before close');
+    expectIssue(() => parseBusinessHours({ ...valid, wed: { open: '08:00', close: '17:00', break: 'x' } }), 'unknown field');
+  });
+
+  it('rejects non-object input', () => {
+    expectIssue(() => parseBusinessHours(42), 'businessHours must be an object');
   });
 });

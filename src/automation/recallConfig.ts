@@ -1,4 +1,5 @@
 import type { Pool, RowDataPacket } from 'mysql2/promise';
+import { loadOrgSetting } from '../db/orgMeta';
 
 export const RECALL_CONFIG_META_KEY = 'recall_config';
 
@@ -36,7 +37,7 @@ export const DEFAULT_RECALL_CONFIG: RecallConfig = {
   maxAttempts: 3,
 };
 
-function isRecallConfig(value: unknown): value is RecallConfig {
+export function isRecallConfig(value: unknown): value is RecallConfig {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
     return false;
   }
@@ -77,7 +78,20 @@ export function cloneRecallConfig(cfg: RecallConfig): RecallConfig {
   };
 }
 
-export async function loadRecallConfig(db: Pool): Promise<RecallConfig> {
+export async function loadRecallConfig(db: Pool, organizationId?: number): Promise<RecallConfig> {
+  if (organizationId !== undefined) {
+    const rawOrg = await loadOrgSetting(db, organizationId, RECALL_CONFIG_META_KEY);
+    if (typeof rawOrg === 'string' && rawOrg !== '') {
+      try {
+        const parsedOrg: unknown = JSON.parse(rawOrg);
+        if (isRecallConfig(parsedOrg)) {
+          return cloneRecallConfig(parsedOrg);
+        }
+      } catch {
+        // corrupt org row - fall through to deployment-global config
+      }
+    }
+  }
   const [rows] = await db.query<RowDataPacket[]>(
     'SELECT meta_value FROM app_meta WHERE meta_key = ?',
     [RECALL_CONFIG_META_KEY],

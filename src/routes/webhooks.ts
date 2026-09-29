@@ -61,7 +61,7 @@ export function createWebhookRouter(deps: WebhookRouterDeps): Router {
       throw new AppError('Organization not found', 404, 'not_found', true);
     }
 
-    const config = await loadTelephonyConfig(deps.db);
+    const config = await loadTelephonyConfig(deps.db, organizationId);
     if (!config.enabled) {
       throw new AppError('Telephony webhooks are disabled', 403, 'telephony_disabled', true);
     }

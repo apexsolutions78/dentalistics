@@ -3,7 +3,8 @@ import type { Logger } from '../logger';
 import { getProvider } from '../communications/registry';
 import { sendTemplateMessage, sendMessage } from '../services/messages';
 import type { RecallConfig } from './recallConfig';
-import { loadRecallConfig } from './recallConfig';
+import { RECALL_CONFIG_META_KEY, loadRecallConfig } from './recallConfig';
+import { loadOrgEnabledFilter } from '../db/orgMeta';
 
 const HOUR_MS = 3_600_000;
 
@@ -43,6 +44,7 @@ interface ContextRow extends RowDataPacket {
   due_date: string;
   recall_type: string;
   org_name: string;
+  clinic_phone: string | null;
   phone: string;
   first_name: string;
   sms_opt_out: number | boolean;
@@ -94,6 +96,7 @@ async function loadContext(db: Pool, recallId: number): Promise<ContextRow | nul
   const [rows] = await db.query<ContextRow[]>(
     `SELECT r.id AS recall_id, r.status AS recall_status, r.organization_id, r.patient_id,
        DATE_FORMAT(r.due_date, '%Y-%m-%d') AS due_date, r.recall_type, o.name AS org_name,
+       o.phone AS clinic_phone,
        p.phone, p.first_name, p.sms_opt_out
      FROM recalls r
      JOIN organizations o ON o.id = r.organization_id
@@ -132,13 +135,17 @@ export async function createRecallForCompletedAppointment(
   const now = input.now ?? new Date();
   const appointmentId = input.appointmentId;
 
-  const cfg = await loadRecallConfig(db);
+  const ctx = await loadAppointmentCtx(db, appointmentId);
+  if (ctx === null) {
+    return { created: false, recallId: null, dueDate: null, reason: 'appointment_not_completed' };
+  }
+
+  const cfg = await loadRecallConfig(db, ctx.organization_id);
   if (!cfg.enabled) {
     return { created: false, recallId: null, dueDate: null, reason: 'disabled' };
   }
 
-  const ctx = await loadAppointmentCtx(db, appointmentId);
-  if (ctx === null || ctx.status !== 'COMPLETED') {
+  if (ctx.status !== 'COMPLETED') {
     return { created: false, recallId: null, dueDate: null, reason: 'appointment_not_completed' };
   }
 
@@ -522,6 +529,7 @@ async function processRecallMessage(
         variables: {
           first_name: ctx.first_name,
           clinic_name: ctx.org_name,
+          clinic_phone: ctx.clinic_phone ?? '',
           due_date: ctx.due_date,
           interval_days: String(cfg.intervalDays),
           recall_type: ctx.recall_type,
@@ -644,7 +652,13 @@ export async function runRecallTick(
   const result = emptyResult();
 
   const cfg = await loadRecallConfig(db);
-  if (!cfg.enabled) {
+  const filter = await loadOrgEnabledFilter(
+    db,
+    RECALL_CONFIG_META_KEY,
+    cfg.enabled,
+    'r.organization_id',
+  );
+  if (!filter.eligible) {
     return result;
   }
 
@@ -666,9 +680,9 @@ export async function runRecallTick(
         ORDER BY a.appointment_date ASC, a.id ASC
         LIMIT 1) AS booking_id
      FROM recalls r
-     WHERE r.status IN ${OPEN_STATUSES}
+     WHERE r.status IN ${OPEN_STATUSES}${filter.clause}
      LIMIT ?`,
-    [today, batchSize],
+    [today, batchSize, ...filter.params],
   );
   for (const openRow of openRows) {
     if (openRow.booking_id === null) {
@@ -692,13 +706,22 @@ export async function runRecallTick(
      JOIN recalls r ON r.id = m.recall_id
      WHERE r.status IN ${OPEN_STATUSES}
        AND (m.status = 'PENDING' OR (m.status = 'FAILED' AND m.attempts < ?))
-       AND m.scheduled_at <= ?
+       AND m.scheduled_at <= ?${filter.clause}
      ORDER BY m.scheduled_at ASC, m.id ASC
      LIMIT ?`,
-    [cfg.maxAttempts, now, batchSize],
+    [cfg.maxAttempts, now, batchSize, ...filter.params],
   );
+  const orgCfgCache = new Map<number, RecallConfig>();
   for (const row of due) {
-    await processRecallMessage(db, logger, cfg, row, now, result);
+    let orgCfg = orgCfgCache.get(row.organization_id);
+    if (orgCfg === undefined) {
+      orgCfg = await loadRecallConfig(db, row.organization_id);
+      orgCfgCache.set(row.organization_id, orgCfg);
+    }
+    if (!orgCfg.enabled) {
+      continue;
+    }
+    await processRecallMessage(db, logger, orgCfg, row, now, result);
   }
 
   if (result.processed > 0 || result.booked > 0) {

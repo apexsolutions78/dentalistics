@@ -1,4 +1,5 @@
 import type { Pool, RowDataPacket } from 'mysql2/promise';
+import { loadOrgSetting } from '../db/orgMeta';
 import { getProvider } from '../communications/registry';
 import { DEFAULT_MISSED_CALL_TEMPLATE, MISSED_CALL_TEMPLATE_NAME } from '../communications/template';
 import type { Logger } from '../logger';
@@ -20,7 +21,7 @@ export const DEFAULT_MISSED_CALL_CONFIG: MissedCallConfig = {
   template: DEFAULT_MISSED_CALL_TEMPLATE,
 };
 
-function isMissedCallConfig(value: unknown): value is MissedCallConfig {
+export function isMissedCallConfig(value: unknown): value is MissedCallConfig {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
     return false;
   }
@@ -35,7 +36,20 @@ function isMissedCallConfig(value: unknown): value is MissedCallConfig {
   );
 }
 
-export async function loadMissedCallConfig(db: Pool): Promise<MissedCallConfig> {
+export async function loadMissedCallConfig(db: Pool, organizationId?: number): Promise<MissedCallConfig> {
+  if (organizationId !== undefined) {
+    const rawOrg = await loadOrgSetting(db, organizationId, MISSED_CALL_CONFIG_META_KEY);
+    if (typeof rawOrg === 'string' && rawOrg !== '') {
+      try {
+        const parsedOrg: unknown = JSON.parse(rawOrg);
+        if (isMissedCallConfig(parsedOrg)) {
+          return parsedOrg;
+        }
+      } catch {
+        // corrupt org row - fall through to deployment-global config
+      }
+    }
+  }
   const [rows] = await db.query<RowDataPacket[]>(
     'SELECT meta_value FROM app_meta WHERE meta_key = ?',
     [MISSED_CALL_CONFIG_META_KEY],
@@ -66,6 +80,7 @@ export interface MissedCallResponseInput {
   to: string;
   firstName: string;
   clinicName: string;
+  clinicPhone: string | null;
   leadId: number | null;
 }
 
@@ -80,7 +95,7 @@ export async function sendMissedCallResponse(
   input: MissedCallResponseInput,
 ): Promise<MissedCallResponseResult> {
   try {
-    const config = await loadMissedCallConfig(db);
+    const config = await loadMissedCallConfig(db, input.organizationId);
     if (!config.enabled) {
       logger.info('missed-call response skipped', { ...input, reason: 'disabled' });
       return { action: 'skipped_disabled' };
@@ -94,6 +109,7 @@ export async function sendMissedCallResponse(
       variables: {
         first_name: input.firstName,
         clinic_name: input.clinicName,
+        clinic_phone: input.clinicPhone ?? '',
       },
       idempotencyKey: missedCallIdempotencyKey(input.providerKey, input.eventId),
       leadId: input.leadId,
@@ -140,7 +156,7 @@ export async function retryMissedCallResponse(
     if (existing.status !== 'FAILED' && existing.status !== 'PENDING') {
       return { action: 'duplicate', messageId: existing.id };
     }
-    const config = await loadMissedCallConfig(db);
+    const config = await loadMissedCallConfig(db, input.organizationId);
     const sent = await sendMessage(db, logger, getProvider(config.provider), input.organizationId, existing.id);
     const action = sent.outcome === 'sent' ? 'sent' : 'failed';
     logger.info('missed-call response retry result', {

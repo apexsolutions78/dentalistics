@@ -173,7 +173,7 @@ export function createWhatsAppWebhookRouter(deps: WhatsAppWebhookRouterDeps): Ro
     const organizationId = parsePathId(req.params.orgId);
     await assertActiveOrg(deps.db, organizationId);
 
-    const config = await loadWhatsAppConfig(deps.db);
+    const config = await loadWhatsAppConfig(deps.db, organizationId);
     const hubMode = req.query['hub.mode'];
     const challenge = req.query['hub.challenge'];
     const verifyToken = req.query['hub.verify_token'];
@@ -201,7 +201,7 @@ export function createWhatsAppWebhookRouter(deps: WhatsAppWebhookRouterDeps): Ro
     const organizationId = parsePathId(req.params.orgId);
     await assertActiveOrg(deps.db, organizationId);
 
-    const config = await loadWhatsAppConfig(deps.db);
+    const config = await loadWhatsAppConfig(deps.db, organizationId);
     if (!config.enabled) {
       throw new AppError('WhatsApp webhooks are disabled', 403, 'whatsapp_disabled', true);
     }

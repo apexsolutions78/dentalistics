@@ -1,4 +1,5 @@
 import type { Pool, RowDataPacket } from 'mysql2/promise';
+import { loadOrgSetting } from '../db/orgMeta';
 
 export const REVIEW_CONFIG_META_KEY = 'review_config';
 
@@ -25,7 +26,7 @@ export const DEFAULT_REVIEW_CONFIG: ReviewConfig = {
   maxAttempts: 3,
 };
 
-function isReviewConfig(value: unknown): value is ReviewConfig {
+export function isReviewConfig(value: unknown): value is ReviewConfig {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
     return false;
   }
@@ -56,7 +57,20 @@ export function cloneReviewConfig(cfg: ReviewConfig): ReviewConfig {
   return { ...cfg };
 }
 
-export async function loadReviewConfig(db: Pool): Promise<ReviewConfig> {
+export async function loadReviewConfig(db: Pool, organizationId?: number): Promise<ReviewConfig> {
+  if (organizationId !== undefined) {
+    const rawOrg = await loadOrgSetting(db, organizationId, REVIEW_CONFIG_META_KEY);
+    if (typeof rawOrg === 'string' && rawOrg !== '') {
+      try {
+        const parsedOrg: unknown = JSON.parse(rawOrg);
+        if (isReviewConfig(parsedOrg)) {
+          return cloneReviewConfig(parsedOrg);
+        }
+      } catch {
+        // corrupt org row - fall through to deployment-global config
+      }
+    }
+  }
   const [rows] = await db.query<RowDataPacket[]>(
     'SELECT meta_value FROM app_meta WHERE meta_key = ?',
     [REVIEW_CONFIG_META_KEY],

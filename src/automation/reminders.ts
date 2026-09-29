@@ -3,7 +3,8 @@ import type { Logger } from '../logger';
 import { getProvider } from '../communications/registry';
 import { sendTemplateMessage, sendMessage } from '../services/messages';
 import type { ReminderConfig } from './reminderConfig';
-import { DEFAULT_REMINDER_TEMPLATE_2H, loadReminderConfig } from './reminderConfig';
+import { DEFAULT_REMINDER_TEMPLATE_2H, REMINDER_CONFIG_META_KEY, loadReminderConfig } from './reminderConfig';
+import { loadOrgEnabledFilter } from '../db/orgMeta';
 import { clinicLocalTime, isWithinQuietHours, zonedToUtc } from './time';
 
 const HOUR_MS = 3_600_000;
@@ -36,6 +37,7 @@ interface ContextRow extends RowDataPacket {
   appointment_time: string;
   timezone: string;
   org_name: string;
+  clinic_phone: string | null;
   patient_id: number;
   phone: string;
   first_name: string;
@@ -73,7 +75,10 @@ export async function scheduleRemindersForAppointment(
     return { scheduled: 0, skipped: 1 };
   }
 
-  const cfg = await loadReminderConfig(db);
+  const cfg = await loadReminderConfig(db, appt.organization_id);
+  if (!cfg.enabled) {
+    return { scheduled: 0, skipped: cfg.offsetsHours.length };
+  }
   const now = Date.now();
   const appointmentInstant = zonedToUtc(
     appt.appointment_date,
@@ -179,7 +184,7 @@ async function loadContext(db: Pool, appointmentId: number): Promise<ContextRow 
   const [rows] = await db.query<ContextRow[]>(
     `SELECT a.id AS appointment_id, a.organization_id, a.status,
        DATE_FORMAT(a.appointment_date, '%Y-%m-%d') AS appointment_date,
-       a.appointment_time, o.timezone, o.name AS org_name,
+       a.appointment_time, o.timezone, o.name AS org_name, o.phone AS clinic_phone,
        p.id AS patient_id, p.phone, p.first_name, p.sms_opt_out
      FROM appointments a
      JOIN organizations o ON o.id = a.organization_id
@@ -280,6 +285,7 @@ async function processReminder(
         variables: {
           first_name: ctx.first_name,
           clinic_name: ctx.org_name,
+          clinic_phone: ctx.clinic_phone ?? '',
           appointment_date: ctx.appointment_date,
           appointment_time: appointmentTime,
         },
@@ -404,7 +410,13 @@ export async function runReminderTick(
   };
 
   const cfg = await loadReminderConfig(db);
-  if (!cfg.enabled) {
+  const filter = await loadOrgEnabledFilter(
+    db,
+    REMINDER_CONFIG_META_KEY,
+    cfg.enabled,
+    'organization_id',
+  );
+  if (!filter.eligible) {
     return result;
   }
 
@@ -420,14 +432,23 @@ export async function runReminderTick(
     `SELECT id, organization_id, appointment_id, offset_hours, status, message_id, attempts, scheduled_at
      FROM appointment_reminders
      WHERE (status = 'PENDING' OR (status = 'FAILED' AND attempts < ?))
-       AND scheduled_at <= ?
+       AND scheduled_at <= ?${filter.clause}
      ORDER BY scheduled_at ASC, id ASC
      LIMIT ?`,
-    [cfg.maxAttempts, now, batchSize],
+    [cfg.maxAttempts, now, batchSize, ...filter.params],
   );
 
+  const orgCfgCache = new Map<number, ReminderConfig>();
   for (const row of due) {
-    await processReminder(db, logger, cfg, row, now, result);
+    let orgCfg = orgCfgCache.get(row.organization_id);
+    if (orgCfg === undefined) {
+      orgCfg = await loadReminderConfig(db, row.organization_id);
+      orgCfgCache.set(row.organization_id, orgCfg);
+    }
+    if (!orgCfg.enabled) {
+      continue;
+    }
+    await processReminder(db, logger, orgCfg, row, now, result);
   }
 
   if (result.processed > 0) {

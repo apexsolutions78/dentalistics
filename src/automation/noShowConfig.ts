@@ -1,4 +1,5 @@
 import type { Pool, RowDataPacket } from 'mysql2/promise';
+import { loadOrgSetting } from '../db/orgMeta';
 
 export const NO_SHOW_CONFIG_META_KEY = 'noshow_config';
 
@@ -34,7 +35,7 @@ export const DEFAULT_NO_SHOW_CONFIG: NoShowConfig = {
   maxAttempts: 3,
 };
 
-function isNoShowConfig(value: unknown): value is NoShowConfig {
+export function isNoShowConfig(value: unknown): value is NoShowConfig {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
     return false;
   }
@@ -71,7 +72,20 @@ export function cloneNoShowConfig(cfg: NoShowConfig): NoShowConfig {
   };
 }
 
-export async function loadNoShowConfig(db: Pool): Promise<NoShowConfig> {
+export async function loadNoShowConfig(db: Pool, organizationId?: number): Promise<NoShowConfig> {
+  if (organizationId !== undefined) {
+    const rawOrg = await loadOrgSetting(db, organizationId, NO_SHOW_CONFIG_META_KEY);
+    if (typeof rawOrg === 'string' && rawOrg !== '') {
+      try {
+        const parsedOrg: unknown = JSON.parse(rawOrg);
+        if (isNoShowConfig(parsedOrg)) {
+          return cloneNoShowConfig(parsedOrg);
+        }
+      } catch {
+        // corrupt org row - fall through to deployment-global config
+      }
+    }
+  }
   const [rows] = await db.query<RowDataPacket[]>(
     'SELECT meta_value FROM app_meta WHERE meta_key = ?',
     [NO_SHOW_CONFIG_META_KEY],

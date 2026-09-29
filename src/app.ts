@@ -18,6 +18,7 @@ import { createLeadsRouter } from './routes/leads';
 import { createOrganizationsRouter } from './routes/organizations';
 import { createPatientsRouter } from './routes/patients';
 import { createPublicRouter } from './routes/public';
+import { createSettingsRouter } from './routes/settings';
 import { createWebhookRouter } from './routes/webhooks';
 import { createWhatsAppWebhookRouter } from './routes/whatsappWebhook';
 import { createWorkspaceRouter } from './routes/workspace';
@@ -119,6 +120,7 @@ export function createApp(deps: AppDeps = {}): Express {
     app.use('/api/organizations', createAppointmentsRouter({ db, logger }));
     app.use('/api/organizations', createDashboardRouter({ db, logger }));
     app.use('/api/organizations', createWorkspaceRouter({ db, logger }));
+    app.use('/api/organizations', createSettingsRouter({ db, logger }));
 
     const publicRate = deps.publicLeadRate;
     app.use(
@@ -148,8 +150,8 @@ export function createApp(deps: AppDeps = {}): Express {
     );
 
     registerProvider(
-      new WhatsAppProvider(async () => {
-        const config = await loadWhatsAppConfig(db);
+      new WhatsAppProvider(async (organizationId: number) => {
+        const config = await loadWhatsAppConfig(db, organizationId);
         if (config.graph.accessToken === '' || config.graph.phoneNumberId === '') {
           return null;
         }

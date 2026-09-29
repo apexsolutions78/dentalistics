@@ -1,4 +1,5 @@
 import type { Pool, RowDataPacket } from 'mysql2/promise';
+import { loadOrgSetting } from '../db/orgMeta';
 import { DEFAULT_LEAD_ACK_TEMPLATE } from '../communications/template';
 
 export const ACK_CONFIG_META_KEY = 'automation_ack_config';
@@ -19,7 +20,7 @@ export const DEFAULT_ACK_CONFIG: AckAutomationConfig = {
   template: DEFAULT_LEAD_ACK_TEMPLATE,
 };
 
-function isAckConfig(value: unknown): value is AckAutomationConfig {
+export function isAckConfig(value: unknown): value is AckAutomationConfig {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
     return false;
   }
@@ -36,7 +37,20 @@ function isAckConfig(value: unknown): value is AckAutomationConfig {
   );
 }
 
-export async function loadAckConfig(db: Pool): Promise<AckAutomationConfig> {
+export async function loadAckConfig(db: Pool, organizationId?: number): Promise<AckAutomationConfig> {
+  if (organizationId !== undefined) {
+    const rawOrg = await loadOrgSetting(db, organizationId, ACK_CONFIG_META_KEY);
+    if (typeof rawOrg === 'string' && rawOrg !== '') {
+      try {
+        const parsedOrg: unknown = JSON.parse(rawOrg);
+        if (isAckConfig(parsedOrg)) {
+          return parsedOrg;
+        }
+      } catch {
+        // corrupt org row - fall through to deployment-global config
+      }
+    }
+  }
   const [rows] = await db.query<RowDataPacket[]>(
     'SELECT meta_value FROM app_meta WHERE meta_key = ?',
     [ACK_CONFIG_META_KEY],

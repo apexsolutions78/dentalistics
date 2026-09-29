@@ -1,4 +1,5 @@
 import type { Pool, RowDataPacket } from 'mysql2/promise';
+import { loadOrgSetting } from '../db/orgMeta';
 
 export const WHATSAPP_CONFIG_META_KEY = 'whatsapp_config';
 
@@ -26,7 +27,7 @@ export const DEFAULT_WHATSAPP_CONFIG: WhatsAppConfig = {
   },
 };
 
-function isWhatsAppConfig(value: unknown): value is WhatsAppConfig {
+export function isWhatsAppConfig(value: unknown): value is WhatsAppConfig {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
     return false;
   }
@@ -50,7 +51,20 @@ function isWhatsAppConfig(value: unknown): value is WhatsAppConfig {
   );
 }
 
-export async function loadWhatsAppConfig(db: Pool): Promise<WhatsAppConfig> {
+export async function loadWhatsAppConfig(db: Pool, organizationId?: number): Promise<WhatsAppConfig> {
+  if (organizationId !== undefined) {
+    const rawOrg = await loadOrgSetting(db, organizationId, WHATSAPP_CONFIG_META_KEY);
+    if (typeof rawOrg === 'string' && rawOrg !== '') {
+      try {
+        const parsedOrg: unknown = JSON.parse(rawOrg);
+        if (isWhatsAppConfig(parsedOrg)) {
+          return parsedOrg;
+        }
+      } catch {
+        // corrupt org row - fall through to deployment-global config
+      }
+    }
+  }
   const [rows] = await db.query<RowDataPacket[]>(
     'SELECT meta_value FROM app_meta WHERE meta_key = ?',
     [WHATSAPP_CONFIG_META_KEY],

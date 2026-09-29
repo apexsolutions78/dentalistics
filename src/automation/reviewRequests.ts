@@ -3,7 +3,8 @@ import type { Logger } from '../logger';
 import { getProvider } from '../communications/registry';
 import { sendTemplateMessage, sendMessage } from '../services/messages';
 import type { ReviewConfig } from './reviewConfig';
-import { loadReviewConfig } from './reviewConfig';
+import { REVIEW_CONFIG_META_KEY, loadReviewConfig } from './reviewConfig';
+import { loadOrgEnabledFilter } from '../db/orgMeta';
 
 const HOUR_MS = 3_600_000;
 const DAY_MS = 24 * HOUR_MS;
@@ -36,6 +37,7 @@ interface ReviewContextRow extends RowDataPacket {
   patient_id: number;
   review_url: string | null;
   org_name: string;
+  clinic_phone: string | null;
   phone: string;
   first_name: string;
   sms_opt_out: number | boolean;
@@ -96,7 +98,7 @@ async function loadAppointmentCtx(
 async function loadContext(db: Pool, reviewId: number): Promise<ReviewContextRow | null> {
   const [rows] = await db.query<ReviewContextRow[]>(
     `SELECT r.id AS review_id, r.status AS review_status, r.organization_id, r.patient_id,
-       r.review_url, o.name AS org_name, p.phone, p.first_name, p.sms_opt_out
+       r.review_url, o.name AS org_name, o.phone AS clinic_phone, p.phone, p.first_name, p.sms_opt_out
      FROM review_requests r
      JOIN organizations o ON o.id = r.organization_id
      JOIN patients p ON p.id = r.patient_id
@@ -142,13 +144,22 @@ export async function createReviewRequestForCompletedAppointment(
   const now = input.now ?? new Date();
   const appointmentId = input.appointmentId;
 
-  const cfg = await loadReviewConfig(db);
+  const ctx = await loadAppointmentCtx(db, appointmentId);
+  if (ctx === null) {
+    return {
+      created: false,
+      reviewRequestId: null,
+      status: null,
+      reason: 'appointment_not_completed',
+    };
+  }
+
+  const cfg = await loadReviewConfig(db, ctx.organization_id);
   if (!cfg.enabled) {
     return { created: false, reviewRequestId: null, status: null, reason: 'disabled' };
   }
 
-  const ctx = await loadAppointmentCtx(db, appointmentId);
-  if (ctx === null || ctx.status !== 'COMPLETED') {
+  if (ctx.status !== 'COMPLETED') {
     return {
       created: false,
       reviewRequestId: null,
@@ -377,6 +388,7 @@ async function processReviewRequest(
         variables: {
           first_name: ctx.first_name,
           clinic_name: ctx.org_name,
+          clinic_phone: ctx.clinic_phone ?? '',
           review_url: reviewUrl,
         },
         idempotencyKey: `review:${row.id}`,
@@ -490,7 +502,13 @@ export async function runReviewRequestTick(
   const result = emptyResult();
 
   const cfg = await loadReviewConfig(db);
-  if (!cfg.enabled) {
+  const filter = await loadOrgEnabledFilter(
+    db,
+    REVIEW_CONFIG_META_KEY,
+    cfg.enabled,
+    'organization_id',
+  );
+  if (!filter.eligible) {
     return result;
   }
 
@@ -506,13 +524,22 @@ export async function runReviewRequestTick(
     `SELECT id, organization_id, status, message_id, attempts
      FROM review_requests
      WHERE (status = 'PENDING' OR (status = 'FAILED' AND attempts < ?))
-       AND scheduled_at <= ?
+       AND scheduled_at <= ?${filter.clause}
      ORDER BY scheduled_at ASC, id ASC
      LIMIT ?`,
-    [cfg.maxAttempts, now, batchSize],
+    [cfg.maxAttempts, now, batchSize, ...filter.params],
   );
+  const orgCfgCache = new Map<number, ReviewConfig>();
   for (const row of due) {
-    await processReviewRequest(db, logger, cfg, row, now, result);
+    let orgCfg = orgCfgCache.get(row.organization_id);
+    if (orgCfg === undefined) {
+      orgCfg = await loadReviewConfig(db, row.organization_id);
+      orgCfgCache.set(row.organization_id, orgCfg);
+    }
+    if (!orgCfg.enabled) {
+      continue;
+    }
+    await processReviewRequest(db, logger, orgCfg, row, now, result);
   }
 
   if (result.processed > 0) {
