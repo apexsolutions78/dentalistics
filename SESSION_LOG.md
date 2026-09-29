@@ -3256,3 +3256,223 @@ for acceptance with this report).
 
 **Recommended next phase:** F1 (application shell + Settings/Templates UI per
 `FrontEnd_Planning.md`), gated on owner acceptance of the M16 report (D8).
+### Session 17 - M16 accepted (PASSED), F1 start + design proposal (PROPOSED - awaiting owner approval)
+
+**Owner conditional instruction (2026-09-29):** "if not done already, save
+session log, commit, push current progress and then proceed to next phase as
+proposed" -> session log was already saved, committed and pushed (rev 40,
+`c65a117`, MATCH=OK verified before the instruction); the instruction
+constitutes **acceptance of the M16 report -> M16 PASSED** (gates at pass
+unchanged from rev 40: verify 256/256 (25 suites, 0 skipped), migrate 0014
+applied then 0/14 idempotent, extended smoke 153/153). Next phase as proposed
+= **F1** (D8 sequence).
+
+**D9 - F1 frontend stack (owner answer to the F1 stack question, 2026-09-29):**
+React 19 + Vite + TypeScript; separate `frontend/` (or `client/`) workspace;
+backend unchanged (Node 24, TypeScript, Express 5, MySQL, tsc-only backend
+build, Vitest); React Router for the documented route structure; React
+Testing Library + Vitest for frontend tests; dev = Vite proxy `/api` ->
+Express; prod = `npm run build` in frontend, Express serves generated `dist`
+same-origin + SPA fallback; no separate frontend hosting, SSR, Next.js,
+Tailwind, Redux, or unnecessary UI frameworks unless explicitly justified;
+lean dependency surface; CSS modules or simple maintainable CSS (project
+specifies no styling system); preserve repo conventions, inspect backend
+first, modify backend behavior only to serve the production frontend + SPA
+fallback; clear build/deploy process for DirectAdmin Node.js hosting, listen
+on `process.env.PORT` (already implemented - config.ts L94 default 3000),
+production env vars; **before implementation provide: proposed folder
+structure, package changes, Vite configuration, Express static-serving and
+SPA-fallback plan, test plan, DirectAdmin deployment steps; wait for approval
+before broad changes.**
+
+**Backend inspection facts (CONFIRMED, for the proposal):**
+
+- `src/index.ts`: listens on `config.port` (`loadEnv()` -> `PORT`, default
+  3000); `secureCookies: nodeEnv === 'production'` -> production login
+  requires HTTPS (K-I2 remains UNKNOWN, M22 re-gate).
+- `src/config.ts` env keys: `NODE_ENV`, `PORT`, `LOG_LEVEL`, `DB_HOST`,
+  `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `MIGRATIONS_DIR` (optional).
+- `tsconfig.build.json`: `include: ["src/**/*.ts"]`, `rootDir: src` ->
+  frontend files are invisible to the backend build; root `tsconfig.json`
+  include list likewise backend-only.
+- `eslint.config.mjs`: flat config, no file-scoped frontend handling; root
+  `vitest.config.mts`: `environment: 'node'`, include `tests/**` only.
+- No frontend exists anywhere (re-confirmed): no HTML/JSX/CSS assets, no
+  bundler, frontend deps absent from package.json (deps: dotenv, express,
+  mysql2 only).
+- Express 5 (wildcard syntax differs from v4 - SPA fallback must use pathless
+  middleware, not `'*'`).
+
+**F1 design proposal (PROPOSED - the six items the owner required; approval
+requested before any implementation):**
+
+**1. Proposed folder structure**
+
+```text
+frontend/                        new workspace (never touched by backend tsc/eslint/vitest)
+  package.json                   own deps + scripts (see item 2)
+  vite.config.ts                 react plugin, dev proxy, build outDir=dist, vitest section (item 3)
+  tsconfig.json                  strict, jsx: react-jsx, moduleResolution: bundler, noEmit
+  eslint.config.mjs              typescript-eslint + js recommended + react-hooks
+  index.html                     Vite entry, mounts #root
+  src/
+    main.tsx                     createRoot + BrowserRouter
+    app/
+      router.tsx                 route table (FrontEnd section 3 paths)
+      shell/AppShell.tsx         Header + Sidebar + <Outlet/>  (B1)
+      shell/Sidebar.tsx          nav: Dashboard, Leads, Patients, Appointments,
+                                 Automations, Communic., Recall, Settings (5; disabled
+                                 links for screens F1 does not build yet -> "planned")
+      shell/Header.tsx           page area + AccountMenu (B2)
+      shell/AccountMenu.tsx      current user + POST /api/auth/logout
+    lib/
+      api.ts                     fetch wrapper: same-origin credentials, JSON in/out,
+                                 ApiError {status, code, issues}, 401 -> session state
+      useAsync.ts                loading/error/success state hook (sections 24-27)
+      auth.tsx                   session context via GET /api/auth/me
+    components/                  PageHeader, FormField, ConfirmDialog, StatusBadge,
+                                 DataTable, EmptyState, ErrorState, LoadingState,
+                                 Toast (section 37 list, only what F1 screens need)
+    pages/
+      LoginPage.tsx              A1
+      NotFoundPage.tsx           M1; UnauthorizedPage.tsx M2
+      settings/
+        SettingsOverviewPage.tsx K1
+        ClinicSettingsPage.tsx   K2   (GET/PATCH /api/organizations/:id/settings/clinic)
+        UsersRolesPage.tsx       K3   (existing member APIs - proposed in F1, see scope)
+        CommunicationSettingsPage.tsx K4 (automations channel/provider surfaces)
+        TemplatesPage.tsx        K5   (template slots from GET settings)
+        TemplateEditorPage.tsx   K6   (PATCH template + POST .../templates/preview)
+        AppointmentSettingsPage.tsx K7 (reminder section)
+        RecallSettingsPage.tsx   K8
+        ReviewSettingsPage.tsx   K9
+        AutomationSettingsPage.tsx K10 (lead ack, no-show, missed call, WhatsApp/telephony)
+    styles/tokens.css            section 7 design system as CSS variables
+    styles/global.css            resets + layout
+    test/setup.ts                jest-dom matchers
+  src/**/*.test.tsx              frontend tests (own vitest config, jsdom)
+```
+
+F1 scope = shell (B1/B2) + A1 login + K1-K10 settings screens + minimum
+system states (M1/M2/M6/M7 as needed) - exactly the section 41 `M16 ->
+Settings / Templates` mapping plus what a shell requires to exist (login,
+navigation, logout). Dashboard/Leads/etc. links appear as planned/disabled
+until their milestones (honest empty navigation beats fake screens - section
+47 no-placeholder rule). K3 (Users) is a Settings screen with existing APIs -
+proposed in F1, flagged below as a scope question.
+
+**2. Package changes (PROPOSED)**
+
+`frontend/package.json` (new):
+
+- dependencies: `react@19`, `react-dom@19`, `react-router-dom@7`
+- devDependencies: `vite`, `@vitejs/plugin-react`, `typescript`,
+  `vitest`, `jsdom`, `@testing-library/react`, `@testing-library/jest-dom`,
+  `@testing-library/user-event`, `eslint`, `@eslint/js`,
+  `typescript-eslint`, `eslint-plugin-react-hooks`
+- scripts: `dev` (vite), `build` (`tsc -b && vite build`), `test`
+  (`vitest run`), `lint` (`eslint .`)
+
+Root `package.json` (script-only additions; no new root dependencies):
+
+- `dev:frontend` = `npm --prefix frontend run dev`
+- `build:frontend` = `npm --prefix frontend run build`
+- `test:frontend` = `npm --prefix frontend run test`
+- `verify:frontend` = lint + test + build in the frontend workspace
+- `verify` stays backend-only (owner: keep backend unchanged); the F1 gate
+  runs `verify` + `verify:frontend` + migrate x2 + smoke (PROPOSED - the
+  owner may instead ask to fold frontend checks into `verify` later).
+
+Root `eslint.config.mjs`: add `frontend/**` to ignores (root `eslint .`
+remains backend-scoped; frontend lints with its own flat config).
+
+**3. Vite configuration (PROPOSED, `frontend/vite.config.ts`)**
+
+- `@vitejs/plugin-react`
+- `server.port` 5173, `strictPort: true`,
+  `server.proxy`: `'/api'` and `'/health'` -> `process.env.VITE_API_PROXY ??
+  'http://localhost:3000'` (same-origin behavior identical to production)
+- `build.outDir: 'dist'`, `build.sourcemap: true`
+- vitest section merged in the same file: `environment: 'jsdom'`,
+  `setupFiles: ['./src/test/setup.ts']`, include `src/**/*.test.tsx`
+
+**4. Express static-serving and SPA-fallback plan (PROPOSED - the only
+backend change)**
+
+In `src/app.ts` (added after all existing routers):
+
+- UI dist dir = `process.env.UI_DIST_DIR` override, default
+  `path.join(__dirname, '..', 'frontend', 'dist')` (correct for both tsx
+  `src/` and compiled `dist/` layouts).
+- If `index.html` exists there: `express.static(uiDist, { index: false })`
+  (express 5; GET/HEAD only), then a pathless fallback middleware: requests
+  to `/api...` or `/health` -> `next()` (JSON 404s unchanged); other GET/HEAD
+  -> `sendFile(index.html)`; other methods -> `next()`.
+- If dist is absent: log one warning ("frontend build not found; UI not
+  served") and skip both registrations - dev UI runs via Vite; API behavior
+  byte-identical.
+- No other backend behavior changes (owner constraint). Express 5 has no
+  `'*'` wildcard - the pathless middleware avoids the v4/v5 path-syntax trap.
+
+Backend tests added (supertest): GET `/` -> 200 text/html with a fixture dir
+via `UI_DIST_DIR`; GET `/api/nope` -> still 404 JSON; GET `/settings` ->
+fallback HTML (non-API GET). Existing 256 tests must stay green (fallback
+registered after routers, `/api` excluded).
+
+**5. Test plan (PROPOSED)**
+
+- Frontend unit/component (vitest + jsdom + RTL, frontend workspace):
+  components (FormField, StatusBadge, Empty/Loading/Error states,
+  ConfirmDialog); `lib/api.ts` error mapping incl. 401 handling; router
+  access (receptionist vs owner per section 2.1); settings screens with
+  mocked fetch: clinic load -> PATCH -> success, template list, template
+  editor PATCH + preview rendering `unknownVariables`, automation partial
+  patches, 400 validation -> field errors, receptionist 403 -> denied state.
+- Per-screen section 6 gate: loading/empty/error/success/authorization
+  covered by tests + manual checks; responsive (section 29) and
+  accessibility (section 30) checked manually per screen and recorded.
+- Backend: unchanged 256 + 3 static/SPA tests (item 4).
+- Section 44 E2E scenarios (lead/no-show/etc.) deferred to M20 - they need
+  screens F1 does not build (recorded, not skipped silently).
+- Section 45 UX review gate: manual pass over completed F1 screens, findings
+  reported with the F1 report.
+- Frontend E2E tooling (Playwright etc.) NOT proposed now - extra
+  heavyweight dependency; revisit at M20 (lean-deps constraint).
+
+**6. DirectAdmin deployment steps (PROPOSED)**
+
+1. Code on the server via SSH/git pull (owner B6: DirectAdmin + Node.js +
+   MySQL + SSH confirmed).
+2. Install Node.js >= 20 (engines; D9 says Node 24 line). Exact DirectAdmin
+   Node provisioning mechanism (Appie/Passenger/systemd/custom) = UNKNOWN ->
+   confirmed at deployment time (K-I3, M22 re-gate).
+3. `npm ci` (root) and `npm ci --prefix frontend`.
+4. Production `.env`: `NODE_ENV=production`, `PORT` (DirectAdmin-assigned),
+   `LOG_LEVEL`, `DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME`, optional
+   `MIGRATIONS_DIR`, optional `UI_DIST_DIR`. `.env` never committed (K6).
+5. `npm run migrate`; `npm run seed:admin` on first run.
+6. Build: `npm run build` (backend `dist/`) + `npm run build:frontend`
+   (`frontend/dist/`).
+7. Start `node dist/index.js` under the DirectAdmin-managed process runner
+   (mechanism UNKNOWN until confirmed - K-I3); app listens on
+   `process.env.PORT` (already implemented).
+8. HTTPS in front of the Node port is REQUIRED in production (secure cookies:
+   `index.ts` sets `secureCookies` when `NODE_ENV=production`, otherwise
+   browsers will not store login cookies). HTTPS/DNS provisioning = K-I2
+   (UNKNOWN, deployment-side, M22 re-gate). Same-origin serving preserves D6
+   (no CORS surface).
+9. Update flow: git pull -> `npm ci` (if lockfiles changed) -> migrate ->
+   build backend + frontend -> restart process.
+
+**Scope questions folded into the approval request (PROPOSED defaults):**
+
+- K3 Users screen: included in F1 (it is a Settings screen with existing
+  APIs). Default: include; say "settings only" to exclude.
+- Sidebar entries for unbuilt screens: shown as disabled "planned" items.
+  Default: include disabled (navigation matches section 5 today).
+- `verify`: kept backend-only; F1 gate runs `verify` + `verify:frontend`.
+  Default: as stated; ask if you want a single combined `verify`.
+
+**Status:** F1 IN_PROGRESS (design only); NO implementation files created.
+Awaiting owner approval of items 1-6 (and the three scope defaults) before
+any code.
