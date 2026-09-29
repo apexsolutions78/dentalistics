@@ -7,7 +7,7 @@ import { createLogger } from '../src/logger';
 
 describe('createApp', () => {
   it('serves the root service descriptor', async () => {
-    const app = createApp();
+    const app = createApp({ uiDistDir: null });
     const res = await request(app).get('/');
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ service: 'dentalistics', status: 'running' });
@@ -49,7 +49,7 @@ describe('createApp', () => {
   });
 
   it('returns a structured 404 for unknown routes', async () => {
-    const app = createApp();
+    const app = createApp({ uiDistDir: null });
     const res = await request(app).get('/does-not-exist');
     expect(res.status).toBe(404);
     expect(res.body.error.code).toBe('not_found');
@@ -76,7 +76,7 @@ describe('createApp', () => {
   });
 
   it('does not expose the x-powered-by header', async () => {
-    const app = createApp();
+    const app = createApp({ uiDistDir: null });
     const res = await request(app).get('/');
     expect(res.headers['x-powered-by']).toBeUndefined();
   });

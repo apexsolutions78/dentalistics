@@ -17,6 +17,10 @@
     "test:watch": "vitest",
     "migrate": "tsx src/db/migrate.ts",
     "seed:admin": "tsx src/db/seed-admin.ts",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "build:frontend": "npm --prefix frontend run build",
+    "test:frontend": "npm --prefix frontend run test",
+    "verify:frontend": "npm --prefix frontend run lint && npm --prefix frontend run test && npm --prefix frontend run build",
     "verify": "npm run lint && npm run typecheck && npm run test && npm run build"
   },
   "dependencies": {

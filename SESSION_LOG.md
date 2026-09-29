@@ -3476,3 +3476,153 @@ registered after routers, `/api` excluded).
 **Status:** F1 IN_PROGRESS (design only); NO implementation files created.
 Awaiting owner approval of items 1-6 (and the three scope defaults) before
 any code.
+
+---
+
+## Session 18 - F1 implementation complete (gates green; report delivered, acceptance PENDING)
+
+**Date:** 2026-09-29. **Trigger:** owner instruction "proceed" after the
+Session 17 proposal. F1 scope per D8/D9 and ``FrontEnd_Planning.md`` section
+41 (M16 -> Settings/Templates): application shell + A1 login + settings
+screens K1-K10 + minimum system states.
+
+### Inputs applied (owner-approved, unchanged)
+
+D9 stack: React 19 + Vite + TypeScript in a separate ``frontend/`` workspace;
+backend unchanged except static serving + SPA fallback; Vite dev proxy
+``/api`` -> Express; prod = ``npm run build`` in frontend, Express serves
+``dist`` same-origin; no SSR/Next/Tailwind/Redux/UI frameworks; lean deps;
+CSS modules or simple CSS. Scope defaults folded into the approval: K3 users
+screen included; unbuilt screens = disabled "planned" sidebar items;
+``verify`` stays backend-only with ``verify:frontend`` separate.
+
+### What was built
+
+1. **Backend UI serving (only backend change):**
+   - ``src/app.ts``: new ``AppDeps.uiDistDir?: string | null`` (null =
+     serving disabled for deterministic tests; default ``frontend/dist``
+     resolved from the compiled file location; ``UI_DIST_DIR`` overrides).
+     Root route serves the built ``index.html`` when present, else the JSON
+     descriptor + warn log. Pathless static + SPA-fallback middleware after
+     API routes and before ``notFoundHandler``: skips ``/api*``, ``/health``
+     and non-GET/HEAD; static miss falls through to ``index.html`` (Express
+     5 has no ``*`` wildcard).
+   - ``tests/app.test.ts``: three ``createApp`` calls pass
+     ``uiDistDir: null`` (root/404/x-powered-by assertions stay stable).
+   - New ``tests/uiServing.test.ts`` (8 tests) + ``tests/fixtures/ui/``
+     (index.html + asset).
+2. **Root wiring:** ``package.json`` adds ``dev:frontend``,
+   ``build:frontend``, ``test:frontend``, ``verify:frontend`` (``verify``
+   untouched - backend-only per the accepted default);
+   ``eslint.config.mjs`` ignores ``frontend/**``.
+3. **``frontend/`` workspace (47 files):**
+   - Installed (``npm ls`` confirmed): react 19.3.0, react-dom 19.3.0,
+     react-router-dom 7.18.4; vite 7.3.6, @vitejs/plugin-react 5.2.0,
+     typescript 5.9.3, vitest 5.0.2, jsdom 26.1.0,
+     @testing-library/react 16.3.3, eslint 10.11.0, typescript-eslint
+     8.71.0, eslint-plugin-react-hooks 7.1.1 - 242 packages, 0
+     vulnerabilities.
+   - Core: ``lib/api.ts`` (fetch wrapper, same-origin credentials,
+     ApiError{status,code,issues}, network-error mapping), ``lib/auth.tsx``
+     (AuthProvider: /api/auth/me session, login/logout, canManageSettings),
+     ``lib/settings.ts`` (useSettings/useMembers/previewTemplate typed to
+     the M16 endpoints), ``lib/types.ts``, ``lib/useAsync.ts`` (useSubmit),
+     ``test/fixtures.ts`` + ``test/setup.ts``.
+   - Shell: ``main.tsx``; ``app/router.tsx`` (section 2.1 route table);
+     guards (RequireAuth; RequireSettingsRole owner/admin - mirrors backend
+     ``assertCanManageMembers``, which 403s receptionists on ALL settings);
+     AppShell/Sidebar/AccountMenu (unbuilt screens shown as disabled
+     "Planned Mxx" items).
+   - Pages: Login (A1), Landing (owner/admin -> /settings; receptionist ->
+     honest "workspace screens not available yet" state), NotFound (M1),
+     Unauthorized, and settings K1-K10:
+     K1 overview (category cards + automation status badges); K2 clinic
+     (name/phone/email/timezone/address/logo + 7-day business hours, client
+     open<close check, all 7 day keys always sent per parseBusinessHours);
+     K3 users (member table, add user with owner/receptionist roles per
+     CLINIC_ROLES, disable with ConfirmDialog, self-disable hidden, role
+     matrix line); K4 communication (telephony + WhatsApp cards, write-only
+     secrets: blank input = keep, explicit Clear = null, Connected/CNot
+     configured badges from ``configured`` booleans); K5 templates list (10
+     slots); K6 template editor (variable chips insert-at-cursor, Preview ->
+     rendered + unknownVariables as invalid chips, Save validates via
+     preview first and requires an explicit "Save anyway" confirm when
+     unknown variables exist); K7 appointments/reminders (channel/provider,
+     comma-separated offsets validated 1-720 h, quiet-hours times,
+     maxAttempts read-only + template links); K8 recall (intervalDays
+     1-3650, followUpDelayHours 1-168); K9 reviews (destination URL through
+     clinic PATCH + review automation with delay/suppression); K10
+     automation (leadAck incl. sources, missedCall, noShow incl. delay +
+     template links).
+   - Design: ``styles/tokens.css`` + ``styles/global.css`` implementing
+     FrontEnd section 7 tokens (the D9 "simple CSS" option; no CSS modules,
+     no UI framework).
+   - Lint-driven rework: eslint-plugin-react-hooks 7
+     ``set-state-in-effect`` rejected synchronous form-init effects - all
+     settings forms now derive state during render
+     (``draft ?? toForm(settings)``); the template editor keeps per-template
+     keyed draft/preview state (no effects); auth session check uses
+     promise callbacks.
+
+### Gates (executed 2026-09-29)
+
+- ``npm run verify`` (backend): **PASS - 264/264 tests, 26 suites, 0
+  skipped, exit 0** (256 pre-F1 + 8 new uiServing tests; tsc + eslint + build
+  in the same run).
+- ``npm run verify:frontend``: **PASS - exit 0** (eslint 0, tsc 0, vitest
+  **20/20** in 5 files, ``vite build`` OK: index-BfyuOxqz.js 312.97 kB /
+  index-DMhPgOpa.css 11.02 kB).
+- ``npm run migrate`` twice: **PASS** - run 1 applied 0 / skipped 14; run 2
+  applied 0 / skipped 14 (idempotent; no F1 migration).
+- Extended smoke (``m3-smoke.ps1``): **SMOKE_PASS** (0 failures; script
+  unchanged from the M16 153-check baseline - no root-path assertions exist,
+  so SPA serving does not affect it).
+- SPA-serving E2E against the REAL server + REAL ``frontend/dist``
+  (``spa-serve-check.ps1``, port 3999): **7/7 PASS** - root = index.html,
+  ``/settings/clinic`` deep link = index.html, template deep link =
+  index.html, static CSS asset served, unknown ``/api/*`` stays JSON 404,
+  POST to a page path = 404 (not swallowed by fallback), ``/health`` = 200.
+
+### Verification notes
+
+- Type/lint/test executed both piecemeal during development and through the
+  official gate scripts (``verify``, ``verify:frontend``) at the end.
+- The SPA E2E check is a meaningfully different path from the unit fixtures:
+  it boots ``tsx src/index.ts`` with no ``uiDistDir`` override, proving the
+  default ``frontend/dist`` resolution end to end.
+- Encoding incident + repair: a PowerShell ``Get-Content -Raw`` round-trip
+  briefly re-encoded three files as ANSI; a full-source mojibake scan found
+  exactly 3 affected files (Communication/Recall/Templates pages);
+  em-dash / en-dash / ellipsis mojibake sequences were repaired and byte-
+  verified (U+2014/U+2013/U+2026 restored); re-scan clean.
+  ``.gitignore``/other files were display-only artifacts, not corrupted.
+
+### Assumptions (ASSUMED - confirm at acceptance)
+
+- Receptionist landing page shows an honest "workspace screens not available
+  yet" state (their queues arrive with M15-UI/M21); F1 builds no
+  receptionist product UI.
+- Settings role gate = owner/admin only. The FrontEnd section 2.1 table's
+  "Receptionist: Limited" row is superseded by backend
+  ``assertCanManageMembers`` (403 for receptionists on ALL settings);
+  frontend gate mirrors the backend rather than the doc table - recorded,
+  not silently diverged.
+- Template save with unknown variables = explicit confirm dialog (not a
+  hard block); reading of section 19 "do not silently save broken
+  templates".
+
+### Open items
+
+- FrontEnd section 45 manual UX review: **NOT executed** in this
+  environment (no browser tooling) - reported as open for owner
+  acceptance; section 44 E2E scenarios deferred to M20 per the approved
+  proposal (they need screens F1 does not build).
+- K-I2 (HTTPS for production secure cookies), K-I3 (process persistence /
+  DirectAdmin Node provisioning), K-I4 (provider accounts) unchanged -
+  M22 re-gate. DirectAdmin deployment steps recorded in Session 17 item 6.
+- No DB changes; settings APIs already shipped in M16.
+
+**Status:** F1 implementation complete; all gates above green; report
+delivered; **awaiting owner acceptance**. M17-M23 NOT_STARTED. Stopping
+rule: M17 does not begin until the owner accepts the F1 report (D8
+sequence).

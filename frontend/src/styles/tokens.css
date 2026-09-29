@@ -1,0 +1,44 @@
+:root {
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+
+  --fs-page-title: 20px;
+  --fs-section-title: 16px;
+  --fs-card-title: 14px;
+  --fs-body: 14px;
+  --fs-label: 13px;
+  --fs-small: 12px;
+  --fs-caption: 11px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --color-bg: #f5f6f8;
+  --color-surface: #ffffff;
+  --color-border: #d9dde3;
+  --color-text: #1f2430;
+  --color-text-secondary: #5c6474;
+  --color-primary: #1d5fd0;
+  --color-primary-hover: #174cab;
+  --color-danger: #b3261e;
+  --color-danger-hover: #8f1e18;
+  --color-success: #1c7c47;
+  --color-warning: #8a6d1d;
+
+  --badge-new-bg: #e7f0ff;
+  --badge-new-text: #174cab;
+  --badge-active-bg: #e6f4ec;
+  --badge-active-text: #1c7c47;
+  --badge-muted-bg: #eceef2;
+  --badge-muted-text: #4a5261;
+  --badge-warn-bg: #fdf3d7;
+  --badge-warn-text: #8a6d1d;
+  --badge-danger-bg: #fbe9e7;
+  --badge-danger-text: #8f1e18;
+
+  --radius: 6px;
+  --shadow: 0 1px 2px rgba(16, 24, 40, 0.08);
+}

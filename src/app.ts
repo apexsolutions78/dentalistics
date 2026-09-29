@@ -1,5 +1,7 @@
 import express from 'express';
 import type { Express, Request, Response } from 'express';
+import fs from 'node:fs';
+import path from 'node:path';
 import type { Pool } from 'mysql2/promise';
 import { loadWhatsAppConfig } from './communications/whatsappConfig';
 import { WhatsAppProvider } from './communications/whatsappProvider';
@@ -43,6 +45,7 @@ export interface AppDeps {
   db?: Pool;
   secureCookies?: boolean;
   publicLeadRate?: { perIp: number; perKey: number; windowMs?: number };
+  uiDistDir?: string | null;
 }
 
 function silentLogger(): Logger {
@@ -79,9 +82,26 @@ export function createApp(deps: AppDeps = {}): Express {
     next();
   });
 
-  app.get('/', (_req: Request, res: Response) => {
-    res.status(200).json({ service: 'dentalistics', status: 'running' });
-  });
+  const uiDistDir =
+    deps.uiDistDir === null
+      ? null
+      : (deps.uiDistDir ?? process.env.UI_DIST_DIR ?? path.join(__dirname, '..', 'frontend', 'dist'));
+  const uiIndexPath = uiDistDir === null ? null : path.join(uiDistDir, 'index.html');
+  const uiAvailable = uiIndexPath !== null && fs.existsSync(uiIndexPath);
+
+  if (uiAvailable && uiIndexPath !== null) {
+    logger.info('serving frontend ui', { uiDistDir });
+    app.get('/', (_req: Request, res: Response) => {
+      res.sendFile(uiIndexPath);
+    });
+  } else {
+    if (uiIndexPath !== null) {
+      logger.warn('frontend build not found; UI not served', { uiDistDir });
+    }
+    app.get('/', (_req: Request, res: Response) => {
+      res.status(200).json({ service: 'dentalistics', status: 'running' });
+    });
+  }
 
   app.get('/health', async (_req: Request, res: Response) => {
     let database: DatabaseStatus = 'unconfigured';
@@ -168,6 +188,24 @@ export function createApp(deps: AppDeps = {}): Express {
         ipLimiter: createRateLimiter(WHATSAPP_WEBHOOK_IP_LIMIT, WHATSAPP_WEBHOOK_RATE_WINDOW_MS),
       }),
     );
+  }
+
+  if (uiAvailable && uiIndexPath !== null && uiDistDir !== null) {
+    const staticFiles = express.static(uiDistDir, { index: false });
+    app.use((req: Request, res: Response, next) => {
+      const isApi = req.path === '/api' || req.path.startsWith('/api/') || req.path === '/health';
+      if (isApi || (req.method !== 'GET' && req.method !== 'HEAD')) {
+        next();
+        return;
+      }
+      staticFiles(req, res, (err?: unknown) => {
+        if (err !== undefined && err !== null) {
+          next(err);
+          return;
+        }
+        res.sendFile(uiIndexPath);
+      });
+    });
   }
 
   app.use(notFoundHandler);
