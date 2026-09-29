@@ -2966,3 +2966,29 @@ endpoints, validation, role matrix, migration) -> implementation -> gates
 (verify/migrate/smoke incl. configuration-changes-affect-automation tests) ->
 docs rev 39 -> commit + push -> Rule 10 report -> stop (M17 gated on owner
 acceptance of the M16 report).
+
+**Owner decisions (2026-09-28, two questions answered before M16 design):**
+
+1. **M16 delivery = "M16 API now, UI immediately after"** - finish the M16
+   backend first (settings + templates API, migration, automation-effect
+   tests), then run a frontend phase (app shell + Settings/Templates UI per
+   `FrontEnd_Planning.md` §18/§41) as the next milestone BEFORE M17.
+   Sequence becomes: M16 (API) -> owner acceptance -> **F1 frontend phase** ->
+   M17. D7 is unchanged for M14/M15 (already accepted API-only); the frontend
+   track is no longer fully open - it is scheduled. Recorded as **D8**.
+2. **`FrontEnd_Planning.md` adopted as the governing frontend companion
+   document** - committed to the repository, recorded in PROJECT_STATE as an
+   owner-issued companion to `Project_Planning_Dentalistics.md`; I follow it
+   whenever frontend work starts (§41 milestone mapping, §42 acceptance
+   criteria, §49 definition of done, §1 screen inventory).
+
+Implications for M16 design (noted, to be resolved in the design block):
+
+- M16 stays backend-only (like M14/M15), but its API must serve the imminent
+  F1 Settings UI: settings GET/PATCH surfaces, template management, and a
+  template preview that reuses the server-side `renderTemplate` (FrontEnd §38:
+  do not duplicate business logic in the frontend; §19: safe template preview).
+- FrontEnd §18/§39: secrets (provider credentials, signing secrets, tokens)
+  must never be readable through any API - write-only set, redacted read.
+- FrontEnd §18 settings categories (Clinic, Users, Communication, Templates,
+  Appointments, Recall, Reviews, Automation) bound the M16 endpoint grouping.
