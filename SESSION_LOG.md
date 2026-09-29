@@ -3778,3 +3778,41 @@ distinguished); operational UI deferred per D10.
 
 **Status:** F1 PASSED; M17 implementation complete - report delivered,
 awaiting owner acceptance; M18-M23 NOT_STARTED.
+
+## Session 20 - M17 accepted (PASSED), M18 (Security hardening) start
+
+**2026-09-29. Owner instruction:** "Proceed" - M17 (Observability and admin
+tools) recorded **PASSED 2026-09-29** (PROJECT_STATE rev 45; M0_Project_Audit
+M17 row PASSED, M18 row IN_PROGRESS). Gates at pass unchanged from the rev 44
+report: `npm run verify` exit 0 (**278/278, 27 suites, 0 skipped**),
+`npm run verify:frontend` exit 0 (20/20, untouched), migrate x2 (`0015`
+applied then 0/15 idempotent), extended smoke **SMOKE_PASS** (+20 M17 checks
+-> 173 total). D10 backend-first interpretation accepted with the pass
+(operational UI deferred to a later frontend slice).
+
+**M18 (Security hardening) started** - plan L1199-1222: "Perform a dedicated
+security review" across 17 checklist areas: authentication, authorization,
+tenant isolation, API security, webhooks, input validation, injection, XSS,
+CSRF where relevant, rate limiting, secrets, logs, file uploads if any,
+dependency vulnerabilities, session handling, error exposure - "Fix discovered
+issues before proceeding."
+
+**Planned method (PROPOSED):** area-by-area code inspection against the
+checklist with executable checks where they exist (`npm audit`, existing test
+suites, targeted probes); every finding recorded with CONFIRMED/PROPOSED
+label, severity, and file references; fixes land with regression tests, then
+full gates (verify + migrate + extended smoke) before the M18 report.
+
+**Carried into M18:**
+- Candidate **defect #26** (reported at M12, mapped to M18 at the F1 triage):
+  M3 `createPatient` validates `smsOptOut` but drops it from the INSERT -
+  1-line fix + regression test.
+- File uploads: none exist anywhere in the codebase (CONFIRMED by inspection
+  across M0-M17) - checklist item recorded not-applicable rather than silently
+  skipped.
+- K-I2 (HTTPS in production) and K-I3 (process persistence) remain
+  deployment-side UNKNOWNs mapped to M22 - not verifiable from the repo now;
+  session/cookie security code is still reviewed in M18 (secure/httponly/
+  sameSite flags, expiry), only the live HTTPS enforcement is M22.
+
+**Status:** M0-M17 + F1 PASSED; M18 IN_PROGRESS; M19-M23 NOT_STARTED.
