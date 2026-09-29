@@ -6,6 +6,13 @@ import { createApp } from './app';
 import { ConfigError, loadEnv } from './config';
 import { checkDatabase, closePool, getPool, initPool } from './db/pool';
 import { createLogger } from './logger';
+import {
+  recordTickFailed,
+  recordTickInterval,
+  recordTickStarted,
+  recordTickSucceeded,
+} from './tickState';
+import type { TickName } from './tickState';
 
 function reportFatal(err: unknown): void {
   if (err instanceof ConfigError) {
@@ -65,31 +72,28 @@ async function main(): Promise<void> {
   const tickMs = Number(process.env.REMINDER_TICK_MS ?? '60000');
   let reminderTimer: NodeJS.Timeout | undefined;
   if (Number.isFinite(tickMs) && tickMs > 0) {
+    recordTickInterval(tickMs);
+    const track = (name: TickName, label: string, run: () => Promise<unknown>): void => {
+      recordTickStarted(name);
+      run()
+        .then(() => recordTickSucceeded(name))
+        .catch((err: unknown) => {
+          recordTickFailed(name, err);
+          logger.error(`${label} tick failed`, {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        });
+    };
     reminderTimer = setInterval(() => {
-      runReminderTick(getPool(), logger).catch((err: unknown) => {
-        logger.error('reminder tick failed', {
-          error: err instanceof Error ? err.message : String(err),
-        });
-      });
-      runNoShowTick(getPool(), logger).catch((err: unknown) => {
-        logger.error('no-show tick failed', {
-          error: err instanceof Error ? err.message : String(err),
-        });
-      });
-      runRecallTick(getPool(), logger).catch((err: unknown) => {
-        logger.error('recall tick failed', {
-          error: err instanceof Error ? err.message : String(err),
-        });
-      });
-      runReviewRequestTick(getPool(), logger).catch((err: unknown) => {
-        logger.error('review request tick failed', {
-          error: err instanceof Error ? err.message : String(err),
-        });
-      });
+      track('reminder', 'reminder', () => runReminderTick(getPool(), logger));
+      track('no_show', 'no-show', () => runNoShowTick(getPool(), logger));
+      track('recall', 'recall', () => runRecallTick(getPool(), logger));
+      track('review_request', 'review request', () => runReviewRequestTick(getPool(), logger));
     }, tickMs);
     reminderTimer.unref();
     logger.info('reminder tick scheduled', { intervalMs: tickMs });
   } else {
+    recordTickInterval(null);
     logger.info('reminder tick disabled', { reminderTickMs: process.env.REMINDER_TICK_MS ?? '' });
   }
 

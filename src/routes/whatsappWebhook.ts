@@ -15,6 +15,7 @@ import { AppError } from '../errors';
 import type { Logger } from '../logger';
 import type { RateLimiter } from '../security/rateLimit';
 import { applyProviderStatus, handleInboundMessage } from '../services/messages';
+import { recordWebhookEvent } from '../services/observability';
 import { parsePathId } from '../validate';
 
 export interface WhatsAppWebhookRouterDeps {
@@ -167,11 +168,31 @@ export function createWhatsAppWebhookRouter(deps: WhatsAppWebhookRouterDeps): Ro
   router.get('/whatsapp/:orgId', async (req: Request, res: Response) => {
     if (!deps.ipLimiter.check(`whatsapp-webhook|ip|${req.ip ?? 'unknown'}`)) {
       deps.logger.warn('whatsapp webhook rate limited', { scope: 'ip' });
+      await recordWebhookEvent(deps.db, deps.logger, {
+        organizationId: null,
+        source: 'whatsapp',
+        requestMethod: req.method,
+        httpStatus: 429,
+        outcome: 'rate_limited',
+        remoteIp: req.ip ?? null,
+      });
       throw new AppError('Too many webhook requests, try again later', 429, 'rate_limited', true);
     }
 
     const organizationId = parsePathId(req.params.orgId);
-    await assertActiveOrg(deps.db, organizationId);
+    try {
+      await assertActiveOrg(deps.db, organizationId);
+    } catch (err) {
+      await recordWebhookEvent(deps.db, deps.logger, {
+        organizationId: null,
+        source: 'whatsapp',
+        requestMethod: req.method,
+        httpStatus: 404,
+        outcome: 'org_not_found',
+        remoteIp: req.ip ?? null,
+      });
+      throw err;
+    }
 
     const config = await loadWhatsAppConfig(deps.db, organizationId);
     const hubMode = req.query['hub.mode'];
@@ -179,6 +200,14 @@ export function createWhatsAppWebhookRouter(deps: WhatsAppWebhookRouterDeps): Ro
     const verifyToken = req.query['hub.verify_token'];
 
     if (hubMode !== 'subscribe' || typeof challenge !== 'string' || challenge === '') {
+      await recordWebhookEvent(deps.db, deps.logger, {
+        organizationId,
+        source: 'whatsapp',
+        requestMethod: req.method,
+        httpStatus: 400,
+        outcome: 'invalid_challenge',
+        remoteIp: req.ip ?? null,
+      });
       throw new AppError('Invalid verification challenge', 400, 'invalid_challenge', true);
     }
     if (
@@ -186,23 +215,67 @@ export function createWhatsAppWebhookRouter(deps: WhatsAppWebhookRouterDeps): Ro
       typeof verifyToken !== 'string' ||
       verifyToken !== config.verifyToken
     ) {
+      await recordWebhookEvent(deps.db, deps.logger, {
+        organizationId,
+        source: 'whatsapp',
+        requestMethod: req.method,
+        httpStatus: 403,
+        outcome: 'invalid_verify_token',
+        remoteIp: req.ip ?? null,
+      });
       throw new AppError('Invalid verify token', 403, 'invalid_verify_token', true);
     }
 
+    await recordWebhookEvent(deps.db, deps.logger, {
+      organizationId,
+      source: 'whatsapp',
+      requestMethod: req.method,
+      httpStatus: 200,
+      outcome: 'challenge_verified',
+      remoteIp: req.ip ?? null,
+    });
     res.status(200).type('text/plain').send(challenge);
   });
 
   router.post('/whatsapp/:orgId', async (req: Request, res: Response) => {
     if (!deps.ipLimiter.check(`whatsapp-webhook|ip|${req.ip ?? 'unknown'}`)) {
       deps.logger.warn('whatsapp webhook rate limited', { scope: 'ip' });
+      await recordWebhookEvent(deps.db, deps.logger, {
+        organizationId: null,
+        source: 'whatsapp',
+        requestMethod: req.method,
+        httpStatus: 429,
+        outcome: 'rate_limited',
+        remoteIp: req.ip ?? null,
+      });
       throw new AppError('Too many webhook requests, try again later', 429, 'rate_limited', true);
     }
 
     const organizationId = parsePathId(req.params.orgId);
-    await assertActiveOrg(deps.db, organizationId);
+    try {
+      await assertActiveOrg(deps.db, organizationId);
+    } catch (err) {
+      await recordWebhookEvent(deps.db, deps.logger, {
+        organizationId: null,
+        source: 'whatsapp',
+        requestMethod: req.method,
+        httpStatus: 404,
+        outcome: 'org_not_found',
+        remoteIp: req.ip ?? null,
+      });
+      throw err;
+    }
 
     const config = await loadWhatsAppConfig(deps.db, organizationId);
     if (!config.enabled) {
+      await recordWebhookEvent(deps.db, deps.logger, {
+        organizationId,
+        source: 'whatsapp',
+        requestMethod: req.method,
+        httpStatus: 403,
+        outcome: 'disabled',
+        remoteIp: req.ip ?? null,
+      });
       throw new AppError('WhatsApp webhooks are disabled', 403, 'whatsapp_disabled', true);
     }
 
@@ -211,16 +284,42 @@ export function createWhatsAppWebhookRouter(deps: WhatsAppWebhookRouterDeps): Ro
     const valid = verifyWhatsappSignature(rawBody, signature, config.appSecret);
     if (!valid) {
       deps.logger.warn('whatsapp webhook signature rejected', { organizationId });
+      await recordWebhookEvent(deps.db, deps.logger, {
+        organizationId,
+        source: 'whatsapp',
+        requestMethod: req.method,
+        httpStatus: 401,
+        outcome: 'invalid_signature',
+        remoteIp: req.ip ?? null,
+      });
       throw new AppError('Invalid webhook signature', 401, 'invalid_signature', true);
     }
 
     const parsed = parseWhatsAppPayload(req.body);
     if (parsed === null) {
+      await recordWebhookEvent(deps.db, deps.logger, {
+        organizationId,
+        source: 'whatsapp',
+        requestMethod: req.method,
+        httpStatus: 400,
+        outcome: 'invalid_payload',
+        remoteIp: req.ip ?? null,
+      });
       throw new AppError('Invalid webhook payload', 400, 'invalid_payload', true);
     }
 
     const inbound = await processInbound(deps.db, deps.logger, organizationId, parsed);
     const statuses = await processStatuses(deps.db, deps.logger, organizationId, parsed);
+
+    await recordWebhookEvent(deps.db, deps.logger, {
+      organizationId,
+      source: 'whatsapp',
+      requestMethod: req.method,
+      httpStatus: 200,
+      outcome: 'processed',
+      remoteIp: req.ip ?? null,
+      detail: `inbound=${inbound.created + inbound.duplicate + inbound.ignored} statuses=${statuses.applied + statuses.ignored}`,
+    });
 
     res.status(200).json({
       status: 'ok',

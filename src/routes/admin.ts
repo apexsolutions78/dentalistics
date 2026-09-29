@@ -9,6 +9,7 @@ import { AppError } from '../errors';
 import { readJsonBody } from '../http/body';
 import type { Logger } from '../logger';
 import { requireAuth, requireRole } from '../middleware/auth';
+import { listAuditLogs, listErrorEvents } from '../services/observability';
 import { createUserInOrg } from '../services/users';
 import { parsePathId, requirePassword, requireString } from '../validate';
 export interface AdminRouterDeps {
@@ -100,6 +101,16 @@ export function createAdminRouter(deps: AdminRouterDeps): Router {
       detail: `target=${rows[0].email}`,
     });
     res.status(200).json({ ok: true });
+  });
+
+  router.get('/observability/error-logs', async (req: Request, res: Response) => {
+    const result = await listErrorEvents(deps.db, null, req.query as Record<string, unknown>);
+    res.status(200).json(result);
+  });
+
+  router.get('/observability/audit-logs', async (req: Request, res: Response) => {
+    const result = await listAuditLogs(deps.db, null, req.query as Record<string, unknown>);
+    res.status(200).json(result);
   });
 
   return router;

@@ -51,8 +51,21 @@ function errorType(err: unknown): string | undefined {
   return undefined;
 }
 
-export function errorHandler(logger: Logger): ErrorRequestHandler {
-  return (err: unknown, req, res, next) => {
+export interface RequestErrorRecord {
+  organizationId: number | null;
+  method: string;
+  path: string;
+  statusCode: number;
+  code: string;
+  errorName: string | null;
+  errorMessage: string | null;
+}
+
+export function errorHandler(
+  logger: Logger,
+  options: { recordError?: (record: RequestErrorRecord) => Promise<void> } = {},
+): ErrorRequestHandler {
+  return async (err: unknown, req, res, next) => {
     if (res.headersSent) {
       next(err);
       return;
@@ -84,6 +97,24 @@ export function errorHandler(logger: Logger): ErrorRequestHandler {
 
     if (status >= 500) {
       logger.error('request failed', logFields);
+      if (options.recordError !== undefined) {
+        const user = req.user;
+        try {
+          await options.recordError({
+            organizationId: user?.organizationId ?? null,
+            method: req.method,
+            path: req.path.slice(0, 500),
+            statusCode: status,
+            code: appError.code,
+            errorName: err instanceof Error ? err.name : appError.name,
+            errorMessage: (err instanceof Error ? err.message : appError.message).slice(0, 1000),
+          });
+        } catch (recordErr) {
+          logger.error('error event write failed', {
+            error: recordErr instanceof Error ? recordErr.message : String(recordErr),
+          });
+        }
+      }
     } else {
       logger.warn('request rejected', logFields);
     }

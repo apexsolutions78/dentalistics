@@ -3626,3 +3626,155 @@ screen included; unbuilt screens = disabled "planned" sidebar items;
 delivered; **awaiting owner acceptance**. M17-M23 NOT_STARTED. Stopping
 rule: M17 does not begin until the owner accepts the F1 report (D8
 sequence).
+
+## Session 19 - F1 accepted (PASSED), M17 (Observability) start + design fork
+
+**Date:** 2026-09-29. **Trigger:** owner question - "can the pending issues wait
+at a later stage without creating an ocean of mistakes/challenges/work? If
+yes then proceed to the next phase".
+
+**Triage answer delivered (evidence-based): YES, all pending items deferrable
+to their mapped milestones without compounding risk:**
+
+- FrontEnd section 45 UX review is an **M21 gate by the governing doc's own
+  text** ("Before M21 can be marked PASSED, perform a dedicated UX review") -
+  my Session 18 framing of it as an F1 open item was overly strict;
+  corrected. M21 in the backend plan = UX Review - same slot.
+- Section 44 E2E scenarios = M20 (deferral already part of the approved F1
+  proposal).
+- K-I2 (HTTPS), K-I3 (process persistence), K-I4 (provider accounts) = M22
+  Production Readiness; deployment-side facts that cannot be verified from
+  this environment, and no production traffic exists (nothing to protect or
+  migrate yet).
+- Candidate defect #26 (M3 createPatient drops smsOptOut) = M18 Security
+  Hardening: one-line INSERT fix + test; not deployed, so no bad patient
+  data is accumulating; already tracked in M0_Project_Audit.
+- Historical SESSION_LOG U+FFFD damage (~lines 1-505, pre-existing): cosmetic,
+  no functional consumers, new content clean - optional editorial pass later,
+  untouched without instruction.
+- ASSUMED UX choices (receptionist landing state, settings gate = mirror of
+  backend 403, save-with-unknown-variables confirm): small localized UI
+  decisions, naturally re-examined at the M21 UX review; settings gate in
+  particular mirrors CONFIRMED backend behavior.
+- Why no compounding: nothing is deployed (no bad data/user habits), every
+  deferral is additive review/test/deployment work rather than rework of
+  architecture, each item has a dedicated future milestone so it cannot fall
+  through, and M17-M19 build on stable APIs unaffected by any pending item.
+
+**Owner conditional instruction executed:** F1 recorded **PASSED 2026-09-29**
+(PROJECT_STATE rev 43; M0_Project_Audit F1 row PASSED, M17 row IN_PROGRESS).
+
+**M17 (Observability and admin tools) started** - plan L1182-1195: automation
+logs, communication logs, webhook logs, error logs, audit logs, failed jobs,
+retry mechanism, operational diagnostics; "sensitive information must not be
+unnecessarily exposed".
+
+**Design fork put to the owner BEFORE building (PROPOSED):** FrontEnd section
+41 maps M17 -> "Operational/automation UI", while D7/D8 precedents were
+backend-first with UI deferred. Options: (a) backend-first (RECOMMENDED):
+deliver all 8 plan bullets as backend services/APIs + tests now, operational
+UI as a follow-up frontend slice once the APIs settle - same shape as D7/D8
+which the owner chose twice; (b) build the operational UI in this same phase
+(shell + router already exist from F1, screens would consume the new
+endpoints). No code written yet pending this answer.
+
+**Status:** F1 PASSED; M17 IN_PROGRESS (design); M18-M23 NOT_STARTED.
+
+### Session 19 - M17 implementation complete (gates green; report delivered, acceptance PENDING)
+
+**2026-09-29. D10 recorded (owner answered the delivery fork via the question
+tool):** M17 = **backend-first** - all 8 plan bullets delivered as backend
+services/APIs + tests now; the operational/automation UI (FrontEnd section 41
+"Operational/automation UI") deferred to a later frontend slice, same shape as
+the D7/D8 precedents the owner chose twice.
+
+**Delivery:**
+- migration `0015_observability.sql`: `webhook_events` (organization_id FK
+  CASCADE NULL, source, request_method, http_status, outcome, provider_key,
+  remote_ip, detail) + `error_events` (organization_id FK NULL, scope,
+  request_method, request_path, http_status, error_code, error_name,
+  error_message).
+- `src/services/observability.ts`: automation logs = UNION over the 4 job
+  tables (appointment_reminders / no_show_messages / recall_messages /
+  review_requests - all share status/attempts/last_error/scheduled_at/
+  sent_at/message_id/created_at) with kind + status filters and a subquery
+  total; failed jobs = same 4 tables UNION communication_messages (DISPATCHABLE
+  = PENDING/FAILED) via FAILED_JOB_KINDS incl. 'message'; retry = jobs
+  requeue (status PENDING, scheduled_at=UTC_TIMESTAMP(), last_error=NULL,
+  attempts preserved - PENDING rows bypass the attempts cap in the tick
+  claim query) / message resets PENDING + sendMessage(getProvider(
+  provider_key)) mirroring retryMissedCallResponse (failure -> 500
+  retry_failed; 404 not_found; 409 not_failed/no_provider/unknown_provider;
+  400 unknown kind); diagnostics = db ping (SELECT 1), 5 status count groups
+  (Promise.all), recent-24h counts, scheduler tick-state passthrough;
+  recordWebhookEvent/recordErrorEvent never-throw with field truncation;
+  communication logs re-export `listMessages` (its own filter validation;
+  route pre-validation dropped as redundant).
+- `src/routes/observability.ts`: 8 org-scoped endpoints (automation-logs,
+  communication-logs, webhook-logs, error-logs, audit-logs, failed-jobs,
+  POST failed-jobs/:kind/:id/retry, diagnostics); requireAuth +
+  assertCanManageMembers (401 / 403 receptionist / 404 foreign-org);
+  parseListParams (limit 1-100 default 50) / parsePathId; mounted under
+  /api/organizations after the settings router.
+- `src/routes/admin.ts`: + global GET /api/admin/observability/error-logs
+  and /audit-logs behind requireRole('admin') (owner -> 403).
+- error path: `src/errors.ts` errorHandler gains optional recordError,
+  awaited with try/catch, recorded ONLY for status >= 500 (4xx excluded as
+  normal validation noise - PROPOSED), storing req.path with the query
+  string stripped (verification tokens/keys live in query) and no stack
+  traces; wired in `src/app.ts` conditionally when deps.db is defined.
+- webhook recording: every terminal branch of `src/routes/webhooks.ts`
+  (rate_limited 429, unknown_provider 404, org_not_found/org_inactive 404,
+  disabled 403, invalid_signature 401, invalid_challenge/invalid_verify_
+  token/invalid_payload 400, challenge_verified/processed/duplicate 200 with
+  detail status/disposition/inbound/statuses) and the whatsapp equivalent
+  (org checks wrapped try/catch to record org_not_found with NULL org for
+  FK safety, then rethrow) calls recordWebhookEvent with metadata + outcome
+  only - no payloads, no headers, no query strings stored.
+- scheduler instrumentation: new `src/tickState.ts` (in-memory tick
+  start/success/failure per TickName + last interval ms) + `src/index.ts`
+  track() wrapper around all 4 ticks, preserving the original error-log
+  labels ('reminder tick failed', 'no-show tick failed', ...).
+- sensitive-data posture: owner/admin read gate on every endpoint; error
+  logs query-stripped; webhook logs metadata only; diagnostics exposes
+  counts/health, not message content; communication logs expose the
+  clinic's own message bodies to owner/admin only (PROPOSED necessary for
+  operational diagnosis).
+
+**Tests:** `tests/m17.integration.test.ts` 14 tests (authz matrix 401/403/
+404/admin; automation-logs union + kind/status filters + total; telephony +
+whatsapp webhook recording incl. org-not-found NULL-org case; webhook-logs
+exact-key shape proving no payload fields; communication-logs; audit-logs
+action filter; error-logs org scoping + 4xx NOT recorded; failed-jobs union +
+org scope; reminder retry preserves attempts (2 -> PENDING, second retry 409);
+message retry through the mock provider (attempts 2 -> 3, SENT, provider_error
+NULL); retry error cases 404/409 x3/400; diagnostics structure; admin global
+endpoints + owner 403): 12/14 first run, then **14/14** after two test-
+expectation corrections (the union legitimately includes the seeded recall
+FAILED row -> total 4; webhook event keys include `detail`). Test-iteration
+fixes only - no product defects found (noUncheckedIndexedAccess row casts).
+
+**Gates (all executed, all green):**
+- `npm run verify` exit 0: **278/278 tests, 27 suites, 0 skipped** (264 prior
+  + 14 m17; eslint 0, tsc 0, build OK).
+- `npm run verify:frontend` exit 0: untouched by M17 (eslint 0, tsc 0,
+  vitest 20/20, vite build OK).
+- `npm run migrate` x2: run 1 applied `0015_observability.sql` (applied 1 /
+  skipped 14), run 2 applied 0 / skipped 15 (idempotent), both exit 0.
+- extended smoke `%TEMP%\opencode\m3-smoke.ps1`: **SMOKE_PASS**, exit 0
+  (+20 M17 checks -> 173 total: 8 read endpoints with owner/receptionist/
+  unauth matrix, diagnostics db + 4 scheduler ticks, webhook_events and
+  error_events table existence, unknown-provider webhook -> 404 + row
+  recorded, forced-FAILED reminder -> retry -> REQUEUED end-to-end, admin
+  global endpoints).
+
+**PROPOSED/ASSUMED interpretations recorded for acceptance:** automation logs
+= UNION over the 4 job tables (plan states "automation logs" generically);
+communication logs = the message-list export (dead route revived); webhook
+logs = metadata only (no payloads); error logs = status >= 500 only; tick
+state in-memory per process (K-I3 single-process assumption); org-not-found
+webhook events recorded with organization_id NULL (missing vs inactive not
+distinguished); operational UI deferred per D10.
+
+**Status:** F1 PASSED; M17 implementation complete - report delivered,
+awaiting owner acceptance; M18-M23 NOT_STARTED.

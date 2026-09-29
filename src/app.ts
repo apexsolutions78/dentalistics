@@ -18,8 +18,10 @@ import { createConversationStateRouter } from './routes/conversationState';
 import { createDashboardRouter } from './routes/dashboard';
 import { createLeadsRouter } from './routes/leads';
 import { createOrganizationsRouter } from './routes/organizations';
+import { createObservabilityRouter } from './routes/observability';
 import { createPatientsRouter } from './routes/patients';
 import { createPublicRouter } from './routes/public';
+import { recordErrorEvent } from './services/observability';
 import { createSettingsRouter } from './routes/settings';
 import { createWebhookRouter } from './routes/webhooks';
 import { createWhatsAppWebhookRouter } from './routes/whatsappWebhook';
@@ -141,6 +143,7 @@ export function createApp(deps: AppDeps = {}): Express {
     app.use('/api/organizations', createDashboardRouter({ db, logger }));
     app.use('/api/organizations', createWorkspaceRouter({ db, logger }));
     app.use('/api/organizations', createSettingsRouter({ db, logger }));
+    app.use('/api/organizations', createObservabilityRouter({ db, logger }));
 
     const publicRate = deps.publicLeadRate;
     app.use(
@@ -209,7 +212,16 @@ export function createApp(deps: AppDeps = {}): Express {
   }
 
   app.use(notFoundHandler);
-  app.use(errorHandler(logger));
+  if (deps.db !== undefined) {
+    const errorDb = deps.db;
+    app.use(
+      errorHandler(logger, {
+        recordError: (record) => recordErrorEvent(errorDb, logger, record),
+      }),
+    );
+  } else {
+    app.use(errorHandler(logger));
+  }
 
   return app;
 }
