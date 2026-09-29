@@ -2912,3 +2912,57 @@ numbers; this completion entry.
 
 **Status:** report delivered; M15 awaiting owner acceptance; M16 does not begin
 until the owner accepts the M15 report.
+
+### Session 16 - M15 accepted (PASSED), M16 start
+
+**Owner conditional instruction (2026-09-28):** "save session log, commit, push
+current progress and then proceed to M16" -> **M15 (Receptionist Workspace)
+PASSED** (proposal of record accepted: D7 workspace API only; one aggregation
+endpoint covering the plan's 7 priority queues; fixture verification as the
+plan's verification; all-member read with receptionist 200). Gates at pass
+unchanged from completion: verify 237/237 (24 suites, 0 skipped), no M15
+migration (applied 0 / skipped 13 idempotent), extended smoke 134/134 PASS.
+
+**M16 research notes (plan + codebase, before design):**
+
+- Plan M16 = MILESTONE 16 — SETTINGS AND AUTOMATION CONFIGURATION (L1164-1178):
+  message templates, reminder timing, recall settings, review settings, clinic
+  hours, timezone, communication settings, provider configuration, user
+  permissions; test directive L1178: "Test that configuration changes affect
+  automation correctly."
+- MVP-13 Basic Clinic Settings (L2194-2209): clinic name, logo, phone, email,
+  address, timezone, business hours, communication settings, review URL,
+  default message templates - "Do not build a large configuration system."
+- MVP-14 Message Templates (L2213-2246): 9 named templates (lead ack,
+  missed-call response, 48h/24h/2h reminders, no-show message, no-show
+  follow-up, recall message, review request) with variables first_name,
+  clinic_name, appointment_date, appointment_time, booking_link, clinic_phone;
+  engine must safely handle missing variables (M6 `renderTemplate` already
+  does - CONFIRMED by prior tests).
+- MVP-14 variable availability (CONFIRMED): first_name / clinic_name /
+  appointment_date / appointment_time are already supplied by M6/M8 senders;
+  clinic_phone has NO source (M10 noted `organizations` has no phone column);
+  booking_link has NO source (patient self-service booking is out of scope
+  per plan) -> both need a design decision (org phone field exists in MVP-13;
+  booking_link likely documented as safe-missing).
+- No TEST 16 exists (test list ends TEST 12) -> the L1178 test directive +
+  prior milestone deferrals govern verification.
+- Schema inspected (CONFIRMED): `organizations` = id/name/status/created_at +
+  site_key (0005) + timezone (0007) + review_url (0012). **Absent:** logo,
+  phone, email, address, business hours - MVP-13 profile fields need a
+  migration (0014).
+- Codebase inspected (CONFIRMED): all automation configs are DEPLOYMENT-GLOBAL
+  `app_meta` JSON (ack M6, reminder M8, noshow M9, recall M10, review M11,
+  telephony M12, whatsapp M13) with shape guards + corrupt fallbacks; prior
+  reports flagged "per-org settings UI" repeatedly for M16 (M8 note: config is
+  global per deployment not per clinic - PROPOSED per-org settings at M16).
+- User permissions: three-role model (owner/receptionist/admin) + member
+  management + authz assertions already exist (M2/M3/M7+); M16 scope for this
+  item to be decided at design (expose vs. already-done).
+
+**Session 16 plan:** docs rev 38 (M15 PASSED, M16 IN_PROGRESS) -> commit +
+push -> M16 design decisions recorded (storage scope for per-org settings,
+endpoints, validation, role matrix, migration) -> implementation -> gates
+(verify/migrate/smoke incl. configuration-changes-affect-automation tests) ->
+docs rev 39 -> commit + push -> Rule 10 report -> stop (M17 gated on owner
+acceptance of the M16 report).
