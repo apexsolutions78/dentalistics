@@ -4091,3 +4091,51 @@ established harness (supertest + MockProvider + captured logger).
 Evidence recorded per step; fix only if a scenario step fails.
 
 **Status:** M0-M19 + F1 PASSED; M20 IN_PROGRESS; M21-M23 NOT_STARTED.
+
+**M20 testing complete 2026-09-30 - report delivered, awaiting owner
+acceptance.**
+
+- **Method:** new suite `tests/m20.integration.test.ts` - 4 tests, one per
+  scenario (A/B/C/D), each walking the full chain through real API / signed
+  webhook / service / tick paths with per-step assertions (DB rows +
+  MockProvider attempt counts per recipient); backend-only, no UI delivery
+  fork (D7/D8/D10 precedent).
+- **Scenario A:** website lead -> acknowledgement `lead_acknowledgement`
+  SENT (key `ack:lead:N`, provider attempt 1) -> workspace `newLeads`
+  queue contains lead -> signed WhatsApp reply `patient_reply` RECEIVED
+  linked to lead (sends nothing) -> patient + appointment booked (reminder
+  sequence offsets 48/24/2h PENDING) -> reminder tick sends 3/3 (attempts
+  4) -> `/complete` -> review request PENDING scheduled +24h + recall DUE
+  (due = visit+180d, INITIAL/FOLLOW_UP PENDING future) -> review forced
+  due -> review tick sends 1 (`review_request`, request SENT, attempts 5).
+- **Scenario B:** signed telephony missed webhook -> `lead_created`
+  (source MISSED_CALL, NEW) + `missed_call_response` SENT (key
+  `missedcall:mock:EVENT`) -> signed WhatsApp reply linked to lead ->
+  patient + appointment booked (3 reminders) - no extra sends.
+- **Scenario C:** `/no-show` -> case OPEN + INITIAL `no_show_message`
+  SENT (FOLLOW_UP PENDING +24h) + reminders cancelled -> `/rebook` ->
+  new appointment SCHEDULED (previous_appointment_id set) + case
+  REBOOKED/closed -> follow-up forced due -> no-show tick sends 0
+  (workflow stops; no `no_show_follow_up` message exists).
+- **Scenario D:** past visit (190d ago) completed -> recall created 10d
+  overdue with INITIAL `recall_message` SENT immediately (CONTACTED) ->
+  recall tick sends `recall_follow_up` (2nd attempt) -> patient books
+  future visit -> recall BOOKED + closed_at + rebooked_appointment_id ->
+  recall tick again sends 0 (workflow stops; 0 PENDING recall_messages).
+- **Test-side defect found and fixed:** forcing due rows with
+  `SET scheduled_at = new Date()` (params carry ms) raced MySQL
+  DATETIME(0) fractional-second handling (INSERT rounds >=.5s UP, the
+  tick's due comparison effectively truncates) -> due queries missed the
+  forced rows ~50% of the time per force point (seen as tick
+  processed=0 in full-suite runs, green standalone). Fixed at all 3
+  force points by forcing with server-side `UTC_TIMESTAMP()` (pattern
+  already used by M19; floor-monotonic, deterministic). No product code
+  changed. Post-fix: m20 re-run 3x consecutively 4/4 green.
+- **Gates (2026-09-30):** `npm run verify` exit 0 -
+  **299/299 (29 suites, 0 skipped)** (295 + 4 new);
+  `npm run verify:frontend` exit 0 (untouched); `npm run migrate` x2
+  applied 0 / skipped 15 (15 migrations, latest 0015_observability.sql);
+  extended smoke **SMOKE_PASS** (176 checks, no endpoint changes).
+
+**Status:** M0-M19 + F1 PASSED; M20 testing complete (report delivered,
+awaiting owner acceptance); M21-M23 NOT_STARTED.
