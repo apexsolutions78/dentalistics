@@ -4139,3 +4139,27 @@ acceptance.**
 
 **Status:** M0-M19 + F1 PASSED; M20 testing complete (report delivered,
 awaiting owner acceptance); M21-M23 NOT_STARTED.
+
+## Session 23 - M20 accepted; M21 UX review started
+
+**2026-09-30 - owner instruction:** "if not done already, save session
+log, commit, push current progress and then proceed to next phase as
+proposed" - recorded as M20 acceptance (precedent: prior "Proceed"
+instructions accepted M17/M18/M19).
+
+- Save/commit/push already done before this instruction: docs rev 50 +
+  `tests/m20.integration.test.ts` at `74fe4c2`, MATCH=OK, tree clean.
+- **M21 scope (plan L1302-1324):** dedicated UX audit covering
+  navigation, information hierarchy, forms, tables, dashboard, empty
+  states, loading states, error states, mobile responsiveness,
+  accessibility, typography, consistency, confirmation flows,
+  destructive actions, receptionist workflow; "Fix UX problems before
+  final production validation" (i.e. before M22).
+- Method (PROPOSED): systematic code-level audit of frontend/ (React
+  19 + Vite + TS, D9) routes/components against the 15 areas ->
+  findings labelled CONFIRMED (observed in code) / ASSUMED -> fix
+  confirmed findings with smallest appropriate changes -> regression
+  gates (npm run verify, verify:frontend). No new feature scope
+  (STRICT MVP BOUNDARY).
+
+**Status:** M0-M20 + F1 PASSED; M21 IN_PROGRESS; M22-M23 NOT_STARTED.
