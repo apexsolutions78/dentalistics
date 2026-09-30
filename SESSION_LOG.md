@@ -3955,3 +3955,34 @@ CSRF control.
 
 **Status:** M0-M17 + F1 PASSED; M18 implementation complete - report
 delivered, awaiting owner acceptance; M19-M23 NOT_STARTED.
+
+## Session 21 - M18 accepted (PASSED), M19 (Performance and reliability) start
+
+**2026-09-30. Owner instruction:** "Proceed" - M18 (Security hardening)
+recorded **PASSED 2026-09-30** (PROJECT_STATE rev 47; M0_Project_Audit M18
+row PASSED, M19 row IN_PROGRESS). Gates at pass unchanged from the rev 46
+report: `npm run verify` exit 0 (**286/286, 27 suites, 0 skipped**),
+`npm run verify:frontend` exit 0 (untouched), migrate x2 (0/15 idempotent),
+extended smoke **SMOKE_PASS** (176 checks). All 4 M18 fixes accepted with
+the pass; defect #26 CLOSED.
+
+**M19 (Performance and reliability) started** - plan L1226-1242: test
+database queries, large lead lists, large appointment lists, dashboard
+calculations, background jobs, automation execution, webhook processing,
+concurrent events, retry behavior; "Identify obvious bottlenecks. Do not
+prematurely optimize without evidence." FrontEnd section 41 maps M19 ->
+"Performance review" - a review deliverable, no UI screens, so no delivery
+fork (unlike M17); backend test + measurement work follows the D7/D8/D10
+precedent.
+
+**Planned method (PROPOSED):** a performance/reliability integration suite
+that seeds realistic volumes (thousands of leads/appointments/messages)
+into the test database, measures endpoint and tick execution with explicit
+time budgets chosen to be generous (correctness-oriented, not
+benchmark-grade), exercises concurrency (parallel webhook posts, concurrent
+tick claims) and retry behavior end-to-end; record measured numbers in
+SESSION_LOG; only change code where a measurement shows an obvious
+bottleneck (e.g. N+1 query patterns, unbounded scans) - per plan, no
+premature optimization.
+
+**Status:** M0-M18 + F1 PASSED; M19 IN_PROGRESS; M20-M23 NOT_STARTED.
