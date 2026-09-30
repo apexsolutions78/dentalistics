@@ -157,11 +157,14 @@ export async function retryFailedJob(
     if (row.provider_key === null || row.provider_key === '') {
       throw new AppError('Message has no provider to retry with', 409, 'no_provider', true);
     }
-    await db.query(
+    const [update] = await db.query(
       `UPDATE communication_messages SET status = 'PENDING'
        WHERE id = ? AND organization_id = ? AND status = 'FAILED'`,
       [id, organizationId],
     );
+    if ((update as { affectedRows: number }).affectedRows === 0) {
+      throw new AppError('Message is not failed', 409, 'not_failed', true);
+    }
     let provider;
     try {
       provider = getProvider(row.provider_key);
@@ -187,13 +190,16 @@ export async function retryFailedJob(
   if (row.status !== 'FAILED') {
     throw new AppError('Job is not failed', 409, 'not_failed', true);
   }
-  await db.query(
-    `UPDATE ${table.table}
-     SET status = 'PENDING', scheduled_at = UTC_TIMESTAMP(), last_error = NULL
-     WHERE id = ? AND organization_id = ? AND status = 'FAILED'`,
-    [id, organizationId],
-  );
-  logger.info('failed job requeued', { kind, jobId: id, organizationId });
+    const [update] = await db.query(
+      `UPDATE ${table.table}
+       SET status = 'PENDING', scheduled_at = UTC_TIMESTAMP(), last_error = NULL
+       WHERE id = ? AND organization_id = ? AND status = 'FAILED'`,
+      [id, organizationId],
+    );
+    if ((update as { affectedRows: number }).affectedRows === 0) {
+      throw new AppError('Job is not failed', 409, 'not_failed', true);
+    }
+    logger.info('failed job requeued', { kind, jobId: id, organizationId });
   return { kind, id, action: 'requeued', status: 'PENDING' };
 }
 

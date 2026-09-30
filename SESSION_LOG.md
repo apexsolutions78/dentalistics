@@ -3986,3 +3986,80 @@ bottleneck (e.g. N+1 query patterns, unbounded scans) - per plan, no
 premature optimization.
 
 **Status:** M0-M18 + F1 PASSED; M19 IN_PROGRESS; M20-M23 NOT_STARTED.
+
+**M19 testing complete (2026-09-30).** Method executed as planned: new
+``tests/m19.integration.test.ts`` (9 tests; suite count 27 -> 28) seeds
+realistic volumes into the test DB - 5,000 leads, 1,000 patients,
+2,900 appointments (2,000 mixed-status for lists/dashboard + 900
+SCHEDULED tick backlog), 2,000 messages (1,200 SENT / 400 PENDING /
+400 FAILED), 900 appointment_reminders (700 PENDING due + 100 FAILED
+due + 100 SENT), 500 webhook_events, 200 error_events, 500 audit rows -
+and measures each plan-area item with generous correctness-oriented
+budgets (lists 3,000ms; dashboard 5,000ms; ticks 120,000/150,000ms;
+webhook burst 15,000ms).
+
+**Measured (final passing run, 2026-09-30, this machine):**
+- Large lead lists (5,000 rows): first page 614ms, deep offset 98ms,
+  search 183ms, status filter 127ms.
+- Large appointment lists (2,900 rows): 12-26ms across list, deep
+  offset, status and date-range filters.
+- Dashboard, 80-day window over 5k leads / 2.9k appointments / 2k
+  messages: 93ms; four metrics (leads.new, appointments.scheduled,
+  appointments.completed, messages.sent) cross-checked against
+  independent SQL computed in the test - exact match on all four.
+- Observability lists (900 / 2,000 / 500 / 200 / 500 / 500 rows):
+  12-29ms each, totals exact vs seed (audit-logs expected value taken
+  from live SQL because login writes an audit row: seed 500 + 1).
+- Background jobs / automation execution: initial reminder tick
+  processed 800 due rows in 48,211ms (~16.6 sends/s); second pass
+  9ms no-op (idempotent). Send path is ~13 sequential queries per
+  reminder (per-row by design) - no N+1 anomaly, no unbounded scan
+  and no cross-product; clinic-scale volume is dozens of messages
+  per day, far below the 800-row batch tested -> NO optimization
+  performed, per plan ("do not prematurely optimize without
+  evidence").
+- Concurrent ticks (2 x runReminderTick over 900 re-armed rows):
+  40,150ms; optimistic claim (status+attempts WHERE) held - exactly
+  900 MockProvider send calls, 900 new message rows, 900/900 SENT
+  with attempts=1 (observed range across runs 40-73s; budget
+  150,000ms).
+- Concurrent retry behavior (after fix): 8 parallel retries of one
+  FAILED message - exactly 1x200 + 7x409 in 123ms, provider invoked
+  exactly once, attempts incremented once; 8 parallel retries of one
+  FAILED reminder - exactly 1x200 + 7x409 in 78ms, row requeued
+  once (attempts preserved).
+- Webhook processing: 30 parallel signed telephony posts (20 unique
+  eventIds + 10 duplicates of one) - 270ms total, avg 9ms/request,
+  all 200, call_events deduped to exactly 20 rows (ER_DUP_ENTRY
+  idempotency held under concurrency).
+
+**Defect found and fixed (evidence-driven):** retryFailedJob
+(src/services/observability.ts) guarded its requeue UPDATEs with
+"AND status = 'FAILED'" but discarded the affectedRows result and
+checked status only in a preceding SELECT - a TOCTOU race. Pre-fix
+under 8 concurrent retries: message path returned 200 on 7-8 of 8
+requests (each winner could reach sendMessage -> double-send), job
+path returned 200 on 8 of 8. Fix: both paths now check affectedRows
+and throw 409 not_failed when the conditional UPDATE matched nothing
+(losing contenders); single-threaded behavior unchanged (first
+attempt affects 1 row). Regression coverage: the two concurrent-
+retry tests assert exactly 1x200 + 7x409, one provider call, one
+attempts increment.
+
+**Gates (all executed 2026-09-30, all green):**
+- npm run verify exit 0: **295/295 tests, 28 suites, 0 skipped**
+  (286 prior + 9 new M19).
+- npm run verify:frontend exit 0 (frontend untouched by M19).
+- npm run migrate x2: applied 0 / skipped 15 (no M19 migration
+  needed), both exit 0.
+- extended smoke: **SMOKE_PASS**, exit 0 (176 checks; M19 adds no
+  endpoints, script unchanged).
+
+**Bottleneck conclusion (plan requirement):** none actionable at the
+measured scale; the only reliability defect exposed was the retry
+concurrency race above. Tick throughput is recorded as evidence only
+(K-I3 single-process scheduler unchanged; budgets are
+correctness-oriented, not benchmark-grade).
+
+**Status:** M0-M18 + F1 PASSED; M19 testing complete - report
+delivered, awaiting owner acceptance; M20-M23 NOT_STARTED.
