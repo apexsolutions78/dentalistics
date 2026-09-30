@@ -1,4 +1,5 @@
 import type { ErrorRequestHandler, RequestHandler } from 'express';
+import { redactUrl } from './logger';
 import type { Logger } from './logger';
 
 export class AppError extends Error {
@@ -85,7 +86,7 @@ export function errorHandler(
     const status = appError.statusCode;
     const logFields: Record<string, unknown> = {
       method: req.method,
-      path: req.originalUrl,
+      path: redactUrl(req.originalUrl),
       statusCode: status,
       code: appError.code,
     };

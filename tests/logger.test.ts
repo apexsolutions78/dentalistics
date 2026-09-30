@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createLogger } from '../src/logger';
+import { createLogger, redactUrl } from '../src/logger';
 
 function capture(level?: 'debug' | 'info' | 'warn' | 'error') {
   const lines: string[] = [];
@@ -76,5 +76,48 @@ describe('createLogger', () => {
     expect(lines).toHaveLength(1);
     const entry = JSON.parse(lines[0] as string) as Record<string, unknown>;
     expect(entry.msg).toBe('circular');
+  });
+});
+
+describe('redactUrl', () => {
+  it('returns urls without a query string unchanged', () => {
+    expect(redactUrl('/api/organizations/7/patients')).toBe(
+      '/api/organizations/7/patients',
+    );
+  });
+
+  it('returns a trailing bare question mark unchanged', () => {
+    expect(redactUrl('/api/leads?')).toBe('/api/leads?');
+  });
+
+  it('redacts secret-looking query values and keeps the rest', () => {
+    const redacted = redactUrl(
+      '/api/webhooks/whatsapp/7?hub.mode=subscribe&hub.challenge=123&hub.verify_token=sekrit',
+    );
+    expect(redacted).toContain('hub.verify_token=[REDACTED]');
+    expect(redacted).toContain('hub.mode=subscribe');
+    expect(redacted).toContain('hub.challenge=123');
+    expect(redacted).not.toContain('sekrit');
+  });
+
+  it('redacts password, api key, secret and credential params', () => {
+    const redacted = redactUrl(
+      '/x?DB_PASSWORD=hide&api_key=hide&signingSecret=hide&credential=hide&keep=1',
+    );
+    expect(redacted).toBe(
+      '/x?DB_PASSWORD=[REDACTED]&api_key=[REDACTED]&signingSecret=[REDACTED]&credential=[REDACTED]&keep=1',
+    );
+  });
+
+  it('redacts percent-encoded secret-looking keys', () => {
+    const redacted = redactUrl('/x?hub.verify%5Ftoken=sekrit&ok=1');
+    expect(redacted).toBe('/x?hub.verify%5Ftoken=[REDACTED]&ok=1');
+  });
+
+  it('keeps params without a value and survives malformed encoding', () => {
+    expect(redactUrl('/x?flag&token=hide')).toBe('/x?flag&token=[REDACTED]');
+    expect(redactUrl('/x?bad%zz=1&token=hide')).toBe(
+      '/x?bad%zz=1&token=[REDACTED]',
+    );
   });
 });

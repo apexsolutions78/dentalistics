@@ -90,13 +90,17 @@ export async function createPatient(
   const phone = normalizePhone(body.phone);
   const email = optionalEmail(body.email);
   const notes = optionalText(body.notes, 'notes', 5000);
+  if (body.smsOptOut !== undefined && typeof body.smsOptOut !== 'boolean') {
+    throw new ValidationError('Invalid input', ['smsOptOut must be a boolean']);
+  }
+  const smsOptOut = body.smsOptOut === true ? 1 : 0;
 
   let result;
   try {
     [result] = await db.query(
-      `INSERT INTO patients (organization_id, first_name, last_name, phone, email, notes, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [input.organizationId, firstName, lastName, phone, email, notes, input.actorId],
+      `INSERT INTO patients (organization_id, first_name, last_name, phone, email, notes, sms_opt_out, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [input.organizationId, firstName, lastName, phone, email, notes, smsOptOut, input.actorId],
     );
   } catch (err) {
     await translatePhoneDuplicate(err, phone);

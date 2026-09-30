@@ -9,6 +9,7 @@ import type {
 } from '../communications/whatsappPayload';
 import {
   WHATSAPP_SIGNATURE_HEADER,
+  timingSafeEqualStrings,
   verifyWhatsappSignature,
 } from '../communications/whatsappSignature';
 import { AppError } from '../errors';
@@ -213,7 +214,7 @@ export function createWhatsAppWebhookRouter(deps: WhatsAppWebhookRouterDeps): Ro
     if (
       config.verifyToken === '' ||
       typeof verifyToken !== 'string' ||
-      verifyToken !== config.verifyToken
+      !timingSafeEqualStrings(verifyToken, config.verifyToken)
     ) {
       await recordWebhookEvent(deps.db, deps.logger, {
         organizationId,

@@ -81,6 +81,16 @@ describe('createApp', () => {
     expect(res.headers['x-powered-by']).toBeUndefined();
   });
 
+  it('sets baseline security headers on responses', async () => {
+    const app = createApp({ uiDistDir: null });
+    const res = await request(app).get('/health');
+    expect(res.headers['x-content-type-options']).toBe('nosniff');
+    expect(res.headers['x-frame-options']).toBe('DENY');
+    expect(res.headers['referrer-policy']).toBe(
+      'strict-origin-when-cross-origin',
+    );
+  });
+
   it('turns unhandled errors into a generic 500 without leaking details', async () => {
     const logger = createLogger({ level: 'error', write: () => undefined });
     const app = express();

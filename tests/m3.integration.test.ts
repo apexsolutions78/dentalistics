@@ -254,6 +254,47 @@ describe.skipIf(testHost === undefined || testHost === '')(
       expect(afterDelete.status).toBe(404);
     }, 25_000);
 
+    it('persists smsOptOut on patient create and validates its type (defect 26)', async () => {
+      const optedOut = await request(app)
+        .post(`/api/organizations/${orgAId}/patients`)
+        .set('Cookie', ownerACookie)
+        .send({
+          firstName: 'Opt',
+          lastName: 'Out',
+          phone: '+97322220013',
+          smsOptOut: true,
+        });
+      expect(optedOut.status).toBe(201);
+      expect(optedOut.body.patient.smsOptOut).toBe(true);
+      const optedOutId: number = optedOut.body.patient.id;
+
+      const [rows] = await pool.query<mysql.RowDataPacket[]>(
+        'SELECT sms_opt_out FROM patients WHERE id = ? AND organization_id = ?',
+        [optedOutId, orgAId],
+      );
+      expect((rows[0] as mysql.RowDataPacket).sms_opt_out).toBe(1);
+
+      const detail = await request(app)
+        .get(`/api/organizations/${orgAId}/patients/${optedOutId}`)
+        .set('Cookie', ownerACookie);
+      expect(detail.status).toBe(200);
+      expect(detail.body.patient.smsOptOut).toBe(true);
+
+      const defaulted = await request(app)
+        .post(`/api/organizations/${orgAId}/patients`)
+        .set('Cookie', ownerACookie)
+        .send({ firstName: 'No', lastName: 'Flag', phone: '+97322220014' });
+      expect(defaulted.status).toBe(201);
+      expect(defaulted.body.patient.smsOptOut).toBe(false);
+
+      const invalid = await request(app)
+        .post(`/api/organizations/${orgAId}/patients`)
+        .set('Cookie', ownerACookie)
+        .send({ firstName: 'Bad', lastName: 'Flag', phone: '+97322220015', smsOptOut: 'yes' });
+      expect(invalid.status).toBe(400);
+      expect(invalid.body.error.code).toBe('validation_failed');
+    }, 25_000);
+
     it('rejects invalid lead input with 400 validation errors', async () => {
       const base = {
         firstName: 'Test',

@@ -3816,3 +3816,142 @@ full gates (verify + migrate + extended smoke) before the M18 report.
   sameSite flags, expiry), only the live HTTPS enforcement is M22.
 
 **Status:** M0-M17 + F1 PASSED; M18 IN_PROGRESS; M19-M23 NOT_STARTED.
+
+### Session 20 - M18 implementation complete (security review + 4 fixes; gates green; report delivered, acceptance PENDING)
+
+**2026-09-30. Dedicated security review executed** per plan L1199-1222 across
+all 17 checklist areas. Method: code inspection + executable checks
+(`npm audit` root and frontend, targeted greps/reads of every route,
+service, middleware and config module, existing integration suites).
+Four issues discovered and fixed; everything else passed.
+
+**Per-area verdicts (CONFIRMED by inspection unless noted):**
+
+1. **Authentication - OK.** scrypt N=16384/r=8/p=1, 32-byte salt, 64-byte
+   key, timingSafeEqual comparison, dummy-hash timing equalization for
+   unknown emails (`src/auth/password.ts`); min 12-char passwords; login
+   rate limited 10/min per ip+email; generic 401 invalid_credentials;
+   disabled account and disabled organization blocked with audit records.
+2. **Authorization - OK.** `router.use(requireAuth)` on all 14 org-scoped
+   routers (verified per file); per-route membership asserts verified
+   route-by-route: appointments 12/12, leads 5/5, patients 5/5, settings
+   authorize() 6/6, organizations 5/5, observability context() 8/8,
+   dashboard/workspace/conversation-state/call-events 1/1 each;
+   admin router `use(requireAuth, requireRole('admin'))` covers all 6
+   admin endpoints; role behavior covered by m3/m14/m15/m16/m17 suites.
+3. **Tenant isolation - OK.** every tenant query constrains
+   organization_id (spot-checked patients/leads/appointments/
+   observability/webhooks incl. UPDATE/DELETE statements); foreign org
+   resolves to 404 before any 403 (assertOrgExists ordering);
+   cross-tenant tests exist in m3/m14/m15/m17.
+4. **API security - OK after fix F3.** 100kb json + urlencoded body
+   limits; malformed JSON -> 400; list params bounded (limit 1-100,
+   offset >= 0); x-powered-by disabled; baseline security headers added.
+5. **Webhooks - OK after fix F4, replay limitation documented.**
+   telephony: per-IP 200/min, fails closed when signing secret empty,
+   timing-safe HMAC-SHA1 over full URL + sorted params (length check then
+   timingSafeEqual); whatsapp: per-IP 200/min on GET and POST, fails
+   closed on empty app secret, timing-safe HMAC-SHA256 over raw body;
+   idempotency at rest (call_events UNIQUE provider_event_id, whatsapp
+   wamid dedupe). Replay: both signature schemes lack timestamps - a
+   captured valid request can be re-delivered; mitigated by idempotent
+   processing (duplicates return duplicate, no side effects). ASSUMED
+   acceptable for provider-style webhooks; not fixable without provider
+   nonce/timestamp support (NOT_VERIFIED whether adapters expose one).
+6. **Input validation - OK.** central helpers in validate.ts (strings,
+   phones, emails, dates, times, timezones, URLs, business hours, choices,
+   pagination); per-route enum filters; JSON object guards; arrays and
+   unknown update fields rejected (UPDATABLE_* allowlists).
+7. **Injection - OK, no issues found.** all SQL parameterized; WHERE
+   fragments are literal strings with `?` placeholders (17 where.push
+   sites verified); ORDER BY fully static; UPDATE column names pass
+   UPDATABLE_* allowlists and apply() is called with string literals only;
+   LIKE search uses escapeLike + ESCAPE clause; orgMeta columnRef callers
+   pass literal 'organization_id'.
+8. **XSS - OK, no issues found.** no data-driven HTML responses
+   (backend); frontend has zero dangerouslySetInnerHTML/innerHTML/
+   document.write/eval hits (grep across frontend/src); React auto-escaping;
+   no dynamic href sinks.
+9. **CSRF - accepted design (no token).** cookie is HttpOnly +
+   SameSite=Lax; state changes only via JSON POST/PATCH/DELETE; no CORS
+   middleware (D6 same-origin proxy); cross-site POSTs carry no Lax cookie
+   and fail the JSON content-type parse. Recorded, not "silently skipped".
+10. **Rate limiting - OK.** login 10/min (ip+email), public leads 30/min
+    per IP + 120/min per site key, telephony and whatsapp webhooks 200/min
+    per IP; authenticated API endpoints are session-gated and unlimited;
+    password change is unlimited but requires an active session plus the
+    current password (LOW, accepted - recorded).
+11. **Secrets - OK after fix F1.** .env gitignored (.env.example holds
+    placeholders only), README clean since the K6 remediation, settings
+    secrets write-only + redacted since M16, logger redacts secret-looking
+    keys at any depth, diagnostics/observability expose no secrets.
+    Discovery: request/error logs recorded full originalUrl, so the
+    whatsapp `hub.verify_token` query parameter was written to logs,
+    contradicting README L56 ("Secrets are never logged").
+12. **Logs - OK after fix F1.** structured JSON with key redaction on
+    fields and bindings; request log = method + redacted path + status +
+    duration (no bodies, cookies or headers); stack traces server-log
+    only; error_events stores path without query string.
+13. **File uploads - N/A (CONFIRMED).** no multer/busboy/multipart/
+    upload code anywhere in the repo; checklist item recorded
+    not-applicable rather than skipped.
+14. **Dependency vulnerabilities - OK.** `npm audit` root: 0
+    vulnerabilities (exit 0); `npm audit` frontend: 0 vulnerabilities
+    (exit 0), run 2026-09-29/30.
+15. **Session handling - OK.** 32-byte random tokens stored as SHA-256
+    hashes, 12h fixed TTL enforced at lookup (expired rows deleted),
+    disabled users rejected, logout revokes the session, password change
+    revokes all of the user's sessions, cookie HttpOnly + SameSite=Lax +
+    Path=/ + Secure when NODE_ENV=production. No idle timeout (fixed TTL
+    design, recorded). Live HTTPS enforcement remains K-I2/M22.
+16. **Error exposure - OK.** 500 responses are the generic
+    "Internal server error" (AppError.expose defaults false >= 500);
+    validation issues only on 400; ProviderSendError extends plain Error
+    so any escape becomes a generic 500; provider_error text is stored in
+    communication_messages and shown to owner/admin in communication logs
+    (accepted: operational diagnosis value, no credentials included).
+17. **XSS/CSRF cross-check** covered by 8/9 above.
+
+**Issues discovered and fixed (all four with regression coverage):**
+
+- **F1 (MEDIUM) - secret query values in logs.** app.ts request logger and
+  errors.ts error logger recorded `req.originalUrl` verbatim; the whatsapp
+  handshake carries `hub.verify_token` in the query string. FIX:
+  new `redactUrl()` in `src/logger.ts` (redacts values for secret-looking
+  keys using the same SECRET_KEY_PATTERN as field redaction, keeps other
+  params) applied at both log sites; 6 unit tests added
+  (`tests/logger.test.ts`).
+- **F2 (MEDIUM) - candidate defect #26.** `createPatient` accepted the
+  request body but dropped `smsOptOut` from the INSERT (updatePatient had
+  validated it since M3; create did neither). FIX: boolean validation
+  (mirrors updatePatient, 400 on non-boolean) + `sms_opt_out` column in
+  the INSERT; regression test in `tests/m3.integration.test.ts` asserting
+  API GET, direct DB row, default false and the 400 type error.
+- **F3 (LOW) - missing security headers.** FIX: middleware after
+  `x-powered-by` disable sets X-Content-Type-Options: nosniff,
+  X-Frame-Options: DENY, Referrer-Policy: strict-origin-when-cross-origin
+  on every response; test in `tests/app.test.ts` + 3 smoke checks.
+- **F4 (LOW) - whatsapp verify token compared with `!==`.** FIX:
+  `timingSafeEqualStrings()` in `src/communications/whatsappSignature.ts`
+  (length check then timingSafeEqual), used in the GET handshake;
+  behavior identical for equal/unequal strings, existing m13 handshake
+  tests and smoke checks cover the outcome paths.
+
+**Gates (all executed 2026-09-30, all green):**
+- `npm run verify` exit 0: **286/286 tests, 27 suites, 0 skipped**
+  (278 prior + 8 new: 6 redactUrl, 1 security headers, 1 defect-26).
+- `npm run verify:frontend` exit 0 (frontend untouched by M18).
+- `npm run migrate` x2: applied 0 / skipped 15 (no M18 migration needed),
+  both exit 0.
+- extended smoke: **SMOKE_PASS**, exit 0 (+3 M18 header checks -> 176
+  total checks).
+
+**Carried forward (recorded, not blocking):** K-I2 HTTPS and K-I3 process
+persistence = M22; telephony/whatsapp replay tolerance = inherent scheme
+limitation (idempotency mitigates); password-change and authenticated API
+not rate-limited (accepted); CSP header not added (needs frontend E2E
+verification - PROPOSED, revisit at M20/M21); SameSite=Lax accepted as the
+CSRF control.
+
+**Status:** M0-M17 + F1 PASSED; M18 implementation complete - report
+delivered, awaiting owner acceptance; M19-M23 NOT_STARTED.

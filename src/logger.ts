@@ -26,6 +26,33 @@ const SECRET_KEY_PATTERN =
 
 const MAX_REDACTION_DEPTH = 6;
 
+export function redactUrl(url: string): string {
+  const qIndex = url.indexOf('?');
+  if (qIndex < 0) {
+    return url;
+  }
+  const path = url.slice(0, qIndex);
+  const query = url.slice(qIndex + 1);
+  if (query === '') {
+    return url;
+  }
+  const parts = query.split('&').map((pair) => {
+    const eq = pair.indexOf('=');
+    if (eq < 0) {
+      return pair;
+    }
+    const rawKey = pair.slice(0, eq);
+    let decodedKey: string;
+    try {
+      decodedKey = decodeURIComponent(rawKey);
+    } catch {
+      decodedKey = rawKey;
+    }
+    return SECRET_KEY_PATTERN.test(decodedKey) ? `${rawKey}=[REDACTED]` : pair;
+  });
+  return `${path}?${parts.join('&')}`;
+}
+
 function redactValue(value: unknown, depth: number): unknown {
   if (depth > MAX_REDACTION_DEPTH) {
     return '[truncated]';

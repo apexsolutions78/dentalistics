@@ -7,7 +7,7 @@ import { loadWhatsAppConfig } from './communications/whatsappConfig';
 import { WhatsAppProvider } from './communications/whatsappProvider';
 import { registerProvider } from './communications/registry';
 import { errorHandler, notFoundHandler } from './errors';
-import { createLogger } from './logger';
+import { createLogger, redactUrl } from './logger';
 import type { Logger } from './logger';
 import { attachSession } from './middleware/auth';
 import { createAdminRouter } from './routes/admin';
@@ -60,6 +60,12 @@ export function createApp(deps: AppDeps = {}): Express {
   const secureCookies = deps.secureCookies ?? false;
 
   app.disable('x-powered-by');
+  app.use((_req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    next();
+  });
   app.use(
     express.json({
       limit: '100kb',
@@ -76,7 +82,7 @@ export function createApp(deps: AppDeps = {}): Express {
       const durationMs = Number(process.hrtime.bigint() - start) / 1e6;
       logger.info('request', {
         method: req.method,
-        path: req.originalUrl,
+        path: redactUrl(req.originalUrl),
         statusCode: res.statusCode,
         durationMs: Math.round(durationMs * 10) / 10,
       });
