@@ -4063,3 +4063,31 @@ correctness-oriented, not benchmark-grade).
 
 **Status:** M0-M18 + F1 PASSED; M19 testing complete - report
 delivered, awaiting owner acceptance; M20-M23 NOT_STARTED.
+
+## Session 22 - M19 accepted (PASSED), M20 (End-to-end production scenarios) start
+
+**2026-09-30. Owner instruction:** "Proceed" - M19 (Performance and
+reliability) recorded **PASSED 2026-09-30** (PROJECT_STATE rev 49;
+M0_Project_Audit M19 row PASSED, M20 row IN_PROGRESS). Gates at pass
+unchanged from the rev 48 report: `npm run verify` exit 0
+(**295/295, 28 suites, 0 skipped**), `npm run verify:frontend` exit 0
+(untouched), migrate x2 (0/15 idempotent), extended smoke
+**SMOKE_PASS** (176 checks). The retry concurrency fix in
+`retryFailedJob` accepted with the pass; no optimization performed
+(none warranted by the measurements).
+
+**M20 (End-to-end production scenarios) started** - plan L1246-1298:
+realistic scenarios A (new lead), B (missed call), C (no-show),
+D (recall); "Every scenario must be tested end-to-end." Backend
+scenario tests only - no delivery fork (D7/D8/D10 precedent;
+FrontEnd section 41 does not gate M20).
+
+**Planned method (PROPOSED):** one integration test per scenario in
+`tests/m20.integration.test.ts`, each walking the full chain through
+the real API / signed webhook / service / tick paths with assertions
+at every arrow (lead rows, message rows + MockProvider calls,
+appointment + reminder rows, review/recall state), reusing the
+established harness (supertest + MockProvider + captured logger).
+Evidence recorded per step; fix only if a scenario step fails.
+
+**Status:** M0-M19 + F1 PASSED; M20 IN_PROGRESS; M21-M23 NOT_STARTED.
