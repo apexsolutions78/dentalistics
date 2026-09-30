@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../lib/auth';
-import { useSettings, previewTemplate } from '../../lib/settings';
+import { useSettings, previewTemplate, sourceLabel } from '../../lib/settings';
 import { useSubmit } from '../../lib/useAsync';
 import type { PreviewResult, Settings } from '../../lib/types';
 import { PageHeader } from '../../components/PageHeader';
@@ -86,7 +86,7 @@ export function TemplateEditorPage() {
   };
 
   const saveTemplate = async (): Promise<void> => {
-    const result = await submit(() => patchTemplate(name, { content }));
+    const result = await submit(() => patchTemplate(name, { body: content }));
     if (result !== null) {
       setDrafts((prev) => {
         const next = { ...prev };
@@ -133,6 +133,7 @@ export function TemplateEditorPage() {
               <ErrorState
                 message={`Unknown template "${name}".`}
                 onRetry={() => navigate('/settings/templates')}
+                retryLabel="Back to templates"
               />
             );
           }
@@ -153,7 +154,7 @@ export function TemplateEditorPage() {
                     type="button"
                     className="var-chip"
                     onClick={() => insertVariable(v.name)}
-                    title={v.source ? `Source: ${v.source}` : 'Not populated automatically'}
+                    title={v.source ? `Source: ${sourceLabel(v.source)}` : 'Not populated automatically'}
                   >
                     {`{{${v.name}}}`}
                   </button>
@@ -206,7 +207,7 @@ export function TemplateEditorPage() {
 
               {preview ? (
                 <div style={{ marginTop: 'var(--space-4)' }}>
-                  <div className="card-title">Preview</div>
+                  <h2 className="card-title">Preview</h2>
                   <div className="preview-box">{preview.rendered || '(empty)'}</div>
                   {preview.unknownVariables.length > 0 ? (
                     <div style={{ marginTop: 'var(--space-3)' }}>

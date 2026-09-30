@@ -19,6 +19,7 @@
   --color-bg: #f5f6f8;
   --color-surface: #ffffff;
   --color-border: #d9dde3;
+  --color-border-control: #868c96;
   --color-text: #1f2430;
   --color-text-secondary: #5c6474;
   --color-primary: #1d5fd0;
@@ -26,7 +27,7 @@
   --color-danger: #b3261e;
   --color-danger-hover: #8f1e18;
   --color-success: #1c7c47;
-  --color-warning: #8a6d1d;
+  --color-warning: #7f641a;
 
   --badge-new-bg: #e7f0ff;
   --badge-new-text: #174cab;
@@ -35,7 +36,7 @@
   --badge-muted-bg: #eceef2;
   --badge-muted-text: #4a5261;
   --badge-warn-bg: #fdf3d7;
-  --badge-warn-text: #8a6d1d;
+  --badge-warn-text: #7f641a;
   --badge-danger-bg: #fbe9e7;
   --badge-danger-text: #8f1e18;
 

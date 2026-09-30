@@ -1,6 +1,6 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth, canManageSettings } from '../lib/auth';
-import { LoadingState, ErrorState } from '../components/states';
+import { LoadingState } from '../components/states';
 import { UnauthorizedPage } from '../pages/UnauthorizedPage';
 
 export function RequireAuth() {
@@ -26,12 +26,4 @@ export function RequireSettingsRole() {
     return <UnauthorizedPage />;
   }
   return <Outlet />;
-}
-
-export function SessionError({ message, onRetry }: { message: string; onRetry: () => void }) {
-  return (
-    <div className="login-page">
-      <ErrorState message={message} onRetry={onRetry} />
-    </div>
-  );
 }

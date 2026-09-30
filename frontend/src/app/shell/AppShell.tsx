@@ -13,7 +13,7 @@ export function AppShell() {
       <div className="app-brand">Apex Dentalistics</div>
       <header className="app-header">
         <span style={{ fontSize: 'var(--fs-label)', color: 'var(--color-text-secondary)' }}>
-          {showSettings ? 'Settings' : 'Practice management'}
+          {showSettings ? 'Settings' : 'Home'}
         </span>
         <AccountMenu />
       </header>

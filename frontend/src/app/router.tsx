@@ -39,7 +39,6 @@ export function AppRouter() {
           <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Route>
-      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
 }

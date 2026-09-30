@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useSettings } from '../../lib/settings';
+import { useSettings, sourceLabel } from '../../lib/settings';
 import { useSubmit } from '../../lib/useAsync';
 import type { Settings } from '../../lib/types';
 import { PageHeader } from '../../components/PageHeader';
@@ -163,9 +163,9 @@ export function AutomationSettingsPage() {
               ) : null}
 
               <div className="card">
-                <div className="card-title">Lead acknowledgement</div>
+                <h2 className="card-title">Lead acknowledgement</h2>
                 <div className="provider-status">
-                  <StatusBadge label={`Source: ${ackCfg.source}`} tone={ackCfg.source === 'org' ? 'new' : 'default'} />
+                  <StatusBadge label={`Source: ${sourceLabel(ackCfg.source)}`} tone={ackCfg.source === 'org' ? 'new' : 'default'} />
                   <StatusBadge label={ackCfg.config.enabled ? 'Enabled' : 'Disabled'} tone={ackCfg.config.enabled ? 'success' : 'default'} />
                 </div>
                 {ackSubmit.saved ? (
@@ -208,9 +208,9 @@ export function AutomationSettingsPage() {
               </div>
 
               <div className="card">
-                <div className="card-title">Missed-call response</div>
+                <h2 className="card-title">Missed-call response</h2>
                 <div className="provider-status">
-                  <StatusBadge label={`Source: ${missedCfg.source}`} tone={missedCfg.source === 'org' ? 'new' : 'default'} />
+                  <StatusBadge label={`Source: ${sourceLabel(missedCfg.source)}`} tone={missedCfg.source === 'org' ? 'new' : 'default'} />
                   <StatusBadge label={missedCfg.config.enabled ? 'Enabled' : 'Disabled'} tone={missedCfg.config.enabled ? 'success' : 'default'} />
                 </div>
                 {missedSubmit.saved ? (
@@ -249,9 +249,9 @@ export function AutomationSettingsPage() {
               </div>
 
               <div className="card">
-                <div className="card-title">No-show follow-up</div>
+                <h2 className="card-title">No-show follow-up</h2>
                 <div className="provider-status">
-                  <StatusBadge label={`Source: ${noShowCfg.source}`} tone={noShowCfg.source === 'org' ? 'new' : 'default'} />
+                  <StatusBadge label={`Source: ${sourceLabel(noShowCfg.source)}`} tone={noShowCfg.source === 'org' ? 'new' : 'default'} />
                   <StatusBadge label={noShowCfg.config.enabled ? 'Enabled' : 'Disabled'} tone={noShowCfg.config.enabled ? 'success' : 'default'} />
                 </div>
                 {noShowSubmit.saved ? (

@@ -16,16 +16,38 @@ export function FormField({
 }) {
   const generatedId = useId();
   const id = htmlFor ?? generatedId;
+  const hintId = `${id}-hint`;
+  const errorId = `${id}-error`;
   const only = Children.only(children);
-  const control = isValidElement(only)
-    ? cloneElement(only as ReactElement<{ id?: string }>, { id })
-    : only;
+  const isLabelChild = isValidElement(only) && only.type === 'label';
+  const describedBy =
+    [hint ? hintId : null, error ? errorId : null].filter(Boolean).join(' ') || undefined;
+  const control =
+    isValidElement(only) && !isLabelChild
+      ? cloneElement(only as ReactElement<Record<string, unknown>>, {
+          id,
+          'aria-invalid': error ? true : undefined,
+          'aria-describedby': describedBy,
+        })
+      : only;
   return (
     <div className="field">
-      <label htmlFor={id}>{label}</label>
+      {isLabelChild ? (
+        <span className="group-label">{label}</span>
+      ) : (
+        <label htmlFor={id}>{label}</label>
+      )}
       {control}
-      {hint ? <span className="hint">{hint}</span> : null}
-      {error ? <span className="error">{error}</span> : null}
+      {hint ? (
+        <span className="hint" id={hintId}>
+          {hint}
+        </span>
+      ) : null}
+      {error ? (
+        <span className="error" id={errorId} role="alert">
+          {error}
+        </span>
+      ) : null}
     </div>
   );
 }

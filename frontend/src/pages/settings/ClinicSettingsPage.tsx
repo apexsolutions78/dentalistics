@@ -166,9 +166,9 @@ export function ClinicSettingsPage() {
                 </FormField>
               </div>
 
-              <div className="card-title" style={{ marginTop: 'var(--space-3)' }}>
+              <h2 className="card-title" style={{ marginTop: 'var(--space-3)' }}>
                 Business hours
-              </div>
+              </h2>
               {Object.entries(form.hours).map(([day, row]) => (
                 <div className="hours-row" key={day}>
                   <label className="checkbox-row" style={{ marginBottom: 0 }}>

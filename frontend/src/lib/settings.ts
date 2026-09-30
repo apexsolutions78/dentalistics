@@ -143,3 +143,10 @@ export async function previewTemplate(
     body: { body: content },
   });
 }
+
+export function sourceLabel(source: string): string {
+  if (source === 'org') return 'Clinic setting';
+  if (source === 'deployment') return 'Server-wide setting';
+  if (source === 'default') return 'Default setting';
+  return source;
+}

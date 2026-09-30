@@ -5,6 +5,7 @@ export function UnauthorizedPage() {
   return (
     <div className="center-narrow">
       <EmptyState
+        heading
         title="Access denied"
         description="Your role does not have permission to view settings. Contact your clinic owner if you believe this is a mistake."
       />

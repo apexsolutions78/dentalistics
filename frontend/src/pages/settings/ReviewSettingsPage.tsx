@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useSettings } from '../../lib/settings';
+import { useSettings, sourceLabel } from '../../lib/settings';
 import { useSubmit } from '../../lib/useAsync';
 import type { Settings } from '../../lib/types';
 import { PageHeader } from '../../components/PageHeader';
@@ -126,7 +126,7 @@ export function ReviewSettingsPage() {
               ) : null}
 
               <div className="card">
-                <div className="card-title">Review destination</div>
+                <h2 className="card-title">Review destination</h2>
                 {destinationSaved ? (
                   <Flash kind="success" message="Review destination saved." onDismiss={clearDestination} />
                 ) : null}
@@ -156,7 +156,7 @@ export function ReviewSettingsPage() {
 
               <div className="card">
                 <div className="provider-status">
-                  <StatusBadge label={`Source: ${cfg.source}`} tone={cfg.source === 'org' ? 'new' : 'default'} />
+                  <StatusBadge label={`Source: ${sourceLabel(cfg.source)}`} tone={cfg.source === 'org' ? 'new' : 'default'} />
                   <StatusBadge label={cfg.config.enabled ? 'Enabled' : 'Disabled'} tone={cfg.config.enabled ? 'success' : 'default'} />
                 </div>
                 {saved ? <Flash kind="success" message="Review settings saved." onDismiss={clearFeedback} /> : null}
@@ -200,9 +200,9 @@ export function ReviewSettingsPage() {
                   </button>
                 </div>
 
-                <div className="card-title" style={{ marginTop: 'var(--space-5)' }}>
-                  Review template
-                </div>
+                    <h2 className="card-title" style={{ marginTop: 'var(--space-5)' }}>
+                      Review template
+                    </h2>
                 <TemplateLinkRow
                   to="/settings/templates/review_request"
                   slot="Review request"

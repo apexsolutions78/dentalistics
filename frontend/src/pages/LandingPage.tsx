@@ -10,10 +10,10 @@ export function LandingPage() {
   }
   return (
     <div>
-      <PageHeader title="Welcome" subtitle="Your workspace" />
+      <PageHeader title="Home" subtitle="Apex Dentalistics" />
       <EmptyState
-        title="Workspace screens are not available yet"
-        description="Practice workspace screens arrive with a later milestone. Settings screens are available to owners and administrators."
+        title="No screens for your account yet"
+        description="Your role does not have any workspace screens right now. Ask the clinic owner to assign your work or grant access."
       />
     </div>
   );

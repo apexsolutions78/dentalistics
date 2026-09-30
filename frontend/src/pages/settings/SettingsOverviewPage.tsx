@@ -41,15 +41,33 @@ export function SettingsOverviewPage() {
                 <span className="desc">{cat.description}</span>
               </Link>
             ))}
-            <div className="category-card" style={{ display: 'block' }}>
+            <div className="card-status">
               <strong>Automation status</strong>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
-                <StatusBadge label="Reminders" tone={settings.automations.reminder.config.enabled ? 'success' : 'default'} />
-                <StatusBadge label="No-show" tone={settings.automations.noShow.config.enabled ? 'success' : 'default'} />
-                <StatusBadge label="Recall" tone={settings.automations.recall.config.enabled ? 'success' : 'default'} />
-                <StatusBadge label="Reviews" tone={settings.automations.review.config.enabled ? 'success' : 'default'} />
-                <StatusBadge label="Lead ack" tone={settings.automations.leadAck.config.enabled ? 'success' : 'default'} />
-                <StatusBadge label="Missed call" tone={settings.automations.missedCall.config.enabled ? 'success' : 'default'} />
+                <StatusBadge
+                  label={`Reminders ${settings.automations.reminder.config.enabled ? 'On' : 'Off'}`}
+                  tone={settings.automations.reminder.config.enabled ? 'success' : 'default'}
+                />
+                <StatusBadge
+                  label={`No-show ${settings.automations.noShow.config.enabled ? 'On' : 'Off'}`}
+                  tone={settings.automations.noShow.config.enabled ? 'success' : 'default'}
+                />
+                <StatusBadge
+                  label={`Recall ${settings.automations.recall.config.enabled ? 'On' : 'Off'}`}
+                  tone={settings.automations.recall.config.enabled ? 'success' : 'default'}
+                />
+                <StatusBadge
+                  label={`Reviews ${settings.automations.review.config.enabled ? 'On' : 'Off'}`}
+                  tone={settings.automations.review.config.enabled ? 'success' : 'default'}
+                />
+                <StatusBadge
+                  label={`Lead ack ${settings.automations.leadAck.config.enabled ? 'On' : 'Off'}`}
+                  tone={settings.automations.leadAck.config.enabled ? 'success' : 'default'}
+                />
+                <StatusBadge
+                  label={`Missed call ${settings.automations.missedCall.config.enabled ? 'On' : 'Off'}`}
+                  tone={settings.automations.missedCall.config.enabled ? 'success' : 'default'}
+                />
               </div>
             </div>
           </div>

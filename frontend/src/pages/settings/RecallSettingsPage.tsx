@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useSettings } from '../../lib/settings';
+import { useSettings, sourceLabel } from '../../lib/settings';
 import { useSubmit } from '../../lib/useAsync';
 import type { Settings } from '../../lib/types';
 import { PageHeader } from '../../components/PageHeader';
@@ -86,7 +86,7 @@ export function RecallSettingsPage() {
           return (
             <div className="card">
               <div className="provider-status">
-                <StatusBadge label={`Source: ${cfg.source}`} tone={cfg.source === 'org' ? 'new' : 'default'} />
+                <StatusBadge label={`Source: ${sourceLabel(cfg.source)}`} tone={cfg.source === 'org' ? 'new' : 'default'} />
                 <StatusBadge label={cfg.config.enabled ? 'Enabled' : 'Disabled'} tone={cfg.config.enabled ? 'success' : 'default'} />
               </div>
               {saved ? <Flash kind="success" message="Recall settings saved." onDismiss={clearFeedback} /> : null}
@@ -140,9 +140,9 @@ export function RecallSettingsPage() {
                 </button>
               </div>
 
-              <div className="card-title" style={{ marginTop: 'var(--space-5)' }}>
+              <h2 className="card-title" style={{ marginTop: 'var(--space-5)' }}>
                 Recall templates
-              </div>
+              </h2>
               <TemplateLinkRow
                 to="/settings/templates/recall_message"
                 slot="First recall"

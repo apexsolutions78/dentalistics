@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useSettings } from '../../lib/settings';
+import { useSettings, sourceLabel } from '../../lib/settings';
 import { useSubmit } from '../../lib/useAsync';
 import type { Settings } from '../../lib/types';
 import { PageHeader } from '../../components/PageHeader';
@@ -103,7 +103,7 @@ export function AppointmentSettingsPage() {
           return (
             <div className="card">
               <div className="provider-status">
-                <StatusBadge label={`Source: ${cfg.source}`} tone={cfg.source === 'org' ? 'new' : 'default'} />
+                <StatusBadge label={`Source: ${sourceLabel(cfg.source)}`} tone={cfg.source === 'org' ? 'new' : 'default'} />
                 <StatusBadge label={cfg.config.enabled ? 'Enabled' : 'Disabled'} tone={cfg.config.enabled ? 'success' : 'default'} />
               </div>
               {saved ? <Flash kind="success" message="Reminder settings saved." onDismiss={clearFeedback} /> : null}
@@ -138,7 +138,7 @@ export function AppointmentSettingsPage() {
                 />
               </FormField>
 
-              <div className="card-title">Quiet hours</div>
+              <h2 className="card-title">Quiet hours</h2>
               <FormField label="Suppress sends during quiet hours">
                 <label className="checkbox-row">
                   <input
@@ -181,9 +181,9 @@ export function AppointmentSettingsPage() {
                 </button>
               </div>
 
-              <div className="card-title" style={{ marginTop: 'var(--space-5)' }}>
+              <h2 className="card-title" style={{ marginTop: 'var(--space-5)' }}>
                 Reminder templates
-              </div>
+              </h2>
               <TemplateLinkRow
                 to="/settings/templates/appointment_reminder_48h"
                 slot="48 hours before"

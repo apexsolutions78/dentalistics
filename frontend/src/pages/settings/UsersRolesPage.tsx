@@ -3,7 +3,7 @@ import { useAuth } from '../../lib/auth';
 import { useMembers } from '../../lib/settings';
 import { apiFetch } from '../../lib/api';
 import { useSubmit } from '../../lib/useAsync';
-import type { MemberUser, Settings } from '../../lib/types';
+import type { MemberUser } from '../../lib/types';
 import { PageHeader } from '../../components/PageHeader';
 import { FormField } from '../../components/FormField';
 import { Flash } from '../../components/Flash';
@@ -40,6 +40,7 @@ export function UsersRolesPage() {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('receptionist');
   const [confirmTarget, setConfirmTarget] = useState<MemberUser | null>(null);
+  const [memberMsg, setMemberMsg] = useState<string | null>(null);
 
   const addMember = async (): Promise<void> => {
     if (user === null) return;
@@ -67,6 +68,22 @@ export function UsersRolesPage() {
     });
     setConfirmTarget(null);
     if (ok !== null) {
+      setMemberMsg('User disabled.');
+      reloadMembers();
+    }
+  };
+
+  const enableMember = async (member: MemberUser): Promise<void> => {
+    if (user === null) return;
+    setMemberMsg(null);
+    const ok = await submitRemove(async () => {
+      await apiFetch(`/api/organizations/${user.organizationId}/users/${member.id}/enable`, {
+        method: 'POST',
+      });
+      return true;
+    });
+    if (ok !== null) {
+      setMemberMsg('User enabled.');
       reloadMembers();
     }
   };
@@ -78,69 +95,87 @@ export function UsersRolesPage() {
         subtitle="Owners manage settings; receptionists work the daily schedule without settings access"
       />
       <SettingsBody state={state} onRetry={reload}>
-        {(settings: Settings) => (
+        {() => (
           <div>
             <div className="card">
-              <div className="card-title">Clinic users</div>
+              <h2 className="card-title">Clinic users</h2>
+              {memberMsg ? (
+                <Flash kind="success" message={memberMsg} onDismiss={() => setMemberMsg(null)} />
+              ) : null}
+              {removeError ? <Flash kind="error" message={removeError} onDismiss={clearRemove} /> : null}
               {status === 'loading' ? <LoadingState label="Loading users…" /> : null}
               {status === 'error' ? <ErrorState message={membersError ?? 'Users could not be loaded.'} onRetry={reloadMembers} /> : null}
               {status === 'success' && members.length === 0 ? (
                 <EmptyState title="No users" description="No users belong to this clinic yet." />
               ) : null}
               {status === 'success' && members.length > 0 ? (
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th>Email</th>
-                      <th>Role</th>
-                      <th>Status</th>
-                      <th>Last sign-in</th>
-                      <th aria-label="Actions" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {members.map((member) => {
-                      const isSelf = member.id === user?.id;
-                      return (
-                        <tr key={member.id}>
-                          <td>
-                            {member.email}
-                            {isSelf ? <span className="meta-line"> (you)</span> : null}
-                          </td>
-                          <td>
-                            <StatusBadge label={member.role} tone={roleTone(member.role)} />
-                          </td>
-                          <td>
-                            <StatusBadge
-                              label={member.status}
-                              tone={member.status === 'active' ? 'success' : 'danger'}
-                            />
-                          </td>
-                          <td>{formatWhen(member.lastLoginAt)}</td>
-                          <td style={{ textAlign: 'right' }}>
-                            {member.status === 'active' && !isSelf ? (
-                              <button
-                                type="button"
-                                className="btn btn-secondary"
-                                onClick={() => {
-                                  clearRemove();
-                                  setConfirmTarget(member);
-                                }}
-                              >
-                                Disable
-                              </button>
-                            ) : null}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                <div className="table-scroll" tabIndex={0} role="region" aria-label="Clinic users table">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th scope="col">Email</th>
+                        <th scope="col">Role</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Last sign-in</th>
+                        <th scope="col" aria-label="Actions" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {members.map((member) => {
+                        const isSelf = member.id === user?.id;
+                        return (
+                          <tr key={member.id}>
+                            <td>
+                              {member.email}
+                              {isSelf ? <span className="meta-line"> (you)</span> : null}
+                            </td>
+                            <td>
+                              <StatusBadge label={member.role} tone={roleTone(member.role)} />
+                            </td>
+                            <td>
+                              <StatusBadge
+                                label={member.status}
+                                tone={member.status === 'active' ? 'success' : 'danger'}
+                              />
+                            </td>
+                            <td>{formatWhen(member.lastLoginAt)}</td>
+                            <td style={{ textAlign: 'right' }}>
+                              {member.status === 'active' && !isSelf ? (
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary"
+                                  disabled={removing}
+                                  onClick={() => {
+                                    clearRemove();
+                                    setMemberMsg(null);
+                                    setConfirmTarget(member);
+                                  }}
+                                >
+                                  Disable
+                                </button>
+                              ) : null}
+                              {member.status === 'disabled' ? (
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary"
+                                  disabled={removing}
+                                  onClick={() => void enableMember(member)}
+                                >
+                                  {removing ? 'Enabling…' : 'Enable'}
+                                </button>
+                              ) : null}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               ) : null}
             </div>
 
             <div className="card">
-              <div className="card-title">Add a user</div>
+              <h2 className="card-title">Add a user</h2>
               {saved ? <Flash kind="success" message="User added." onDismiss={clearFeedback} /> : null}
               {error ? <Flash kind="error" message={error} onDismiss={clearFeedback} /> : null}
               <div className="form-grid">
@@ -155,7 +190,7 @@ export function UsersRolesPage() {
                     }}
                   />
                 </FormField>
-                <FormField label="Password" hint="Server enforces the password policy.">
+                <FormField label="Password" hint="12–200 characters. The server enforces the password policy.">
                   <input
                     className="input"
                     type="password"
@@ -194,13 +229,6 @@ export function UsersRolesPage() {
                   {saving ? 'Adding…' : 'Add user'}
                 </button>
               </div>
-              <div className="meta-line" role="note">
-                {settings.definitions.roleMatrix
-                  ? Object.entries(settings.definitions.roleMatrix)
-                      .map(([roleName, perms]) => roleName + ': ' + perms.length + ' permissions')
-                      .join(' | ')
-                  : ''}
-              </div>
             </div>
 
             <ConfirmDialog
@@ -208,7 +236,7 @@ export function UsersRolesPage() {
               title="Disable user?"
               body={
                 confirmTarget !== null
-                  ? `${confirmTarget.email} will no longer be able to sign in. Their history is kept.`
+                  ? `${confirmTarget.email} will no longer be able to sign in. Their history is kept. You can re-enable the account later.`
                   : ''
               }
               confirmLabel="Disable user"
@@ -222,9 +250,6 @@ export function UsersRolesPage() {
                 clearRemove();
               }}
             />
-            {removeError ? (
-              <Flash kind="error" message={removeError} onDismiss={clearRemove} />
-            ) : null}
           </div>
         )}
       </SettingsBody>

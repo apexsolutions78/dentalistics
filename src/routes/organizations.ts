@@ -205,5 +205,30 @@ export function createOrganizationsRouter(deps: OrganizationsRouterDeps): Router
     res.status(200).json({ ok: true });
   });
 
+  router.post('/:orgId/users/:userId/enable', async (req: Request, res: Response) => {
+    const organizationId = parsePathId(req.params.orgId ?? '');
+    const userId = parsePathId(req.params.userId ?? '');
+    const actor = req.user as SessionUser;
+    assertCanManageMembers(actor, organizationId);
+
+    const [rows] = await deps.db.query<UserTargetRow[]>(
+      'SELECT id, organization_id, email FROM users WHERE id = ?',
+      [userId],
+    );
+    const target = rows[0];
+    if (target === undefined || target.organization_id !== organizationId) {
+      throw new AppError('User not found', 404, 'not_found', true);
+    }
+
+    await deps.db.query("UPDATE users SET status = 'active' WHERE id = ?", [userId]);
+    await recordAudit(deps.db, deps.logger, {
+      organizationId,
+      userId: actor.id,
+      action: 'user_enabled',
+      detail: `target=${target.email}`,
+    });
+    res.status(200).json({ ok: true });
+  });
+
   return router;
 }

@@ -60,9 +60,10 @@ describe('route access', () => {
     expect(await screen.findByText('Page not found')).toBeInTheDocument();
   });
 
-  it('renders settings screens without a sidebar entry for receptionists on the landing page', async () => {
+  it('renders an honest empty landing without planned screens for receptionists', async () => {
     await renderAt('/', makeUser({ role: 'receptionist', email: 'desk@example.com' }));
-    expect(await screen.findByText(/workspace screens are not available yet/i)).toBeInTheDocument();
+    expect(await screen.findByText(/no screens for your account yet/i)).toBeInTheDocument();
+    expect(screen.queryByText(/planned/i)).not.toBeInTheDocument();
     expect(screen.queryByText('Users & roles')).not.toBeInTheDocument();
   });
 });

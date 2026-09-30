@@ -71,8 +71,7 @@ export function CommunicationSettingsPage() {
   const saveWhatsApp = async (): Promise<void> => {
     if (wa === null || user === null) return;
     const body: Record<string, unknown> = { enabled: wa.enabled };
-    const secretFields: Array<keyof WhatsAppForm['clear']> = ['verifyToken', 'appSecret', 'accessToken'];
-    const graph: Record<string, string> = {};
+    const secretFields: Array<'verifyToken' | 'appSecret'> = ['verifyToken', 'appSecret'];
     for (const field of secretFields) {
       if (wa.clear[field]) {
         body[field] = null;
@@ -80,8 +79,15 @@ export function CommunicationSettingsPage() {
         body[field] = wa[field];
       }
     }
-    graph.phoneNumberId = wa.phoneNumberId;
-    graph.apiVersion = wa.apiVersion;
+    const graph: Record<string, unknown> = {
+      phoneNumberId: wa.phoneNumberId,
+      apiVersion: wa.apiVersion,
+    };
+    if (wa.clear.accessToken) {
+      graph.accessToken = null;
+    } else if (wa.accessToken.length > 0) {
+      graph.accessToken = wa.accessToken;
+    }
     body.graph = graph;
     const ok = await submit(() => patchProvider('whatsapp', body));
     if (ok !== null) {
@@ -112,7 +118,7 @@ export function CommunicationSettingsPage() {
               {error ? <Flash kind="error" message={error} onDismiss={clearFeedback} /> : null}
 
               <div className="card">
-                <div className="card-title">Telephony</div>
+                <h2 className="card-title">Telephony</h2>
                 <div className="provider-status">
                   <StatusBadge
                     label={telConfigured ? 'Signing secret configured' : 'Signing secret not set'}
@@ -177,7 +183,7 @@ export function CommunicationSettingsPage() {
               </div>
 
               <div className="card">
-                <div className="card-title">WhatsApp</div>
+                <h2 className="card-title">WhatsApp</h2>
                 <div className="provider-status">
                   <StatusBadge
                     label={waConfigured.verifyToken ? 'Verify token set' : 'Verify token missing'}
@@ -289,9 +295,13 @@ export function CommunicationSettingsPage() {
                       });
                       clearFeedback();
                     }}
+                    disabled={wa.clear.verifyToken && wa.clear.appSecret && wa.clear.accessToken}
                   >
                     Clear secrets
                   </button>
+                  {wa.clear.verifyToken || wa.clear.appSecret || wa.clear.accessToken ? (
+                    <span className="meta-line">Secrets will be cleared on save.</span>
+                  ) : null}
                 </div>
               </div>
             </div>

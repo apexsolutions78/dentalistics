@@ -4163,3 +4163,88 @@ instructions accepted M17/M18/M19).
   (STRICT MVP BOUNDARY).
 
 **Status:** M0-M20 + F1 PASSED; M21 IN_PROGRESS; M22-M23 NOT_STARTED.
+
+## Session 24 - M21 UX review complete (gates green, awaiting acceptance)
+
+**2026-09-30 - M21 execution** (method accepted at Session 23: code-level
+audit of frontend/ -> findings labelled CONFIRMED/ASSUMED -> fix confirmed
+findings -> regression gates; no new feature scope, STRICT MVP BOUNDARY
+FrontEnd 46; backend-only UI delivery unchanged per D7/D8/D10).
+
+- Audit: two parallel explore-agent reviews of `frontend/` (44 files)
+  against plan L1302-1324's 15 areas + `FrontEnd_Planning.md` 45
+  (Login/Settings/Templates workflows reviewed in place; Dashboard,
+  Workspace, Lead, Patient, Appointment, No-show, Recall, Communication
+  and Automation screens do not exist as UI - deferred to the owner's
+  future UI phase by D7/D8/D10 - recorded as not-reviewable for M21).
+- Findings re-verified in source before fixing (2 blocking contract
+  defects confirmed by direct read, not agent trust):
+  - **F-01** `TemplateEditorPage` save sent `{ content }`; backend
+    `readTemplateBody` (src/services/settings.ts) accepts only `body` ->
+    template save could not persist (CONFIRMED).
+  - **F-02** `saveWhatsApp` sent top-level `accessToken`; backend
+    `sanitizeNullableStrings` -> `mergeSection` throws on unknown field ->
+    any WhatsApp save with a typed token would fail (CONFIRMED).
+  - **F-07** disable-user existed (`DELETE`), no re-enable path anywhere
+    (CONFIRMED) - disable was irreversible in the delivered product.
+- Fixes executed (all gated):
+  1. F-01 -> `{ body: content }`; locked by new
+     `frontend/src/pages/settings/TemplateEditorPage.test.tsx` (2 tests:
+     save payload + preview payload both `{ body }`).
+  2. F-02 -> token nested under `graph.accessToken`; secrets stay
+     write-only; Clear secrets disabled when already staged + visible
+     notice "Secrets will be cleared on save."; locked by new
+     `CommunicationSettingsPage.test.tsx` (2 tests: graph nesting, notice).
+  3. F-07 -> `POST /api/organizations/:orgId/users/:userId/enable`
+     (assertCanManageMembers, org check -> 404, audit `user_enabled`);
+     `tests/auth.integration.test.ts` +2 assertions (cross-org enable 404;
+     disable -> enable -> login 200).
+  4. F-03/F-04 (FrontEnd 47 forbidden placeholder UI): Sidebar "Planned
+     M19/M20/M21" block (wrong milestone IDs) and LandingPage roadmap copy
+     removed; receptionist/Landing now honest - "No screens for your
+     account yet" + nav empty-state (D7 deferral surfaced, not hidden).
+  5. F-06: Unauthorized circular link -> "Home".
+  6. Headings: 14 settings card titles div -> h2; 404/401 titles -> h1
+     (EmptyState `heading` prop); dialog title -> h2; ErrorState
+     `retryLabel` (TemplateEditor "Back to templates").
+  7. Contrast (computed WCAG ratios, node calculation): `--badge-warn-text`
+     #8a6d1d -> #7f641a (4.43 -> 5.07:1 on #fdf3d7); new
+     `--color-border-control` #868c96 (3.38:1 white / 3.13:1 bg, was 1.36:1)
+     on inputs/selects/textareas/secondary buttons.
+  8. Responsive: sidebar nav horizontal scroll row <=820px (B1); business
+     hours rows stack <=820px (B3); Clinic users table wrapped in focusable
+     labelled `.table-scroll` region + `scope=col` (B2); automation badges
+     state On/Off in text (B4 color-only).
+  9. A11y: FormField `group-label` (label-clone no longer orphaned),
+     aria-describedby/aria-invalid, error `role="alert"`; ConfirmDialog
+     focuses Cancel, Escape ignored while busy; `:focus-visible` outlines;
+     `prefers-reduced-motion` disables spinner.
+  10. Copy/cleanup: `Source: default` jargon -> `sourceLabel()` (Clinic
+      setting / Server-wide setting / Default setting) at 6 badge sites +
+      variable tooltip; password hint -> "12-200 characters"; role-matrix
+      jargon line removed; enable button + "You can re-enable the account
+      later."; header "Practice management" -> "Home"; unused SessionError
+      removed; duplicate top-level router `*` route removed; login email
+      `autoFocus`; member messages moved into Clinic users card.
+- Deferred / PROPOSED (NOT fixed, awaiting owner): F-05 receptionist has no
+  delivered screens (D7/D8/D10), F-09 forgot-password (FrontEnd A1),
+  F-11 no 401 auto-redirect, F-40 receptionist settings-access matrix
+  doc-vs-code, B6 unsaved-changes guard, password show/hide toggle,
+  per-route document.title, client error boundary, full dialog focus trap,
+  B5 error-placement refactors, template-list status labels, login
+  noValidate. Assumed rendering-dependent findings (visual hierarchy,
+  mobile feel) remain ASSUMED - code-level review only, no browser session.
+- Gates (all executed 2026-09-30, after fixes):
+  - `npm run verify:frontend` exit 0 (eslint 0; vitest **24/24**, 7 files;
+    tsc + vite build OK).
+  - `npm run verify` exit 0 (eslint 0; tsc 0; vitest **299/299**, 29
+    suites, 0 skipped; build OK).
+  - `npm run migrate` x2: applied 0 / skipped 15 both runs (idempotent).
+  - extended smoke `m3-smoke.ps1`: **SMOKE_PASS** (176 checks; the new
+    enable endpoint is covered by integration tests, not by smoke).
+- Docs rev 52: PROJECT_STATE L5 M21 review-complete/awaiting-acceptance,
+  L9 rev 52, blockquote + row 52; M0_Project_Audit M21 row ->
+  REVIEW COMPLETE (gates + fix/deferred lists).
+
+**Status:** M0-M20 + F1 PASSED; M21 review complete (awaiting acceptance);
+M22-M23 NOT_STARTED.

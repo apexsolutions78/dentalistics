@@ -20,7 +20,15 @@ export function LoadingState({ label = 'Loading…' }: { label?: string }) {
   );
 }
 
-export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
+export function ErrorState({
+  message,
+  onRetry,
+  retryLabel = 'Try again',
+}: {
+  message: string;
+  onRetry?: () => void;
+  retryLabel?: string;
+}) {
   return (
     <div className="state-block error" role="alert">
       <div className="state-title">Something went wrong</div>
@@ -28,7 +36,7 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
       {onRetry ? (
         <div className="btn-row" style={{ justifyContent: 'center' }}>
           <button type="button" className="btn btn-secondary" onClick={onRetry}>
-            Try again
+            {retryLabel}
           </button>
         </div>
       ) : null}
@@ -36,10 +44,22 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
   );
 }
 
-export function EmptyState({ title, description }: { title: string; description: string }) {
+export function EmptyState({
+  title,
+  description,
+  heading = false,
+}: {
+  title: string;
+  description: string;
+  heading?: boolean;
+}) {
   return (
     <div className="state-block">
-      <div className="state-title">{title}</div>
+      {heading ? (
+        <h1 className="state-title">{title}</h1>
+      ) : (
+        <div className="state-title">{title}</div>
+      )}
       <div>{description}</div>
     </div>
   );

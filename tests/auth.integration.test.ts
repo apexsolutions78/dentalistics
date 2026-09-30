@@ -375,6 +375,11 @@ describe.skipIf(testHost === undefined || testHost === '')(
         .set('Cookie', cookieA);
       expect(crossOrg.status).toBe(404);
 
+      const crossOrgEnable = await request(app)
+        .post(`/api/organizations/${orgAId}/users/${ownerBId}/enable`)
+        .set('Cookie', cookieA);
+      expect(crossOrgEnable.status).toBe(404);
+
       const selfDisable = await request(app)
         .delete(`/api/organizations/${orgAId}/users/${ownerAId}`)
         .set('Cookie', cookieA);
@@ -406,6 +411,16 @@ describe.skipIf(testHost === undefined || testHost === '')(
         .send({ email: 'receptionist.b@apextest.local', password: 'ReceptionBPassw0rd!26x' });
       expect(loginAfter.status).toBe(403);
       expect(loginAfter.body.error.code).toBe('account_disabled');
+
+      const enabled = await request(app)
+        .post(`/api/organizations/${orgAId}/users/${recBId}/enable`)
+        .set('Cookie', cookie(loginA));
+      expect(enabled.status).toBe(200);
+
+      const loginEnabled = await request(app)
+        .post('/api/auth/login')
+        .send({ email: 'receptionist.b@apextest.local', password: 'ReceptionBPassw0rd!26x' });
+      expect(loginEnabled.status).toBe(200);
     }, 20_000);
 
     it('supports self password change with session invalidation', async () => {
