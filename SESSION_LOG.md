@@ -4248,3 +4248,34 @@ FrontEnd 46; backend-only UI delivery unchanged per D7/D8/D10).
 
 **Status:** M0-M20 + F1 PASSED; M21 review complete (awaiting acceptance);
 M22-M23 NOT_STARTED.
+
+## Session 25 - M21 accepted PASSED; M22 production readiness started
+
+**2026-09-30 - owner instruction:** "if not done already, save session
+log, commit, push current progress and then proceed to next phase as
+proposed" - save/commit/push already done before this instruction
+(docs rev 52 + M21 fixes + 4 new tests at `cc6c6dd`, MATCH=OK, tree
+clean). Recorded as M21 acceptance (precedent: prior instructions
+accepted M17/M18/M19/M20).
+
+- **M21 PASSED 2026-09-30** - gates at pass: verify 299/299 (29 suites,
+  0 skipped), verify:frontend exit 0 (eslint 0, vitest 24/24, build OK),
+  migrate x2 0/15 idempotent, extended smoke SMOKE_PASS 176 checks.
+  Deferred/PROPOSED M21 findings stay open as recorded in Session 24.
+- **M22 scope (plan L1328-1348):** verify 16 areas - environment
+  configuration, database migrations, backups strategy, logging,
+  monitoring, error tracking, security, deployment, rollback strategy,
+  provider configuration, webhook URLs, cron/background workers,
+  email/SMS/WhatsApp configuration, rate limits, documentation - then
+  perform final production build and tests.
+- Method (PROPOSED): repo-level verification of each area -> per-area
+  CONFIRMED/ASSUMED/UNKNOWN verdicts -> fix in-repo gaps (docs, scripts,
+  config) -> final production build + full regression gates.
+- Entry-gate items that cannot be verified from this workstation are
+  flagged, not claimed: **B4** legal/consent position (owner answer,
+  K-I5/R6); **B6** remaining DirectAdmin server answers (K-I2 inbound
+  HTTPS/DNS, K-I3 process persistence - owner/server side, UNKNOWN);
+  **K-I4** provider accounts (owner side). Rule 11: no deployment or
+  destructive/irreversible action without explicit owner instruction.
+
+**Status:** M0-M21 + F1 PASSED; M22 IN_PROGRESS; M23 NOT_STARTED.
