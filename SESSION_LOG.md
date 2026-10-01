@@ -4411,3 +4411,44 @@ commit and push already done at `1f603bf`, MATCH=OK, tree clean).
   Rule 11 - no deployment without explicit instruction.
 
 **Status:** M0-M22 + F1 PASSED; M23 IN_PROGRESS.
+
+## Session 28 - M23 final acceptance suite green (awaiting owner declaration)
+
+**2026-10-01 - M23 execution** (plan L1352-1374; method as recorded at
+Session 27). Checklist -> execution -> results:
+
+- **Unit + integration + security + webhook + automation + tenant
+  isolation + type checking + lint + build** (entire suite):
+  `npm run verify` exit 0 - eslint 0, tsc 0, vitest **302/302**
+  (29 suites, 0 skipped), `tsc -p tsconfig.build.json` production build OK.
+- **Frontend suite:** `npm run verify:frontend` exit 0 - eslint 0,
+  vitest **24/24** (7 files), `tsc -b && vite build` production bundle OK.
+- **Database migration tests:** `npm run migrate` x2 - applied 0 /
+  skipped 15 both runs (idempotent).
+- **Complete end-to-end scenarios:** explicit re-run
+  `npx vitest run tests/m20.integration.test.ts` - **4/4 passed**
+  (A website lead chain, B missed-call chain, C no-show chain,
+  D recall chain, each end-to-end).
+- **Extended smoke** (`m3-smoke.ps1`): **SMOKE_PASS** (176 checks -
+  auth, tenancy, public lead, appointments, no-show, recall, review,
+  webhooks with signatures, dashboard, workspace, settings, observability,
+  security headers, logout invalidation, health).
+
+Acceptance criteria check (plan L1374 "Only declare the project complete
+if all defined acceptance criteria pass"):
+- M0-M22 + F1 all PASSED: CONFIRMED (PROJECT_STATE L5, M0_Project_Audit
+  milestone table).
+- All defined gates green at M23: CONFIRMED (results above).
+- Owner-side items remain open and are NOT claimed as verified: B4
+  legal/consent position (K-I5/R6), K-I2 inbound HTTPS/DNS, K-I3
+  process persistence, K-I4 provider accounts, automated backups,
+  external monitoring. These are deployment-side and were never in the
+  repo's verifiable scope (recorded since M0/M22).
+- Rule 11: no deployment performed.
+
+0 defects found during M23 (0 fixes needed; no code changed this
+milestone - verification only). Docs rev 56 records the results.
+
+**Status:** M0-M22 + F1 PASSED; M23 final suite green - report delivered,
+awaiting owner final acceptance (project completion is the owner's
+declaration).
