@@ -4452,3 +4452,41 @@ milestone - verification only). Docs rev 56 records the results.
 **Status:** M0-M22 + F1 PASSED; M23 final suite green - report delivered,
 awaiting owner final acceptance (project completion is the owner's
 declaration).
+
+## Session 29 - M23 accepted PASSED; PROJECT DECLARED COMPLETE
+
+**2026-10-01 - owner instruction:** "proceed next" - recorded as M23
+acceptance and the owner's project-completion declaration (precedent:
+each prior "proceed" instruction accepted the milestone under review;
+M23 is the final milestone, plan L1352-1374; session log, commit and
+push already done at `6d02e47`, MATCH=OK, tree clean).
+
+- **M23 PASSED 2026-10-01** - gates at pass: entire suite verify
+  **302/302** (29 suites, 0 skipped; unit, integration, E2E, security,
+  webhook, automation, tenant isolation + typecheck + lint + production
+  build), verify:frontend exit 0 (**24/24** + vite build), migrate x2
+  0/15, complete E2E scenarios A-D **4/4**, extended smoke
+  **SMOKE_PASS** (176 checks).
+- **Plan L1374 satisfied:** "Only declare the project complete if all
+  defined acceptance criteria pass" - all milestones M0-M23 + F1 are
+  PASSED (M0_Project_Audit milestone table), every gate green, 0 open
+  blocking defects. PROJECT DECLARED COMPLETE by the owner.
+- Final repository state: 29 backend/shared test suites (302 tests) +
+  7 frontend test files (24 tests) = 326 tests total, all green;
+  migrations 0001-0015; frontend production bundle built; docs at
+  revision 57.
+- Known limitations carried into completion (flagged, never claimed -
+  deployment-side, mostly owner answers): B4 legal/consent position
+  (K-I5/R6 - compliance must not be claimed), K-I2 inbound HTTPS/DNS,
+  K-I3 process persistence (single-instance scheduler), K-I4 provider
+  accounts (no live traffic until added), automated backups, external
+  monitoring, real SMS transport (mock default; WhatsApp is the real
+  channel), deferred UX/UI items (D7/D8/D10 screens, FrontEnd A1
+  forgot-password, M21 PROPOSED list).
+- Rule 11: no deployment performed; deployment requires an explicit
+  owner instruction and should follow README "Production deployment
+  (outline)" + M22 owner-side checklist.
+
+**Status:** PROJECT COMPLETE - M0-M23 + F1 all PASSED (owner
+declaration 2026-10-01). Remaining work is owner-side: deployment,
+provider accounts, legal position, backups, monitoring.
