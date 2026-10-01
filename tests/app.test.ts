@@ -91,6 +91,28 @@ describe('createApp', () => {
     );
   });
 
+  it('sets a Content-Security-Policy on responses', async () => {
+    const app = createApp({ uiDistDir: null });
+    const res = await request(app).get('/health');
+    const csp = res.headers['content-security-policy'];
+    expect(typeof csp).toBe('string');
+    const policy = String(csp);
+    expect(policy).toContain("default-src 'self'");
+    expect(policy).toContain("base-uri 'self'");
+    expect(policy).toContain("object-src 'none'");
+    expect(policy).toContain("frame-ancestors 'none'");
+    expect(policy).toContain("form-action 'self'");
+    expect(policy).toContain("script-src 'self'");
+    expect(policy).toContain("style-src 'self' 'unsafe-inline'");
+    expect(policy).toContain("img-src 'self'");
+    expect(policy).toContain("font-src 'self'");
+    expect(policy).toContain("connect-src 'self'");
+    const directives = policy.split('; ');
+    expect(directives).toContain("script-src 'self'");
+    expect(directives).toContain("style-src 'self' 'unsafe-inline'");
+    expect(policy).not.toContain('unsafe-eval');
+  });
+
   it('turns unhandled errors into a generic 500 without leaking details', async () => {
     const logger = createLogger({ level: 'error', write: () => undefined });
     const app = express();
