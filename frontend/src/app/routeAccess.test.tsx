@@ -10,12 +10,56 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+function emptyQueue(): { count: number; items: [] } {
+  return { count: 0, items: [] };
+}
+
+function makeWorkspace() {
+  return {
+    date: '2026-10-01',
+    timezone: 'Asia/Bahrain',
+    generatedAt: '2026-10-01T09:00:00Z',
+    queues: {
+      newLeads: emptyQueue(),
+      missedCalls: emptyQueue(),
+      patientReplies: emptyQueue(),
+      upcomingAppointments: emptyQueue(),
+      noShows: emptyQueue(),
+      recallOpportunities: emptyQueue(),
+      tasks: emptyQueue(),
+    },
+    definitions: {},
+  };
+}
+
+function makeDashboard() {
+  return {
+    window: { from: '2026-09-24', to: '2026-10-01', basis: '7d' },
+    metrics: {
+      leads: { new: 0, contacted: 0, converted: 0, responseRate: null },
+      leadResponses: 0,
+      appointments: { booked: 0, scheduled: 0, confirmed: 0, completed: 0, noShows: 0, rebooked: 0 },
+      recall: { due: 0, contacted: 0, booked: 0 },
+      messages: { sent: 0, patientReplies: 0 },
+      delivery: { delivered: 0, deliveredRate: null },
+      failures: { failed: 0, failedRate: null },
+    },
+    definitions: { metrics: {}, planMetrics: {} },
+  };
+}
+
 function routeFor(user: SessionUser | null) {
   return (url: string): Response => {
     if (url.includes('/api/auth/me')) {
       return user === null
         ? jsonResponse(401, { error: { code: 'unauthorized', message: 'Sign in required' } })
         : jsonResponse(200, { user });
+    }
+    if (url.includes('/receptionist/workspace')) {
+      return jsonResponse(200, makeWorkspace());
+    }
+    if (url.includes('/dashboard')) {
+      return jsonResponse(200, makeDashboard());
     }
     if (url.includes('/settings')) {
       return jsonResponse(200, { settings: makeSettings() });
@@ -60,10 +104,34 @@ describe('route access', () => {
     expect(await screen.findByText('Page not found')).toBeInTheDocument();
   });
 
-  it('renders an honest empty landing without planned screens for receptionists', async () => {
+  it('sends owners landing on "/" to the dashboard', async () => {
+    await renderAt('/', makeUser({ role: 'owner' }));
+    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
+    expect(screen.getByText('Settings')).toBeInTheDocument();
+    expect(screen.getByText('Automations')).toBeInTheDocument();
+  });
+
+  it('sends receptionists landing on "/" to the workspace without management navigation', async () => {
     await renderAt('/', makeUser({ role: 'receptionist', email: 'desk@example.com' }));
-    expect(await screen.findByText(/no screens for your account yet/i)).toBeInTheDocument();
-    expect(screen.queryByText(/planned/i)).not.toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Workspace' })).toBeInTheDocument();
+    expect(screen.queryByText(/no screens for your account yet/i)).not.toBeInTheDocument();
     expect(screen.queryByText('Users & roles')).not.toBeInTheDocument();
+    expect(screen.queryByText('Automations')).not.toBeInTheDocument();
+  });
+
+  it('denies a receptionist access to the dashboard', async () => {
+    await renderAt('/dashboard', makeUser({ role: 'receptionist', email: 'desk@example.com' }));
+    expect(await screen.findByText('Access denied')).toBeInTheDocument();
+  });
+
+  it('denies a receptionist access to automations', async () => {
+    await renderAt('/automations', makeUser({ role: 'receptionist', email: 'desk@example.com' }));
+    expect(await screen.findByText('Access denied')).toBeInTheDocument();
+  });
+
+  it('lets every member open the workspace and the leads list', async () => {
+    await renderAt('/workspace', makeUser({ role: 'admin', email: 'admin@example.com' }));
+    expect(await screen.findByRole('heading', { name: 'Workspace' })).toBeInTheDocument();
+    expect(screen.queryByText('Access denied')).not.toBeInTheDocument();
   });
 });

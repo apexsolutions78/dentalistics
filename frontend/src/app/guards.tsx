@@ -27,3 +27,11 @@ export function RequireSettingsRole() {
   }
   return <Outlet />;
 }
+
+export function RequireManagerRole() {
+  const { user } = useAuth();
+  if (!canManageSettings(user)) {
+    return <UnauthorizedPage />;
+  }
+  return <Outlet />;
+}

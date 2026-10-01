@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { errorMessage } from '../lib/api';
 import { FormField } from '../components/FormField';
@@ -13,6 +13,8 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const passwordResetDone =
+    (location.state as { passwordReset?: boolean } | null)?.passwordReset === true;
 
   if (status === 'authenticated') {
     const from = (location.state as { from?: string } | null)?.from;
@@ -40,6 +42,13 @@ export function LoginPage() {
       <div className="login-card">
         <h1>Apex Dentalistics</h1>
         <div className="sub">Sign in to your clinic account</div>
+        {passwordResetDone ? (
+          <Flash
+            kind="success"
+            message="Password updated. Sign in with your new password."
+            onDismiss={() => undefined}
+          />
+        ) : null}
         {error ? <Flash kind="error" message={error} onDismiss={() => setError(null)} /> : null}
         <form onSubmit={(e) => void onSubmit(e)} noValidate>
           <FormField label="Email">
@@ -67,6 +76,9 @@ export function LoginPage() {
             {busy ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
+        <p style={{ marginTop: '12px', fontSize: 'var(--fs-label)', textAlign: 'center' }}>
+          <Link to="/forgot-password">Forgot password?</Link>
+        </p>
       </div>
     </div>
   );

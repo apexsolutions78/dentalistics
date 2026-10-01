@@ -5,12 +5,14 @@ export function FormField({
   label,
   hint,
   error,
+  required = false,
   children,
   htmlFor,
 }: {
   label: string;
   hint?: string;
   error?: string | null;
+  required?: boolean;
   children: ReactNode;
   htmlFor?: string;
 }) {
@@ -28,6 +30,7 @@ export function FormField({
           id,
           'aria-invalid': error ? true : undefined,
           'aria-describedby': describedBy,
+          ...(required ? { required: true } : {}),
         })
       : only;
   return (
@@ -35,7 +38,10 @@ export function FormField({
       {isLabelChild ? (
         <span className="group-label">{label}</span>
       ) : (
-        <label htmlFor={id}>{label}</label>
+        <label htmlFor={id}>
+          {label}
+          {required ? ' *' : ''}
+        </label>
       )}
       {control}
       {hint ? (

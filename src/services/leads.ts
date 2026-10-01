@@ -3,6 +3,8 @@ import { recordAudit } from '../audit';
 import { AppError, ValidationError } from '../errors';
 import type { Logger } from '../logger';
 import { appointmentsForLead } from './appointments';
+import { messageDto } from './messages';
+import type { MessageRow } from './messages';
 import {
   normalizePhone,
   optionalEmail,
@@ -354,6 +356,10 @@ export async function getLeadDetail(
     [leadId],
   );
   const appointments = await appointmentsForLead(db, leadId);
+  const [communications] = await db.query<MessageRow[]>(
+    'SELECT * FROM communication_messages WHERE lead_id = ? ORDER BY created_at DESC, id DESC',
+    [leadId],
+  );
   return {
     lead: leadDto(lead),
     notes: lead.notes,
@@ -365,7 +371,7 @@ export async function getLeadDetail(
       actorEmail: row.actor_email,
       createdAt: row.created_at,
     })),
-    communicationHistory: [],
+    communicationHistory: communications.map((row) => messageDto(row)),
     appointments,
   };
 }

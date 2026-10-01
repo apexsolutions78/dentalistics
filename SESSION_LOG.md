@@ -4490,3 +4490,70 @@ push already done at `6d02e47`, MATCH=OK, tree clean).
 **Status:** PROJECT COMPLETE - M0-M23 + F1 all PASSED (owner
 declaration 2026-10-01). Remaining work is owner-side: deployment,
 provider accounts, legal position, backups, monitoring.
+
+## Session 30 - F2 complete (member-facing UIs, password reset, test depth); all gates green
+
+**2026-10-01 - owner directive:** "everything in the product should be
+built and tested" - F2 executed after PROJECT DECLARED COMPLETE (rev 57,
+`206ddbc`): all remaining member-facing UIs per FrontEnd_Planning 8-17,
+plus test-depth gaps (coverage tooling, browser E2E per Section 44).
+Deployment/owner-only items remain out of scope (Rule 11).
+
+- **Backend F2:** recalls service+routes (`src/services/recalls.ts`, `src/routes/recalls.ts`), messages filters + exported `messageDto`,
+  communications GET member-visible, leads `communicationHistory`,
+  observability `subjectId` positive-int filter;
+  `tests/f2.integration.test.ts` **31/31**.
+- **Password reset (FrontEnd A1):** migration `0016_password_reset_tokens` (sha256 tokens, 30-min TTL, RESET_TOKEN_TTL_MINUTES),
+  `src/auth/passwordReset.ts`, `src/mail/passwordResetMailer.ts`
+  (injectable; mock transport in tests; SMTP_* env; nodemailer 10.0.13 +
+  types, 0 audit vulns), routes: POST `/api/auth/forgot-password`
+  (generic 200 + warn logs; 5/15min ip|email) and POST
+  `/api/auth/reset-password` (requirePassword 12-200 checked BEFORE the
+  limiter; 400 invalid_reset_token; 429 rate_limited 10/ip; revokes
+  sessions), `.env.example` RESET_BASE_URL + SMTP_*;
+  `tests/passwordReset.integration.test.ts` **10/10**. Known limitation (documented, accepted): token-validation timing side-channel bounded by
+  rate limits.
+- **Frontend F2:** 11 member-facing screens (workspace, dashboard, leads,
+  patients, appointments, communications, recall, automations + supporting
+  list/detail views) + ForgotPasswordPage/ResetPasswordPage, router public
+  routes + login reset-flash, shell guards/Sidebar/AppShell/Landing wiring;
+  shared `useApi.ts`/`format.ts`/`constants.ts`,
+  `CommunicationTimeline`, `Pager`; tests: `screens.test.tsx` **11/11** (renderPage wraps `<Routes>` for useParams; queryByText for absence
+  asserts), `authPages.test.tsx` **8/8** (fetch-args asserts via tuple
+  cast), `routeAccess.test.tsx` 9/9; frontend total **47/47** (9 files).
+- **Coverage tooling:** `@vitest/coverage-v8` root + frontend,
+  `test:coverage` scripts, v8 provider + json-summary reporters in
+  `vitest.config.mts` + `frontend/vite.config.ts`. Recorded (measurement, NOT a gate): backend **85.43% stmts / 74.64% branches /
+  91.28% funcs / 85.58% lines**; frontend **38.62% stmts / 34.96%
+  branches / 33.53% funcs / 41.07% lines** (frontend low by design -
+  flows covered by Playwright instead).
+- **Playwright E2E (Section 44):** `@playwright/test` 1.63 + chromium (Chrome 153); `playwright.config.ts` (webServer `tests/e2e/serve.ts`
+  on port 3799 with TEST_DB_* + REMINDER_TICK_MS=0 + LOG_LEVEL=warn,
+  globalSetup, workers 1, locale en-US); `tests/e2e/`: serve.ts creates
+  the DB + runs migrations itself - CONFIRMED by reading the Playwright
+  runner: webServer plugin setup runs BEFORE globalSetup; globalSetup (asserts frontend/dist exists, migrates, seeds), seed.ts (E2E org + 2
+  users + fixtures; org-scoped cleanup; em dashes preserved - file was
+  once corrupted and fully rewritten), db/dates/helpers,
+  `scenarios.spec.ts` **5/5** (lead, missed call, confirm+reschedule,
+  no-show+rebook with DB assertions, recall); script `test:e2e`
+  (root package.json); `.gitignore` test-results/ + playwright-report/.
+- **Defects/incidents this session:** (1) PowerShell file corruption -
+  `Get-Content -Raw` + `-replace` + `Set-Content -Encoding UTF8`
+  decoded UTF-8 source as ANSI (mangled em dashes, emptied a file) ->
+  rule: never rewrite UTF-8 sources via PS text cmdlets; use Write/Edit
+  tools + byte-scan verify. (2) Root tsconfig includes tests/** - e2e
+  files need `import('../../src/index.js')` (.js extension, TS2835
+  under node16); no-console error avoided in playwright.config.ts.
+  (3) webServer-before-globalSetup ordering -> serve.ts self-bootstraps
+  DB. (4) authPages fetch-args narrowing fixed with tuple cast
+  `(call as unknown as [RequestInfo | URL, RequestInit?])[1]`.
+- **Full gates (all green):** backend `npm run verify` **343/343** (31 suites, 0 skipped; lint+tsc+vitest+build), `verify:frontend`
+  **47/47** (9 files) + eslint 0 + tsc 0 + vite build OK,
+  `npm run migrate` x2 (0016 applied then 0/16 idempotent), m20 re-run
+  **4/4**, extended smoke `m3-smoke.ps1` **SMOKE_PASS**, Playwright
+  **5/5** (33.0s).
+- Docs at revision 58; AGENTS.md observed untracked in the repo (owner to decide - left out of the F2 commit).
+
+**Status:** F2 implementation complete - gates green, report delivered,
+awaiting owner acceptance. PROJECT remains COMPLETE (M0-M23 + F1 PASSED).
+

@@ -1,9 +1,10 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 
 export function ConfirmDialog({
   open,
   title,
   body,
+  children,
   confirmLabel = 'Confirm',
   cancelLabel = 'Cancel',
   danger = false,
@@ -14,6 +15,7 @@ export function ConfirmDialog({
   open: boolean;
   title: string;
   body: string;
+  children?: ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
   danger?: boolean;
@@ -45,6 +47,9 @@ export function ConfirmDialog({
       <div className="dialog" role="dialog" aria-modal="true" aria-label={title}>
         <h2 className="dialog-title">{title}</h2>
         <div className="dialog-body">{body}</div>
+        {children !== undefined && children !== null && children !== false ? (
+          <div style={{ marginTop: '12px' }}>{children}</div>
+        ) : null}
         <div className="btn-row">
           <button
             type="button"

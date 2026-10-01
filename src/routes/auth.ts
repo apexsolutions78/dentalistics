@@ -3,12 +3,18 @@ import type { Request, Response } from 'express';
 import type { Pool, RowDataPacket } from 'mysql2/promise';
 import { recordAudit } from '../audit';
 import { getDummyHash, hashPassword, verifyPassword } from '../auth/password';
+import {
+  consumePasswordResetToken,
+  issuePasswordResetToken,
+  RESET_TOKEN_TTL_MINUTES,
+} from '../auth/passwordReset';
 import { createSession, revokeSession, revokeUserSessions } from '../auth/sessions';
 import type { SessionUser } from '../auth/sessions';
 import { AppError, ValidationError } from '../errors';
 import { readJsonBody } from '../http/body';
 import { buildClearCookie, buildSessionCookie, SESSION_TTL_HOURS } from '../http/cookies';
 import type { Logger } from '../logger';
+import type { PasswordResetMailer } from '../mail/passwordResetMailer';
 import { requireAuth } from '../middleware/auth';
 import type { RateLimiter } from '../security/rateLimit';
 import { normalizeEmail, requirePassword } from '../validate';
@@ -18,6 +24,10 @@ export interface AuthRouterDeps {
   logger: Logger;
   secureCookies: boolean;
   loginLimiter: RateLimiter;
+  resetRequestLimiter: RateLimiter;
+  resetSubmitLimiter: RateLimiter;
+  resetMailer: PasswordResetMailer;
+  resetBaseUrl: string;
 }
 
 interface UserAuthRow extends RowDataPacket {
@@ -169,6 +179,118 @@ export function createAuthRouter(deps: AuthRouterDeps): Router {
       organizationId: user.organizationId,
       userId: user.id,
       action: 'password_changed',
+    });
+    res.setHeader('Set-Cookie', buildClearCookie(deps.secureCookies));
+    res.status(200).json({ ok: true });
+  });
+
+  const forgotPasswordResponse = (res: Response): void => {
+    res.status(200).json({
+      message: 'If an account exists for that email, a password reset link has been sent.',
+    });
+  };
+
+  router.post('/forgot-password', async (req: Request, res: Response) => {
+    const body = readJsonBody(req);
+    const emailRaw = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+
+    if (!deps.resetRequestLimiter.check(`${req.ip ?? 'unknown'}|${emailRaw}`)) {
+      deps.logger.warn('password reset request rate limited', { ip: req.ip });
+      throw new AppError('Too many reset requests, try again later', 429, 'rate_limited', true);
+    }
+    if (emailRaw === '') {
+      throw new ValidationError('Invalid input', ['email is required']);
+    }
+
+    let email: string;
+    try {
+      email = normalizeEmail(emailRaw);
+    } catch {
+      await recordAudit(deps.db, deps.logger, {
+        organizationId: null,
+        userId: null,
+        action: 'password_reset_requested',
+        detail: 'reason=unknown_email',
+      });
+      forgotPasswordResponse(res);
+      return;
+    }
+
+    const [rows] = await deps.db.query<UserAuthRow[]>(
+      `SELECT u.id, u.email, u.organization_id, u.status, o.status AS org_status
+       FROM users u
+       LEFT JOIN organizations o ON o.id = u.organization_id
+       WHERE u.email = ?`,
+      [email],
+    );
+    const row = rows[0];
+    const ineligible = row === undefined || row.status !== 'active' || row.org_status === 'disabled';
+
+    if (ineligible) {
+      await recordAudit(deps.db, deps.logger, {
+        organizationId: row?.organization_id ?? null,
+        userId: row?.id ?? null,
+        action: 'password_reset_requested',
+        detail: 'reason=unknown_email',
+      });
+      forgotPasswordResponse(res);
+      return;
+    }
+
+    const token = await issuePasswordResetToken(deps.db, row.id);
+    const baseUrl = deps.resetBaseUrl.replace(/\/+$/, '');
+    const link = `${baseUrl}/reset-password?token=${encodeURIComponent(token)}`;
+    const delivery = await deps.resetMailer.sendPasswordReset({
+      to: row.email,
+      link,
+      ttlMinutes: RESET_TOKEN_TTL_MINUTES,
+    });
+    await recordAudit(deps.db, deps.logger, {
+      organizationId: row.organization_id,
+      userId: row.id,
+      action: 'password_reset_requested',
+      detail: delivery.sent ? 'reason=delivered' : `reason=delivery_failed:${delivery.reason ?? 'unknown'}`,
+    });
+    forgotPasswordResponse(res);
+  });
+
+  router.post('/reset-password', async (req: Request, res: Response) => {
+    const body = readJsonBody(req);
+    const token = typeof body.token === 'string' ? body.token.trim() : '';
+    const password = requirePassword(body.password, 'password');
+
+    if (!deps.resetSubmitLimiter.check(req.ip ?? 'unknown')) {
+      deps.logger.warn('password reset submit rate limited', { ip: req.ip });
+      throw new AppError('Too many reset attempts, try again later', 429, 'rate_limited', true);
+    }
+    if (token === '' || token.length > 300) {
+      throw new AppError('Reset link is invalid or has expired', 400, 'invalid_reset_token', true);
+    }
+
+    const userId = await consumePasswordResetToken(deps.db, token);
+    if (userId === null) {
+      throw new AppError('Reset link is invalid or has expired', 400, 'invalid_reset_token', true);
+    }
+
+    const [userRows] = await deps.db.query<UserAuthRow[]>(
+      'SELECT id, organization_id, status FROM users WHERE id = ?',
+      [userId],
+    );
+    const user = userRows[0];
+    if (user === undefined) {
+      throw new AppError('Reset link is invalid or has expired', 400, 'invalid_reset_token', true);
+    }
+    if (user.status !== 'active') {
+      throw new AppError('Account is disabled', 403, 'account_disabled', true);
+    }
+
+    const newHash = await hashPassword(password);
+    await deps.db.query('UPDATE users SET password_hash = ? WHERE id = ?', [newHash, userId]);
+    await revokeUserSessions(deps.db, userId);
+    await recordAudit(deps.db, deps.logger, {
+      organizationId: user.organization_id,
+      userId,
+      action: 'password_reset_completed',
     });
     res.setHeader('Set-Cookie', buildClearCookie(deps.secureCookies));
     res.status(200).json({ ok: true });

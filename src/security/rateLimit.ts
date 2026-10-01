@@ -14,6 +14,10 @@ export const TELEPHONY_WEBHOOK_RATE_WINDOW_MS = 60_000;
 export const WHATSAPP_WEBHOOK_IP_LIMIT = 200;
 export const WHATSAPP_WEBHOOK_RATE_WINDOW_MS = 60_000;
 
+export const PASSWORD_RESET_REQUEST_LIMIT = 5;
+export const PASSWORD_RESET_SUBMIT_LIMIT = 10;
+export const PASSWORD_RESET_RATE_WINDOW_MS = 15 * 60_000;
+
 interface Bucket {
   count: number;
   resetAt: number;

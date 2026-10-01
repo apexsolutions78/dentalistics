@@ -36,7 +36,7 @@ const DELIVERY_STATUSES: readonly string[] = ['DELIVERED', 'UNDELIVERED'];
 
 const DISPATCHABLE: readonly string[] = ['PENDING', 'FAILED'];
 
-interface MessageRow extends RowDataPacket {
+export interface MessageRow extends RowDataPacket {
   id: number;
   organization_id: number;
   channel: MessageChannel;
@@ -58,7 +58,7 @@ interface MessageRow extends RowDataPacket {
   updated_at: Date;
 }
 
-function messageDto(row: MessageRow): Record<string, unknown> {
+export function messageDto(row: MessageRow): Record<string, unknown> {
   return {
     id: row.id,
     organizationId: row.organization_id,
@@ -417,6 +417,26 @@ export async function listMessages(
   if (input.query.channel !== undefined) {
     where.push('channel = ?');
     params.push(requireChoice(input.query.channel, MESSAGE_CHANNELS, 'channel'));
+  }
+  if (input.query.direction !== undefined) {
+    where.push('direction = ?');
+    params.push(requireChoice(input.query.direction, MESSAGE_DIRECTIONS, 'direction'));
+  }
+  if (input.query.leadId !== undefined) {
+    const leadId = Number(input.query.leadId);
+    if (!Number.isInteger(leadId) || leadId <= 0) {
+      throw new ValidationError('Invalid input', ['leadId must be a positive integer']);
+    }
+    where.push('lead_id = ?');
+    params.push(leadId);
+  }
+  const recipient = input.query.recipient;
+  if (recipient !== undefined && recipient !== '') {
+    if (typeof recipient !== 'string' || recipient.length > 32) {
+      throw new ValidationError('Invalid input', ['recipient must be a string of at most 32 characters']);
+    }
+    where.push('recipient = ?');
+    params.push(recipient);
   }
 
   const whereSql = where.join(' AND ');

@@ -152,3 +152,216 @@ export interface PreviewResult {
   rendered: string;
   unknownVariables: string[];
 }
+
+export type LeadStatus =
+  | 'NEW'
+  | 'CONTACTED'
+  | 'QUALIFIED'
+  | 'APPOINTMENT_BOOKED'
+  | 'LOST'
+  | 'CLOSED';
+
+export type LeadSource = 'WEBSITE' | 'MISSED_CALL' | 'MANUAL' | 'OTHER';
+
+export interface Lead {
+  id: number;
+  firstName: string;
+  lastName: string;
+  phone: string;
+  email: string | null;
+  requestedService: string | null;
+  source: string;
+  status: string;
+  assignedUserId: number | null;
+  assignedUserEmail: string | null;
+  notes: string | null;
+  lastActivityAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LeadActivityItem {
+  id: number;
+  action: string;
+  detail: string | null;
+  actorUserId: number | null;
+  actorEmail: string | null;
+  createdAt: string;
+}
+
+export interface LeadDetail {
+  lead: Lead;
+  notes: string | null;
+  activity: LeadActivityItem[];
+  communicationHistory: Message[];
+  appointments: Appointment[];
+}
+
+export interface Patient {
+  id: number;
+  firstName: string;
+  lastName: string;
+  phone: string;
+  email: string | null;
+  notes: string | null;
+  smsOptOut: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Appointment {
+  id: number;
+  organizationId: number;
+  patientId: number;
+  leadId: number | null;
+  date: string;
+  time: string;
+  status: string;
+  service: string | null;
+  provider: string | null;
+  previousAppointmentId: number | null;
+  patient: { id: number; firstName: string; lastName: string; phone: string };
+  createdBy: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type MessageDirection = 'OUTBOUND' | 'INBOUND';
+
+export interface Message {
+  id: number;
+  organizationId: number;
+  channel: string;
+  recipient: string;
+  body: string;
+  status: string;
+  direction: MessageDirection;
+  messageType: string | null;
+  template: string | null;
+  leadId: number | null;
+  providerKey: string | null;
+  attempts: number;
+  sentAt: string | null;
+  deliveredAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type RecallStatus = 'DUE' | 'CONTACTED' | 'BOOKED' | 'COMPLETED' | 'CLOSED';
+
+export interface Recall {
+  id: number;
+  patientId: number;
+  patient: { id: number; firstName: string; lastName: string; phone: string };
+  recallType: string;
+  dueDate: string;
+  status: RecallStatus;
+  lastContactedAt: string | null;
+  rebookedAppointmentId: number | null;
+  anchorAppointmentId: number | null;
+  closeReason: string | null;
+  openedAt: string | null;
+  closedAt: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface DashboardResult {
+  window: { from: string; to: string; basis: string };
+  metrics: {
+    leads: { new: number; contacted: number; converted: number; responseRate: number | null };
+    leadResponses: number;
+    appointments: {
+      booked: number;
+      scheduled: number;
+      confirmed: number;
+      completed: number;
+      noShows: number;
+      rebooked: number;
+    };
+    recall: { due: number; contacted: number; booked: number };
+    messages: { sent: number; patientReplies: number };
+    delivery: { delivered: number; deliveredRate: number | null };
+    failures: { failed: number; failedRate: number | null };
+  };
+  definitions: {
+    metrics: Record<string, string>;
+    planMetrics: Record<string, string[]>;
+  };
+  trends: {
+    daily: Array<{ date: string; newLeads: number; messagesSent: number; patientReplies: number }>;
+  };
+}
+
+export interface WorkspaceQueue<T> {
+  count: number;
+  items: T[];
+}
+
+export interface ReceptionistWorkspace {
+  date: string;
+  timezone: string;
+  generatedAt: string;
+  queues: {
+    newLeads: WorkspaceQueue<{
+      id: number;
+      firstName: string;
+      lastName: string;
+      phone: string;
+      source: string;
+      createdAt: string;
+    }>;
+    missedCalls: WorkspaceQueue<{
+      id: number;
+      callerNumber: string;
+      calledNumber: string;
+      callOutcome: string;
+      disposition: string;
+      occurredAt: string;
+      leadId: number | null;
+      patientId: number | null;
+    }>;
+    patientReplies: WorkspaceQueue<{
+      id: number;
+      channel: string;
+      recipient: string;
+      body: string;
+      leadId: number | null;
+      createdAt: string;
+    }>;
+    upcomingAppointments: WorkspaceQueue<{
+      id: number;
+      patientId: number;
+      patientName: string;
+      date: string;
+      time: string;
+      status: string;
+      service: string | null;
+      needsConfirmation: boolean;
+    }>;
+    noShows: WorkspaceQueue<{
+      id: number;
+      patientId: number;
+      patientName: string;
+      date: string;
+      time: string;
+    }>;
+    recallOpportunities: WorkspaceQueue<{
+      id: number;
+      patientId: number;
+      patientName: string;
+      dueDate: string;
+      daysSinceDue: number;
+    }>;
+    tasks: WorkspaceQueue<{
+      queue: string;
+      type: string;
+      id: number;
+      label: string;
+      at: string;
+    }>;
+  };
+  definitions: Record<string, string>;
+}
+
+export type { Paged } from './useApi';

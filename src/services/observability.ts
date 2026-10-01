@@ -1,5 +1,5 @@
 import type { Pool, RowDataPacket } from 'mysql2/promise';
-import { AppError } from '../errors';
+import { AppError, ValidationError } from '../errors';
 import type { Logger } from '../logger';
 import { getProvider } from '../communications/registry';
 import { requireChoice, parseListParams } from '../validate';
@@ -64,6 +64,13 @@ export async function listAutomationLogs(
     input.query.kind !== undefined
       ? requireChoice(input.query.kind, AUTOMATION_LOG_KINDS, 'kind')
       : null;
+  let subjectId: number | null = null;
+  if (input.query.subjectId !== undefined) {
+    subjectId = Number(input.query.subjectId);
+    if (!Number.isInteger(subjectId) || subjectId <= 0) {
+      throw new ValidationError('Invalid input', ['subjectId must be a positive integer']);
+    }
+  }
   const tables = JOB_TABLES.filter((entry) => kind === null || entry.kind === kind);
 
   const branches: string[] = [];
@@ -74,6 +81,10 @@ export async function listAutomationLogs(
     if (status !== null) {
       where.push('status = ?');
       branchParams.push(status);
+    }
+    if (subjectId !== null) {
+      where.push(`${entry.subject} = ?`);
+      branchParams.push(subjectId);
     }
     branches.push(`${jobSelect(entry)} WHERE ${where.join(' AND ')}`);
     params.push(...branchParams);

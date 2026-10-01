@@ -14,6 +14,7 @@ import { createAdminRouter } from './routes/admin';
 import { createAppointmentsRouter } from './routes/appointments';
 import { createAuthRouter } from './routes/auth';
 import { createCallEventsRouter } from './routes/callEvents';
+import { createCommunicationsRouter } from './routes/communications';
 import { createConversationStateRouter } from './routes/conversationState';
 import { createDashboardRouter } from './routes/dashboard';
 import { createLeadsRouter } from './routes/leads';
@@ -21,15 +22,21 @@ import { createOrganizationsRouter } from './routes/organizations';
 import { createObservabilityRouter } from './routes/observability';
 import { createPatientsRouter } from './routes/patients';
 import { createPublicRouter } from './routes/public';
+import { createRecallsRouter } from './routes/recalls';
 import { recordErrorEvent } from './services/observability';
 import { createSettingsRouter } from './routes/settings';
 import { createWebhookRouter } from './routes/webhooks';
 import { createWhatsAppWebhookRouter } from './routes/whatsappWebhook';
 import { createWorkspaceRouter } from './routes/workspace';
+import { createPasswordResetMailerFromEnv } from './mail/passwordResetMailer';
+import type { PasswordResetMailer } from './mail/passwordResetMailer';
 import {
   createRateLimiter,
   LOGIN_RATE_LIMIT,
   LOGIN_RATE_WINDOW_MS,
+  PASSWORD_RESET_RATE_WINDOW_MS,
+  PASSWORD_RESET_REQUEST_LIMIT,
+  PASSWORD_RESET_SUBMIT_LIMIT,
   PUBLIC_LEAD_IP_LIMIT,
   PUBLIC_LEAD_KEY_LIMIT,
   PUBLIC_LEAD_RATE_WINDOW_MS,
@@ -49,6 +56,8 @@ export interface AppDeps {
   trustProxy?: boolean | number;
   publicLeadRate?: { perIp: number; perKey: number; windowMs?: number };
   uiDistDir?: string | null;
+  passwordResetMailer?: PasswordResetMailer;
+  resetBaseUrl?: string;
 }
 
 function silentLogger(): Logger {
@@ -141,6 +150,16 @@ export function createApp(deps: AppDeps = {}): Express {
         logger,
         secureCookies,
         loginLimiter: createRateLimiter(LOGIN_RATE_LIMIT, LOGIN_RATE_WINDOW_MS),
+        resetRequestLimiter: createRateLimiter(
+          PASSWORD_RESET_REQUEST_LIMIT,
+          PASSWORD_RESET_RATE_WINDOW_MS,
+        ),
+        resetSubmitLimiter: createRateLimiter(
+          PASSWORD_RESET_SUBMIT_LIMIT,
+          PASSWORD_RESET_RATE_WINDOW_MS,
+        ),
+        resetMailer: deps.passwordResetMailer ?? createPasswordResetMailerFromEnv(logger),
+        resetBaseUrl: deps.resetBaseUrl ?? process.env.RESET_BASE_URL ?? '',
       }),
     );
     app.use('/api/admin', createAdminRouter({ db, logger }));
@@ -152,6 +171,8 @@ export function createApp(deps: AppDeps = {}): Express {
     app.use('/api/organizations', createWorkspaceRouter({ db, logger }));
     app.use('/api/organizations', createSettingsRouter({ db, logger }));
     app.use('/api/organizations', createObservabilityRouter({ db, logger }));
+    app.use('/api/organizations', createRecallsRouter({ db, logger }));
+    app.use('/api/organizations', createCommunicationsRouter({ db, logger }));
 
     const publicRate = deps.publicLeadRate;
     app.use(

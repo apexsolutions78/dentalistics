@@ -174,7 +174,10 @@ describe.skipIf(testHost === undefined || testHost === '')(
       expect(detail.status).toBe(200);
       expect(detail.body.lead.email).toBe('ahmed@example.com');
       expect(detail.body.lead.assignedUserEmail).toBeNull();
-      expect(detail.body.communicationHistory).toEqual([]);
+      expect(detail.body.communicationHistory).toHaveLength(1);
+      expect(detail.body.communicationHistory[0].direction).toBe('OUTBOUND');
+      expect(detail.body.communicationHistory[0].leadId).toBe(leadId);
+      expect(detail.body.communicationHistory[0].body).toContain('thank you for contacting');
       expect(detail.body.appointments).toEqual([]);
       expect(detail.body.activity).toHaveLength(1);
       expect(detail.body.activity[0].action).toBe('created');
