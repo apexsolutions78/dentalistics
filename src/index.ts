@@ -60,6 +60,7 @@ async function main(): Promise<void> {
     checkDatabase: () => checkDatabase(getPool()),
     db: getPool(),
     secureCookies: config.nodeEnv === 'production',
+    trustProxy: config.trustProxy,
   });
 
   const server = app.listen(config.port, () => {

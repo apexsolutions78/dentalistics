@@ -17,6 +17,7 @@ export interface AppConfig {
   logLevel: LogLevel;
   db: DbConfig;
   migrationsDir: string;
+  trustProxy: boolean | number;
 }
 
 export class ConfigError extends Error {
@@ -81,6 +82,25 @@ function enumValue<T extends string>(
   return raw as T;
 }
 
+function optionalTrustProxy(
+  env: NodeJS.ProcessEnv,
+  name: string,
+  issues: string[],
+): boolean | number {
+  const raw = env[name];
+  if (raw === undefined || raw === '') {
+    return false;
+  }
+  if (raw === 'true') return true;
+  if (raw === 'false') return false;
+  const parsed = Number(raw);
+  if (Number.isInteger(parsed) && parsed >= 0 && parsed <= 10) {
+    return parsed;
+  }
+  issues.push(`${name} must be true, false, or an integer between 0 and 10`);
+  return false;
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
   const issues: string[] = [];
 
@@ -116,6 +136,8 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
       ? './migrations'
       : env.MIGRATIONS_DIR;
 
+  const trustProxy = optionalTrustProxy(env, 'TRUST_PROXY', issues);
+
   if (issues.length > 0) {
     throw new ConfigError(issues);
   }
@@ -132,6 +154,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
       database: dbName,
     },
     migrationsDir,
+    trustProxy,
   };
 }
 

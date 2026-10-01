@@ -4279,3 +4279,111 @@ accepted M17/M18/M19/M20).
   destructive/irreversible action without explicit owner instruction.
 
 **Status:** M0-M21 + F1 PASSED; M22 IN_PROGRESS; M23 NOT_STARTED.
+
+## Session 26 - M22 production readiness verified (gates green, awaiting acceptance)
+
+**2026-10-01 - M22 execution** (plan L1328-1348; method as recorded at
+Session 25: repo-level verification of the 16 areas -> per-area verdicts
+-> fix in-repo gaps -> final production build + full regression gates).
+
+Per-area verdicts (evidence = direct file reads this session):
+
+1. **Environment configuration - CONFIRMED.** `src/config.ts` fail-fast
+   `ConfigError` (required DB_HOST/DB_USER/DB_PASSWORD/DB_NAME, enum
+   NODE_ENV/LOG_LEVEL, port range checks); `.env.example` documents all
+   vars; `.gitignore` excludes `.env*` (keeps `.env.example`); no secrets
+   in tracked files (M18).
+2. **Database migrations - CONFIRMED.** 15 migrations, explicit
+   `npm run migrate` (server does not auto-migrate), applied/skipped
+   tracking, idempotent (x2 runs 0/15 every gate), no DROP/TRUNCATE/
+   DELETE FROM anywhere in migrations/.
+3. **Backups strategy - MISSING in-repo.** No backup/restore scripts or
+   docs (grep clean). Owner question "Backup and recovery expectations"
+   (PROJECT_STATE 4.2) still unanswered. Fixed: honest status + suggested
+   approach documented in README; execution = owner/server side.
+4. **Logging - CONFIRMED.** `src/logger.ts`: structured JSON lines,
+   levels, secret-key redaction + `redactUrl()` (M18), stdout only (no
+   rotation - process-manager side, recorded).
+5. **Monitoring - CONFIRMED (in-app).** `GET /health` 200/503 with DB
+   status + uptime; `/api/organizations/:orgId/observability/*` (automation/
+   communication/webhook/error/audit logs, failed jobs, diagnostics with
+   DB up + scheduler ticks) behind requireAuth; `/api/admin/observability/*`
+   behind requireRole('admin'). No external uptime/log integration (owner).
+6. **Error tracking - CONFIRMED.** error_events table (0015), express
+   `errorHandler`/`notFoundHandler`, failed-job records + requeue API;
+   no process-level uncaughtException/unhandledRejection handlers (Node
+   default = exit; recorded as known limitation).
+7. **Security - CONFIRMED** (re-verified, M18 baseline): headers
+   (nosniff/XFO DENY/Referrer-Policy), scrypt + timingSafeEqual passwords,
+   HttpOnly/SameSite=Lax/Secure-in-production cookies, logout revocation,
+   tenant isolation, no CORS (D6 by design). CSP remains PROPOSED (M18).
+8. **Deployment - PARTIAL.** `npm run build` -> `dist/`, `npm start`;
+   frontend `vite build` served by Express (`frontend/dist`, UI_DIST_DIR
+   override); engines node>=20; graceful shutdown; DB check at boot;
+   admin seed script. No CI/Docker/process-manager configs (owner side).
+   Fixed: production deployment outline added to README.
+9. **Rollback strategy - MISSING in-repo.** No rollback scripts/docs;
+   migrations are forward-only (no down migrations). Fixed: factual
+   rollback posture documented in README (app = redeploy previous build;
+   DB = restore backup); detailed runbook = owner decision.
+10. **Provider configuration - CONFIRMED.** Registered communication
+    providers: `mock` (default) + real `WhatsAppProvider` (Meta Graph,
+    registered at app bootstrap when credentials present); telephony
+    adapters: Twilio + mock; per-org secrets write-only in Settings (API
+    never returns them); channel (SMS/WHATSAPP) and provider switchable
+    per-org via settings API (`mergeSection` allows base-config keys).
+11. **Webhook URLs - CONFIRMED.** `POST /api/webhooks/telephony/:provider/
+    :orgId` (adapter signature header verified against signing secret),
+    `GET`+`POST /api/webhooks/whatsapp/:orgId` (verify-token handshake,
+    X-Hub-Signature-256 raw-body check); both 200/min/IP rate-limited,
+    idempotent. Fixed: exact paths + provider-side setup documented in
+    README.
+12. **Cron/background workers - CONFIRMED (single instance).** One
+    in-process scheduler (`src/index.ts`): reminder/no-show/recall/review
+    ticks every `REMINDER_TICK_MS` (default 60s), unref'd, tick state
+    observable via diagnostics; SIGINT/SIGTERM graceful shutdown; failed-job
+    requeue is manual only (observability API - no auto-retry scheduler,
+    recorded). K-I3 (process persistence on server) remains UNKNOWN;
+    single-instance constraint documented in README (multi-instance would
+    double-run jobs).
+13. **Email/SMS/WhatsApp configuration - CONFIRMED with gap noted.**
+    Channel enum is SMS/WHATSAPP (no email channel implemented). Real SMS
+    transport is NOT implemented (mock provider only for SMS); WhatsApp is
+    the real outbound channel (Graph API, org credentials); Twilio exists
+    as telephony adapter (missed-call webhooks). Real SMS provider +
+    provider accounts = K-I4 owner side.
+14. **Rate limits - CONFIRMED** (`src/security/rateLimit.ts`, in-memory
+    fixed window): login 10/min, public lead 30/min/IP + 120/min/key,
+    webhooks 200/min/IP. **Gap found + fixed:** `trust proxy` was never
+    configured, so behind a reverse proxy every limiter would key on the
+    proxy address (all users sharing one 10/min login bucket); added
+    `TRUST_PROXY` env -> `app.set('trust proxy')` (config.ts/app.ts/
+    index.ts) + 3 config tests. Authenticated APIs remain unlimited
+    (accepted at M18).
+15. **Documentation - PARTIAL -> improved.** README covered dev setup/
+    commands/env/health only; added: frontend + seed commands, new env
+    vars, production deployment outline, webhook configuration, monitoring
+    endpoints, backups/rollback status. Project docs (plan, PROJECT_STATE,
+    SESSION_LOG, audit) unchanged. External runbooks = owner side.
+16. **Final production build and tests - EXECUTED.**
+    - `npm run verify` exit 0: eslint 0, tsc 0, vitest **302/302**
+      (29 suites, 0 skipped; +3 TRUST_PROXY tests), `tsc -p
+      tsconfig.build.json` (production backend build) OK.
+    - `npm run verify:frontend` exit 0: eslint 0, vitest **24/24**,
+      `tsc -b && vite build` OK (production frontend bundle built).
+    - `npm run migrate` x2: applied 0 / skipped 15 (idempotent).
+    - extended smoke `m3-smoke.ps1`: **SMOKE_PASS** (176 checks).
+
+Files changed this milestone: `src/config.ts` (TRUST_PROXY parsing),
+`src/app.ts` (AppDeps.trustProxy + app.set), `src/index.ts` (wire),
+`tests/config.test.ts` (+3 tests), `.env.example` (+TRUST_PROXY,
+UI_DIST_DIR, REMINDER_TICK_MS), `README.md` (commands, env, webhooks,
+monitoring, backups/rollback, production deployment).
+
+Rule 11: no deployment, no destructive/irreversible action performed.
+Owner-side UNKNOWNs flagged, not claimed: B4 legal position (K-I5/R6),
+B6 server answers (K-I2 HTTPS/DNS, K-I3 process persistence), K-I4
+provider accounts, backups execution, external monitoring.
+
+**Status:** M0-M21 + F1 PASSED; M22 verification complete (awaiting
+acceptance); M23 NOT_STARTED.

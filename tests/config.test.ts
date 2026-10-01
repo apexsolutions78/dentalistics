@@ -110,4 +110,37 @@ describe('loadConfig', () => {
       'supersecretvalue',
     );
   });
+
+  it('defaults TRUST_PROXY to false when unset or empty', () => {
+    expect(loadConfig(validEnv).trustProxy).toBe(false);
+    expect(loadConfig({ ...validEnv, TRUST_PROXY: '' }).trustProxy).toBe(
+      false,
+    );
+  });
+
+  it('parses TRUST_PROXY true/false and hop counts', () => {
+    expect(loadConfig({ ...validEnv, TRUST_PROXY: 'true' }).trustProxy).toBe(
+      true,
+    );
+    expect(
+      loadConfig({ ...validEnv, TRUST_PROXY: 'false' }).trustProxy,
+    ).toBe(false);
+    expect(loadConfig({ ...validEnv, TRUST_PROXY: '1' }).trustProxy).toBe(1);
+    expect(loadConfig({ ...validEnv, TRUST_PROXY: '10' }).trustProxy).toBe(
+      10,
+    );
+  });
+
+  it('rejects invalid TRUST_PROXY values', () => {
+    for (const raw of ['no', '1.5', '-1', '11']) {
+      let caught: unknown;
+      try {
+        loadConfig({ ...validEnv, TRUST_PROXY: raw });
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught).toBeInstanceOf(ConfigError);
+      expect((caught as ConfigError).message).toContain('TRUST_PROXY');
+    }
+  });
 });

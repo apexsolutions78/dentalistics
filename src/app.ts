@@ -46,6 +46,7 @@ export interface AppDeps {
   checkDatabase?: () => Promise<DatabaseStatus>;
   db?: Pool;
   secureCookies?: boolean;
+  trustProxy?: boolean | number;
   publicLeadRate?: { perIp: number; perKey: number; windowMs?: number };
   uiDistDir?: string | null;
 }
@@ -60,6 +61,7 @@ export function createApp(deps: AppDeps = {}): Express {
   const secureCookies = deps.secureCookies ?? false;
 
   app.disable('x-powered-by');
+  app.set('trust proxy', deps.trustProxy ?? false);
   app.use((_req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
