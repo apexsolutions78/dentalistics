@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useDocumentTitle } from '../lib/useDocumentTitle';
 
 export function PageHeader({
   title,
@@ -9,6 +10,7 @@ export function PageHeader({
   subtitle?: string;
   actions?: ReactNode;
 }) {
+  useDocumentTitle(title);
   return (
     <div className="page-header">
       <div>

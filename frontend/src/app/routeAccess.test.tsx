@@ -134,4 +134,25 @@ describe('route access', () => {
     expect(await screen.findByRole('heading', { name: 'Workspace' })).toBeInTheDocument();
     expect(screen.queryByText('Access denied')).not.toBeInTheDocument();
   });
+
+  it('sends an expired session back to login with a notice', async () => {
+    const routes = routeFor(makeUser({ role: 'owner' }));
+    mockFetch((url) => {
+      if (url.includes('/leads')) {
+        return jsonResponse(401, { error: { code: 'unauthorized', message: 'Sign in required' } });
+      }
+      return routes(url);
+    });
+    render(
+      <MemoryRouter initialEntries={['/leads']}>
+        <AuthProvider>
+          <AppRouter />
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+    expect(
+      await screen.findByText('Your session has expired. Please sign in again.'),
+    ).toBeInTheDocument();
+    expect(await screen.findByText('Sign in to your clinic account')).toBeInTheDocument();
+  });
 });

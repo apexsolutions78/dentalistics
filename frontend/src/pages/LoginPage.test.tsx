@@ -69,4 +69,56 @@ describe('LoginPage', () => {
       expect(screen.queryByText('Incorrect email or password')).not.toBeInTheDocument(),
     );
   });
+
+  it('validates required fields before calling the API and sets the page title', async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) =>
+      Promise.resolve(routesFor('ok')(String(input), init)),
+    );
+    renderLogin(fetchMock);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Sign in' }));
+    expect(await screen.findByText('Email is required.')).toBeInTheDocument();
+    expect(screen.getByText('Password is required.')).toBeInTheDocument();
+    const loginCalls = fetchMock.mock.calls.filter((call) => String(call[0]).includes('/api/auth/login'));
+    expect(loginCalls).toHaveLength(0);
+    expect(document.title).toBe('Sign in | Apex Dentalistics');
+  });
+
+  it('shows and hides the password', async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) =>
+      Promise.resolve(routesFor('ok')(String(input), init)),
+    );
+    renderLogin(fetchMock);
+
+    const field = await screen.findByLabelText('Password');
+    expect(field).toHaveAttribute('type', 'password');
+    fireEvent.click(screen.getByRole('button', { name: 'Show password' }));
+    expect(screen.getByLabelText('Password')).toHaveAttribute('type', 'text');
+    fireEvent.click(screen.getByRole('button', { name: 'Hide password' }));
+    expect(screen.getByLabelText('Password')).toHaveAttribute('type', 'password');
+  });
+
+  it('shows a dismissible notice when redirected after the session expired', async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) =>
+      Promise.resolve(routesFor('ok')(String(input), init)),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    render(
+      <MemoryRouter initialEntries={[{ pathname: '/login', state: { sessionExpired: true } }]}>
+        <AuthProvider>
+          <LoginPage />
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+
+    expect(
+      await screen.findByText('Your session has expired. Please sign in again.'),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    await waitFor(() =>
+      expect(
+        screen.queryByText('Your session has expired. Please sign in again.'),
+      ).not.toBeInTheDocument(),
+    );
+  });
 });

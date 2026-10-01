@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { apiFetch, errorMessage } from '../../lib/api';
+import { useDocumentTitle } from '../../lib/useDocumentTitle';
 import { FormField } from '../../components/FormField';
 import { Flash } from '../../components/Flash';
 
@@ -8,9 +9,11 @@ export function ResetPasswordPage() {
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token') ?? '';
   const navigate = useNavigate();
+  useDocumentTitle('Reset password');
 
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -63,20 +66,34 @@ export function ResetPasswordPage() {
             <div className="sub">Pick a new password for your clinic account.</div>
             {error ? <Flash kind="error" message={error} onDismiss={() => setError(null)} /> : null}
             <form onSubmit={(e) => void onSubmit(e)} noValidate>
-              <FormField label="New password" hint="Between 12 and 200 characters" required>
+              <FormField
+                label="New password"
+                hint="Between 12 and 200 characters"
+                htmlFor="reset-password"
+                required
+              >
                 <input
                   className="input"
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   autoComplete="new-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   autoFocus
                 />
               </FormField>
-              <FormField label="Confirm password" required>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                style={{ padding: 0, marginBottom: 'var(--space-3)' }}
+                aria-controls="reset-password"
+                onClick={() => setShowPassword((prev) => !prev)}
+              >
+                {showPassword ? 'Hide password' : 'Show password'}
+              </button>
+              <FormField label="Confirm password" htmlFor="reset-confirm" required>
                 <input
                   className="input"
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   autoComplete="new-password"
                   value={confirm}
                   onChange={(e) => setConfirm(e.target.value)}

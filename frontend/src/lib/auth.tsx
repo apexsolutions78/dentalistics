@@ -4,10 +4,11 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import type { ReactNode } from 'react';
-import { apiFetch } from './api';
+import { apiFetch, onUnauthorized } from './api';
 import type { SessionUser } from './types';
 
 export type AuthStatus = 'loading' | 'authenticated' | 'anonymous';
@@ -15,8 +16,10 @@ export type AuthStatus = 'loading' | 'authenticated' | 'anonymous';
 interface AuthContextValue {
   user: SessionUser | null;
   status: AuthStatus;
+  sessionExpired: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  clearSessionExpired: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -28,10 +31,23 @@ interface MeResponse {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [status, setStatus] = useState<AuthStatus>('loading');
+  const [sessionExpired, setSessionExpired] = useState(false);
+  const hadSessionRef = useRef(false);
+
+  useEffect(() => {
+    return onUnauthorized(() => {
+      if (!hadSessionRef.current) return;
+      hadSessionRef.current = false;
+      setUser(null);
+      setStatus('anonymous');
+      setSessionExpired(true);
+    });
+  }, []);
 
   const checkSession = useCallback((): void => {
     apiFetch<MeResponse>('/api/auth/me')
       .then((res) => {
+        hadSessionRef.current = true;
         setUser(res.user);
         setStatus('authenticated');
       })
@@ -50,6 +66,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       method: 'POST',
       body: { email, password },
     });
+    hadSessionRef.current = true;
+    setSessionExpired(false);
     setUser(res.user);
     setStatus('authenticated');
   }, []);
@@ -58,14 +76,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await apiFetch<{ ok: boolean }>('/api/auth/logout', { method: 'POST' });
     } finally {
+      hadSessionRef.current = false;
       setUser(null);
       setStatus('anonymous');
     }
   }, []);
 
+  const clearSessionExpired = useCallback((): void => {
+    setSessionExpired(false);
+  }, []);
+
   const value = useMemo(
-    () => ({ user, status, login, logout }),
-    [user, status, login, logout],
+    () => ({ user, status, sessionExpired, login, logout, clearSessionExpired }),
+    [user, status, sessionExpired, login, logout, clearSessionExpired],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

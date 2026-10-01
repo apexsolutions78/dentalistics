@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useSettings, sourceLabel } from '../../lib/settings';
 import { useSubmit } from '../../lib/useAsync';
+import { useUnsavedChanges } from '../../lib/useUnsavedChanges';
 import type { Settings } from '../../lib/types';
 import { PageHeader } from '../../components/PageHeader';
 import { FormField } from '../../components/FormField';
@@ -44,6 +45,9 @@ export function ReviewSettingsPage() {
   const [clientError, setClientError] = useState<string | null>(null);
   const settings = state.settings;
   const form = draft ?? (settings !== null ? toForm(settings) : null);
+  const dirty =
+    draft !== null && settings !== null && JSON.stringify(draft) !== JSON.stringify(toForm(settings));
+  useUnsavedChanges(dirty);
 
   const update = <K extends keyof ReviewForm>(key: K, value: ReviewForm[K]): void => {
     setDraft((prev) => {

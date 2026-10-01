@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiFetch, errorMessage } from '../../lib/api';
+import { useDocumentTitle } from '../../lib/useDocumentTitle';
 import { FormField } from '../../components/FormField';
 import { Flash } from '../../components/Flash';
 
@@ -13,6 +14,7 @@ export function ForgotPasswordPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sentMessage, setSentMessage] = useState<string | null>(null);
+  useDocumentTitle('Forgot password');
 
   const onSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();

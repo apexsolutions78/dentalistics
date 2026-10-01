@@ -1,7 +1,9 @@
 import { Link } from 'react-router-dom';
+import { useDocumentTitle } from '../lib/useDocumentTitle';
 import { EmptyState } from '../components/states';
 
 export function NotFoundPage() {
+  useDocumentTitle('Page not found');
   return (
     <div className="center-narrow">
       <EmptyState

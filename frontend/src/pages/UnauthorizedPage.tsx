@@ -1,7 +1,9 @@
 import { Link } from 'react-router-dom';
+import { useDocumentTitle } from '../lib/useDocumentTitle';
 import { EmptyState } from '../components/states';
 
 export function UnauthorizedPage() {
+  useDocumentTitle('Access denied');
   return (
     <div className="center-narrow">
       <EmptyState

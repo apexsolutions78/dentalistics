@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { AuthProvider } from '../../lib/auth';
 import { CommunicationSettingsPage } from './CommunicationSettingsPage';
 import { makeSettings, makeUser, jsonResponse, mockFetch } from '../../test/fixtures';
@@ -42,9 +43,11 @@ describe('CommunicationSettingsPage', () => {
       }),
     );
     render(
-      <AuthProvider>
-        <CommunicationSettingsPage />
-      </AuthProvider>,
+      <MemoryRouter>
+        <AuthProvider>
+          <CommunicationSettingsPage />
+        </AuthProvider>
+      </MemoryRouter>,
     );
     const token = await screen.findByLabelText('Graph access token');
     fireEvent.change(token, { target: { value: 'tok-123' } });
@@ -64,9 +67,11 @@ describe('CommunicationSettingsPage', () => {
   it('shows a visible notice when Clear secrets stages a wipe', async () => {
     mockFetch(baseRoutes());
     render(
-      <AuthProvider>
-        <CommunicationSettingsPage />
-      </AuthProvider>,
+      <MemoryRouter>
+        <AuthProvider>
+          <CommunicationSettingsPage />
+        </AuthProvider>
+      </MemoryRouter>,
     );
     await screen.findByLabelText('Graph access token');
     expect(screen.queryByText('Secrets will be cleared on save.')).not.toBeInTheDocument();

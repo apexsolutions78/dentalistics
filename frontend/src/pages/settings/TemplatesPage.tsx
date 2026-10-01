@@ -39,6 +39,9 @@ export function TemplatesPage() {
                 return (
                   <Link key={name} to={`/settings/templates/${encodeURIComponent(name)}`} className="template-link">
                     <span className="slot">{LABELS[name] ?? name}</span>
+                    <span className={`badge ${content ? 'badge-success' : 'badge-warn'}`}>
+                      {content ? 'Configured' : 'Empty'}
+                    </span>
                     <span className="snippet">{content || 'Empty template'}</span>
                   </Link>
                 );

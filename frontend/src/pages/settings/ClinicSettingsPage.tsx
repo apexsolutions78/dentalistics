@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useSettings } from '../../lib/settings';
 import { useSubmit } from '../../lib/useAsync';
+import { useUnsavedChanges } from '../../lib/useUnsavedChanges';
 import type { BusinessHours, Settings } from '../../lib/types';
 import { PageHeader } from '../../components/PageHeader';
 import { FormField } from '../../components/FormField';
@@ -73,6 +74,9 @@ export function ClinicSettingsPage() {
   const [clientError, setClientError] = useState<string | null>(null);
   const settings = state.settings;
   const form = draft ?? (settings !== null ? toForm(settings) : null);
+  const dirty =
+    draft !== null && settings !== null && JSON.stringify(draft) !== JSON.stringify(toForm(settings));
+  useUnsavedChanges(dirty);
 
   const update = <K extends keyof ClinicForm>(key: K, value: ClinicForm[K]): void => {
     setDraft((prev) => {

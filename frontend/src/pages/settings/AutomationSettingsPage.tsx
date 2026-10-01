@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSettings, sourceLabel } from '../../lib/settings';
 import { useSubmit } from '../../lib/useAsync';
+import { useUnsavedChanges } from '../../lib/useUnsavedChanges';
 import type { Settings } from '../../lib/types';
 import { PageHeader } from '../../components/PageHeader';
 import { FormField } from '../../components/FormField';
@@ -58,6 +59,13 @@ export function AutomationSettingsPage() {
   const missed = missedDraft ?? (settings !== null ? toMissedCall(settings) : null);
   const noShow = noShowDraft ?? (settings !== null ? toNoShow(settings) : null);
   const [clientError, setClientError] = useState<string | null>(null);
+  const dirty =
+    (ackDraft !== null && settings !== null && JSON.stringify(ackDraft) !== JSON.stringify(toLeadAck(settings))) ||
+    (missedDraft !== null &&
+      settings !== null &&
+      JSON.stringify(missedDraft) !== JSON.stringify(toMissedCall(settings))) ||
+    (noShowDraft !== null && settings !== null && JSON.stringify(noShowDraft) !== JSON.stringify(toNoShow(settings)));
+  useUnsavedChanges(dirty);
 
   const clearAll = (): void => {
     ackSubmit.clearFeedback();

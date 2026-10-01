@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '../../lib/auth';
 import { useSettings } from '../../lib/settings';
 import { useSubmit } from '../../lib/useAsync';
+import { useUnsavedChanges } from '../../lib/useUnsavedChanges';
 import type { Settings } from '../../lib/types';
 import { PageHeader } from '../../components/PageHeader';
 import { FormField } from '../../components/FormField';
@@ -53,6 +54,10 @@ export function CommunicationSettingsPage() {
   const wa = waDraft ?? (settings !== null ? toWhatsApp(settings) : null);
   const setTel = (value: TelephonyForm): void => setTelDraft(value);
   const setWa = (value: WhatsAppForm): void => setWaDraft(value);
+  const dirty =
+    (telDraft !== null && settings !== null && JSON.stringify(telDraft) !== JSON.stringify(toTelephony(settings))) ||
+    (waDraft !== null && settings !== null && JSON.stringify(waDraft) !== JSON.stringify(toWhatsApp(settings)));
+  useUnsavedChanges(dirty);
 
   const saveTelephony = async (): Promise<void> => {
     if (tel === null || user === null) return;

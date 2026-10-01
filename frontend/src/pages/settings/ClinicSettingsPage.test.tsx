@@ -1,18 +1,22 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { MemoryRouter, Route, Routes, Link } from 'react-router-dom';
 import { AuthProvider } from '../../lib/auth';
 import { ClinicSettingsPage } from './ClinicSettingsPage';
 import { makeSettings, makeUser, jsonResponse, mockFetch } from '../../test/fixtures';
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 function renderPage(): void {
   render(
-    <AuthProvider>
-      <ClinicSettingsPage />
-    </AuthProvider>,
+    <MemoryRouter>
+      <AuthProvider>
+        <ClinicSettingsPage />
+      </AuthProvider>
+    </MemoryRouter>,
   );
 }
 
@@ -92,5 +96,34 @@ describe('ClinicSettingsPage', () => {
     fireEvent.change(name, { target: { value: '' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
     expect(await screen.findByText('Clinic name cannot be empty.')).toBeInTheDocument();
+  });
+
+  it('prompts before internal navigation while the form has unsaved changes', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    mockFetch(baseRoutes());
+    render(
+      <MemoryRouter initialEntries={['/settings/clinic']}>
+        <AuthProvider>
+          <Link to="/settings">Leave</Link>
+          <Routes>
+            <Route path="/settings/clinic" element={<ClinicSettingsPage />} />
+            <Route path="/settings" element={<div>Settings index</div>} />
+          </Routes>
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+    const name = await screen.findByLabelText('Clinic name');
+
+    fireEvent.change(name, { target: { value: 'Renamed Clinic' } });
+    fireEvent.click(screen.getByRole('link', { name: 'Leave' }));
+    expect(confirm).toHaveBeenCalledWith('You have unsaved changes. Leave this page?');
+    expect(screen.getByLabelText('Clinic name')).toHaveValue('Renamed Clinic');
+    expect(screen.queryByText('Settings index')).not.toBeInTheDocument();
+
+    fireEvent.change(name, { target: { value: 'Test Clinic' } });
+    fireEvent.click(screen.getByRole('link', { name: 'Leave' }));
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText('Settings index')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Clinic name')).not.toBeInTheDocument();
   });
 });

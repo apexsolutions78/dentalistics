@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { AppRouter } from './app/router';
 import { AuthProvider } from './lib/auth';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import './styles/tokens.css';
 import './styles/global.css';
 
@@ -15,7 +16,9 @@ createRoot(container).render(
   <StrictMode>
     <AuthProvider>
       <BrowserRouter>
-        <AppRouter />
+        <ErrorBoundary>
+          <AppRouter />
+        </ErrorBoundary>
       </BrowserRouter>
     </AuthProvider>
   </StrictMode>,

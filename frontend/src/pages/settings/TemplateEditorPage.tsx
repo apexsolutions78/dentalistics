@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../lib/auth';
 import { useSettings, previewTemplate, sourceLabel } from '../../lib/settings';
 import { useSubmit } from '../../lib/useAsync';
+import { useUnsavedChanges } from '../../lib/useUnsavedChanges';
 import type { PreviewResult, Settings } from '../../lib/types';
 import { PageHeader } from '../../components/PageHeader';
 import { FormField } from '../../components/FormField';
@@ -46,6 +47,8 @@ export function TemplateEditorPage() {
   const content = drafts[name] ?? serverContent ?? '';
   const preview = previews[name] ?? null;
   const previewError = previewErrors[name] ?? null;
+  const dirty = drafts[name] !== undefined && serverContent !== null && drafts[name] !== serverContent;
+  useUnsavedChanges(dirty, 'This template has unsaved edits. Leave the editor?');
 
   const setContent = (value: string): void => {
     setDrafts((prev) => ({ ...prev, [name]: value }));

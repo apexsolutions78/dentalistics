@@ -3,6 +3,7 @@ import { useAuth } from '../../lib/auth';
 import { useMembers } from '../../lib/settings';
 import { apiFetch } from '../../lib/api';
 import { useSubmit } from '../../lib/useAsync';
+import { useUnsavedChanges } from '../../lib/useUnsavedChanges';
 import type { MemberUser } from '../../lib/types';
 import { PageHeader } from '../../components/PageHeader';
 import { FormField } from '../../components/FormField';
@@ -41,6 +42,7 @@ export function UsersRolesPage() {
   const [role, setRole] = useState('receptionist');
   const [confirmTarget, setConfirmTarget] = useState<MemberUser | null>(null);
   const [memberMsg, setMemberMsg] = useState<string | null>(null);
+  useUnsavedChanges(email.trim().length > 0 || password.length > 0, 'The new-user form has unsaved entries. Leave this page?');
 
   const addMember = async (): Promise<void> => {
     if (user === null) return;
