@@ -4557,3 +4557,43 @@ Deployment/owner-only items remain out of scope (Rule 11).
 **Status:** F2 implementation complete - gates green, report delivered,
 awaiting owner acceptance. PROJECT remains COMPLETE (M0-M23 + F1 PASSED).
 
+
+## Session 31 - F2 accepted PASSED
+
+**2026-10-01 - owner instruction:** "proceed" - recorded as F2 acceptance
+(precedent: each prior "proceed" instruction accepted the milestone under
+review; F2 report delivered at rev 58, commit `eeba730`, MATCH=OK).
+
+- **F2 PASSED 2026-10-01** - gates at pass (executed and observed green
+  before the report): backend `npm run verify` **343/343** (31 suites,
+  0 skipped; lint + tsc + vitest + build), `verify:frontend` **47/47**
+  (9 files) + eslint 0 + tsc 0 + vite build OK, `npm run migrate` x2
+  (0016 applied then 0/16 idempotent), m20 scenarios re-run **4/4**
+  (analysis of the executed run), extended smoke `m3-smoke.ps1`
+  **SMOKE_PASS**, Playwright E2E **5/5** (33.0s).
+- Scope accepted: recalls/messages/communications backend, forgot/reset
+  password flow (migration 0016, SMTP via env with injectable mailer,
+  mock-transport tests), 11 member-facing screens + Forgot/Reset pages
+  wired into shell/guards/router, coverage tooling (backend 85.43% stmts
+  / frontend 38.62% stmts - measurement, not a gate), Playwright +
+  Chromium harness (`tests/e2e`, 5 scenarios per FrontEnd Section 44).
+- Owner-side items unchanged (flagged, never claimed): SMTP_* credentials
+  (reset email inert until supplied), deployment (Rule 11), provider
+  accounts (K-I4), legal position (K-I5/R6), HTTPS/DNS (K-I2), process
+  persistence (K-I3), automated backups, external monitoring.
+- PROPOSED backlog awaiting an explicit next-phase instruction (Rule 1 -
+  no new development phase without owner instruction): M21 deferred UX
+  polish items (F-11 401 auto-redirect, unsaved-changes guard, password
+  show/hide, per-route document.title, error boundary, full dialog focus
+  trap, template-list status labels, login noValidate), CSP header (M18
+  PROPOSED - now testable via Playwright), FrontEnd Appendix A screens
+  absent from the router (CONFIRMED by inspection: /admin/webhooks,
+  /admin/automation-failures, /admin/audit deferred per D10;
+  /appointments/calendar; /automations/activity), F-40
+  settings-access matrix doc-vs-code check. Also still untracked:
+  `AGENTS.md` (owner to decide whether to track it).
+
+**Status:** F2 PASSED 2026-10-01 (owner acceptance). PROJECT remains
+COMPLETE - M0-M23 + F1 + F2 all PASSED. No new phase started; awaiting
+owner instruction for next work (Rule 1).
+
