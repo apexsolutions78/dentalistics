@@ -4387,3 +4387,27 @@ provider accounts, backups execution, external monitoring.
 
 **Status:** M0-M21 + F1 PASSED; M22 verification complete (awaiting
 acceptance); M23 NOT_STARTED.
+
+## Session 27 - M22 accepted PASSED; M23 final acceptance started
+
+**2026-10-01 - owner instruction:** "proceed next" - recorded as M22
+acceptance (precedent: prior instructions accepted M17-M21; session log,
+commit and push already done at `1f603bf`, MATCH=OK, tree clean).
+
+- **M22 PASSED 2026-10-01** - gates at pass: verify 302/302 (29 suites,
+  0 skipped), verify:frontend exit 0 (24/24), migrate x2 0/15 idempotent,
+  extended smoke SMOKE_PASS 176 checks. Owner-side items stay flagged
+  (B4/K-I5, B6/K-I2/K-I3, K-I4, backups, external monitoring).
+- **M23 scope (plan L1352-1374):** run the entire test suite - unit,
+  integration, E2E, security, type checking, lint, build, database
+  migration tests, webhook, automation, tenant isolation - then execute
+  the complete end-to-end scenarios; only declare the project complete if
+  all defined acceptance criteria pass.
+- Method (PROPOSED): full regression gates (`npm run verify`,
+  `npm run verify:frontend`, `npm run migrate` x2) + explicit re-run of
+  `tests/m20.integration.test.ts` (complete scenarios A-D) + extended
+  smoke. Acceptance criteria = M0-M22 all PASSED + all gates green.
+  Owner-side UNKNOWNs remain deployment-side and are not claimed;
+  Rule 11 - no deployment without explicit instruction.
+
+**Status:** M0-M22 + F1 PASSED; M23 IN_PROGRESS.
