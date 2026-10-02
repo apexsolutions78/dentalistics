@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { canManageSettings, useAuth } from '../../lib/auth';
+import { useAuth } from '../../lib/auth';
+import { can } from '../../lib/capabilities';
 import { useApi } from '../../lib/useApi';
 import { apiFetch } from '../../lib/api';
 import { useSubmit } from '../../lib/useAsync';
@@ -43,7 +44,7 @@ const EMPTY: RecallFilters = { status: '', q: '', dueFrom: '', dueTo: '' };
 export function RecallPage() {
   const { user } = useAuth();
   const orgId = user?.organizationId ?? null;
-  const canManage = canManageSettings(user);
+  const canManage = can(user, 'recall.manage');
 
   const [draft, setDraft] = useState<RecallFilters>(EMPTY);
   const [applied, setApplied] = useState<RecallFilters>(EMPTY);

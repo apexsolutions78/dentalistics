@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { canManageSettings, useAuth } from '../../lib/auth';
+import { useAuth } from '../../lib/auth';
+import { can } from '../../lib/capabilities';
 import { useApi } from '../../lib/useApi';
 import { apiFetch } from '../../lib/api';
 import { useSubmit } from '../../lib/useAsync';
@@ -31,7 +32,7 @@ export function LeadDetailPage() {
   const [flash, setFlash] = useState<string | null>(null);
   const [statusDraft, setStatusDraft] = useState<string | null>(null);
   const [notesDraft, setNotesDraft] = useState<string | null>(null);
-  const canManage = canManageSettings(user);
+  const canEditNotes = can(user, 'leads.notes.edit');
 
   const saveStatus = async (): Promise<void> => {
     if (orgId === null || leadId === undefined || statusDraft === null || data === null) return;
@@ -174,7 +175,7 @@ export function LeadDetailPage() {
         </div>
       </section>
 
-      {canManage ? (
+      {canEditNotes ? (
         <section className="card">
           <h2 className="card-title">Notes</h2>
           <FormField label="Notes" hint="Visible to clinic staff only.">

@@ -1,5 +1,6 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { canManageSettings, useAuth } from '../../lib/auth';
+import { useAuth } from '../../lib/auth';
+import { can } from '../../lib/capabilities';
 
 const PRIMARY_LINKS: Array<{ to: string; label: string; end?: boolean }> = [
   { to: '/workspace', label: 'Workspace', end: true },
@@ -44,7 +45,8 @@ function NavLinkItem({ link }: { link: { to: string; label: string; end?: boolea
 
 export function Sidebar() {
   const { user } = useAuth();
-  const isManager = canManageSettings(user);
+  const showManagement = can(user, 'dashboard.view');
+  const showSettingsSections = can(user, 'settings.view');
   const location = useLocation();
   const inSettings = location.pathname.startsWith('/settings');
 
@@ -55,14 +57,14 @@ export function Sidebar() {
           <NavLinkItem key={link.to} link={link} />
         ))}
       </ul>
-      {isManager ? (
+      {showManagement ? (
         <ul className="nav-list" aria-label="Management" style={{ marginTop: '16px' }}>
           {MANAGER_LINKS.map((link) => (
             <NavLinkItem key={link.to} link={link} />
           ))}
         </ul>
       ) : null}
-      {isManager && inSettings ? (
+      {showSettingsSections && inSettings ? (
         <ul className="nav-list" aria-label="Settings sections" style={{ marginTop: '16px' }}>
           {SETTINGS_LINKS.map((link) => (
             <NavLinkItem key={link.to} link={link} />

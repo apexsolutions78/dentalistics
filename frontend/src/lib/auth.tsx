@@ -101,7 +101,3 @@ export function useAuth(): AuthContextValue {
   }
   return ctx;
 }
-
-export function canManageSettings(user: SessionUser | null): boolean {
-  return user !== null && (user.role === 'owner' || user.role === 'admin');
-}

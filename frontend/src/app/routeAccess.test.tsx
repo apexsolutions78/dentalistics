@@ -169,6 +169,18 @@ describe('route access', () => {
     expect(screen.queryByText('Access denied')).not.toBeInTheDocument();
   });
 
+  it('shows receptionists the patient list without the create action', async () => {
+    await renderAt('/patients', makeUser({ role: 'receptionist', email: 'desk@example.com' }));
+    expect(await screen.findByRole('heading', { name: 'Patients' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add patient' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Access denied')).not.toBeInTheDocument();
+  });
+
+  it('keeps the create action for owners on the patient list', async () => {
+    await renderAt('/patients', makeUser({ role: 'owner' }));
+    expect(await screen.findByRole('button', { name: 'Add patient' })).toBeInTheDocument();
+  });
+
   it('sends an expired session back to login with a notice', async () => {
     const routes = routeFor(makeUser({ role: 'owner' }));
     mockFetch((url) => {

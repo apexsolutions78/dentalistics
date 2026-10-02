@@ -1,5 +1,6 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
-import { useAuth, canManageSettings } from '../lib/auth';
+import { useAuth } from '../lib/auth';
+import { can, type Capability } from '../lib/capabilities';
 import { LoadingState } from '../components/states';
 import { UnauthorizedPage } from '../pages/UnauthorizedPage';
 
@@ -26,17 +27,9 @@ export function RequireAuth() {
   return <Outlet />;
 }
 
-export function RequireSettingsRole() {
+export function RequireCapability({ capability }: { capability: Capability }) {
   const { user } = useAuth();
-  if (!canManageSettings(user)) {
-    return <UnauthorizedPage />;
-  }
-  return <Outlet />;
-}
-
-export function RequireManagerRole() {
-  const { user } = useAuth();
-  if (!canManageSettings(user)) {
+  if (!can(user, capability)) {
     return <UnauthorizedPage />;
   }
   return <Outlet />;

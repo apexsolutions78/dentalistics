@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
-import { useAuth, canManageSettings } from '../../lib/auth';
+import { useAuth } from '../../lib/auth';
+import { can } from '../../lib/capabilities';
 import { useSettings } from '../../lib/settings';
 import { PageHeader } from '../../components/PageHeader';
 import { StatusBadge } from '../../components/states';
@@ -79,7 +80,7 @@ export function SettingsOverviewPage() {
           </div>
         )}
       </SettingsBody>
-      {canManageSettings(user) ? (
+      {can(user, 'admin.audit.view') ? (
         <section className="card" style={{ marginTop: 'var(--space-4)' }}>
           <h2 className="card-title">Operational screens</h2>
           <div className="card-grid">

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../lib/auth';
+import { can } from '../../lib/capabilities';
 import { useApi } from '../../lib/useApi';
 import { apiFetch } from '../../lib/api';
 import { useSubmit } from '../../lib/useAsync';
@@ -17,6 +18,7 @@ const PAGE_SIZE = 20;
 export function PatientsPage() {
   const { user } = useAuth();
   const orgId = user?.organizationId ?? null;
+  const canCreate = can(user, 'patients.create');
   const [draft, setDraft] = useState('');
   const [query, setQuery] = useState('');
   const [offset, setOffset] = useState(0);
@@ -63,17 +65,19 @@ export function PatientsPage() {
         title="Patients"
         subtitle="Everyone who has contacted the clinic"
         actions={
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={() => {
-              setAdding((value) => !value);
-              clearFeedback();
-              setFlash(null);
-            }}
-          >
-            {adding ? 'Hide form' : 'Add patient'}
-          </button>
+          canCreate ? (
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => {
+                setAdding((value) => !value);
+                clearFeedback();
+                setFlash(null);
+              }}
+            >
+              {adding ? 'Hide form' : 'Add patient'}
+            </button>
+          ) : null
         }
       />
 

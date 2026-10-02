@@ -1,5 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
-import { RequireAuth, RequireManagerRole, RequireSettingsRole } from './guards';
+import { RequireAuth, RequireCapability } from './guards';
 import { AppShell } from './shell/AppShell';
 import { LoginPage } from '../pages/LoginPage';
 import { ForgotPasswordPage } from '../pages/auth/ForgotPasswordPage';
@@ -44,7 +44,7 @@ export function AppRouter() {
         <Route element={<AppShell />}>
           <Route index element={<LandingPage />} />
           <Route path="unauthorized" element={<UnauthorizedPage />} />
-          <Route path="dashboard" element={<RequireManagerRole />}>
+          <Route path="dashboard" element={<RequireCapability capability="dashboard.view" />}>
             <Route index element={<DashboardPage />} />
           </Route>
           <Route path="workspace" element={<WorkspacePage />} />
@@ -59,17 +59,27 @@ export function AppRouter() {
           </Route>
           <Route path="communications" element={<CommunicationsPage />} />
           <Route path="recall" element={<RecallPage />} />
-          <Route path="automations" element={<RequireManagerRole />}>
-            <Route index element={<AutomationsPage />} />
-            <Route path="activity" element={<AutomationActivityPage />} />
+          <Route path="automations">
+            <Route element={<RequireCapability capability="automations.view" />}>
+              <Route index element={<AutomationsPage />} />
+            </Route>
+            <Route element={<RequireCapability capability="automations.activity.view" />}>
+              <Route path="activity" element={<AutomationActivityPage />} />
+            </Route>
           </Route>
-          <Route path="admin" element={<RequireManagerRole />}>
+          <Route path="admin">
             <Route index element={<Navigate to="/admin/audit" replace />} />
-            <Route path="webhooks" element={<WebhooksPage />} />
-            <Route path="automation-failures" element={<AutomationFailuresPage />} />
-            <Route path="audit" element={<AuditLogPage />} />
+            <Route element={<RequireCapability capability="admin.webhooks.view" />}>
+              <Route path="webhooks" element={<WebhooksPage />} />
+            </Route>
+            <Route element={<RequireCapability capability="admin.automation_failures.view" />}>
+              <Route path="automation-failures" element={<AutomationFailuresPage />} />
+            </Route>
+            <Route element={<RequireCapability capability="admin.audit.view" />}>
+              <Route path="audit" element={<AuditLogPage />} />
+            </Route>
           </Route>
-          <Route path="settings" element={<RequireSettingsRole />}>
+          <Route path="settings" element={<RequireCapability capability="settings.view" />}>
             <Route index element={<SettingsOverviewPage />} />
             <Route path="clinic" element={<ClinicSettingsPage />} />
             <Route path="users" element={<UsersRolesPage />} />

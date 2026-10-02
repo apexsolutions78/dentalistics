@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { canManageSettings, useAuth } from '../../lib/auth';
+import { useAuth } from '../../lib/auth';
+import { can } from '../../lib/capabilities';
 import { useApi } from '../../lib/useApi';
 import { apiFetch } from '../../lib/api';
 import { useSubmit } from '../../lib/useAsync';
@@ -30,7 +31,8 @@ export function AppointmentDetailPage() {
   const { appointmentId } = useParams();
   const { user } = useAuth();
   const orgId = user?.organizationId ?? null;
-  const canManage = canManageSettings(user);
+  const canEdit = can(user, 'appointments.edit');
+  const canViewActivity = can(user, 'automations.activity.view');
 
   const path =
     orgId === null || appointmentId === undefined
@@ -46,7 +48,7 @@ export function AppointmentDetailPage() {
   const messagesQuery = useApi<Paged & { messages: Message[] }>(messagesPath);
 
   const automationBase =
-    orgId === null || appointmentId === undefined || !canManage
+    orgId === null || appointmentId === undefined || !canViewActivity
       ? null
       : `/api/organizations/${orgId}/observability/automation-logs?subjectId=${appointmentId}&limit=20&kind=`;
   const remindersQuery = useApi<Paged & { logs: AutomationLogRow[] }>(
@@ -253,7 +255,7 @@ export function AppointmentDetailPage() {
               Mark no-show
             </button>
           ) : null}
-          {allowed.includes('COMPLETED') && canManage ? (
+          {allowed.includes('COMPLETED') && canEdit ? (
             <button
               type="button"
               className="btn btn-secondary"
@@ -263,7 +265,7 @@ export function AppointmentDetailPage() {
               Mark completed
             </button>
           ) : null}
-          {allowed.includes('CANCELLED') && canManage ? (
+          {allowed.includes('CANCELLED') && canEdit ? (
             <button
               type="button"
               className="btn btn-danger"
@@ -273,7 +275,7 @@ export function AppointmentDetailPage() {
               Cancel appointment
             </button>
           ) : null}
-          {allowed.includes('RESCHEDULED') && canManage ? (
+          {allowed.includes('RESCHEDULED') && canEdit ? (
             <button
               type="button"
               className="btn btn-secondary"
@@ -300,7 +302,7 @@ export function AppointmentDetailPage() {
             </button>
           ) : null}
         </div>
-        {canManage && (appointment.status === 'SCHEDULED' || appointment.status === 'CONFIRMED') ? (
+        {canEdit && (appointment.status === 'SCHEDULED' || appointment.status === 'CONFIRMED') ? (
           <div style={{ marginTop: '12px' }}>
             <div className="form-grid">
               <FormField label="Service">
@@ -330,7 +332,7 @@ export function AppointmentDetailPage() {
             </div>
           </div>
         ) : null}
-        {!canManage && !allowed.includes('CONFIRMED') && !canRebook ? (
+        {!canEdit && !allowed.includes('CONFIRMED') && !canRebook ? (
           <p style={{ fontSize: 'var(--fs-label)', color: 'var(--color-text-secondary)', marginTop: '8px' }}>
             Further changes require the clinic owner or an administrator.
           </p>
@@ -391,7 +393,7 @@ export function AppointmentDetailPage() {
 
       <section className="card">
         <h2 className="card-title">Automation status</h2>
-        {!canManage ? (
+        {!canViewActivity ? (
           <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--fs-label)' }}>
             Reminders, no-show recovery and review requests run automatically based on the clinic's
             automation settings. Ask the owner or administrator for activity details.

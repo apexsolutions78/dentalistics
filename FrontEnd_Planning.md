@@ -3391,38 +3391,42 @@ Authenticated users must belong to an active clinic account.
 | `/dashboard`                   |   Yes |           No |   Yes |
 | `/workspace`                   |   Yes |          Yes |   Yes |
 | `/leads`                       |   Yes |          Yes |   Yes |
-| `/leads/new`                   |   Yes |          Yes |   Yes |
+| `/leads/new` †                 |   Yes |          Yes |   Yes |
 | `/leads/:id`                   |   Yes |          Yes |   Yes |
-| `/leads/:id/edit`              |   Yes |          Yes |   Yes |
+| `/leads/:id/edit` †            |   Yes |          Yes |   Yes |
 | `/patients`                    |   Yes |          Yes |   Yes |
 | `/patients/:id`                |   Yes |          Yes |   Yes |
-| `/patients/:id/edit`           |   Yes |          Yes |   Yes |
+| `/patients/:id/edit` †         |   Yes |           No |   Yes |
 | `/appointments`                |   Yes |          Yes |   Yes |
 | `/appointments/calendar`       |   Yes |          Yes |   Yes |
-| `/appointments/new`            |   Yes |          Yes |   Yes |
+| `/appointments/new` †          |   Yes |          Yes |   Yes |
 | `/appointments/:id`            |   Yes |          Yes |   Yes |
-| `/appointments/:id/reschedule` |   Yes |          Yes |   Yes |
-| `/appointments/:id/rebook`     |   Yes |          Yes |   Yes |
-| `/automations`                 |   Yes |          Yes |   Yes |
-| `/automations/:id`             |   Yes |          Yes |   Yes |
-| `/automations/activity`        |   Yes |          Yes |   Yes |
-| `/automations/activity/:id`    |  Yes* |          No* |  Yes* |
+| `/appointments/:id/reschedule` † | Yes |           No |   Yes |
+| `/appointments/:id/rebook` †   |   Yes |          Yes |   Yes |
+| `/automations`                 |   Yes |           No |   Yes |
+| `/automations/:id` †           |   Yes |           No |   Yes |
+| `/automations/activity`        |   Yes |           No |   Yes |
+| `/automations/activity/:id` †  |  Yes* |           No* |  Yes* |
 | `/communications`              |   Yes |          Yes |   Yes |
-| `/communications/:id`          |   Yes |          Yes |   Yes |
+| `/communications/:id` †        |   Yes |          Yes |   Yes |
 | `/recall`                      |   Yes |          Yes |   Yes |
-| `/recall/:id`                  |   Yes |          Yes |   Yes |
-| `/settings`                    |   Yes |      Limited |   Yes |
+| `/recall/:id` †                |   Yes |          Yes |   Yes |
+| `/settings`                    |   Yes |           No |   Yes |
 | `/settings/clinic`             |   Yes |           No |   Yes |
 | `/settings/users`              |   Yes |           No |   Yes |
 | `/settings/communication`      |   Yes |           No |   Yes |
-| `/settings/templates`          |   Yes |      Limited |   Yes |
-| `/settings/templates/:id`      |   Yes |      Limited |   Yes |
-| `/settings/appointments`       |   Yes |      Limited |   Yes |
-| `/settings/recall`             |   Yes |      Limited |   Yes |
-| `/settings/reviews`            |   Yes |      Limited |   Yes |
+| `/settings/templates`          |   Yes |           No |   Yes |
+| `/settings/templates/:id`      |   Yes |           No |   Yes |
+| `/settings/appointments`       |   Yes |           No |   Yes |
+| `/settings/recall`             |   Yes |           No |   Yes |
+| `/settings/reviews`            |   Yes |           No |   Yes |
 | `/settings/automation`         |   Yes |           No |   Yes |
 
 `*` Access must be determined by the final backend role/permission model. The frontend must not assume operational privileges that the backend does not grant.
+
+`†` No separate route exists in the build. The workflow lives inline on the parent screen — add-lead form on `/leads`, status and notes editor on `/leads/:id`, booking form at `/appointments?new=1`, reschedule/rebook panels on `/appointments/:id`, row expansion on `/communications`, row actions on `/recall`. Navigating to the literal path renders the app's 404. `/patients/:id/edit` has no screen at all (the profile is read-only), and `/automations/:id` and `/automations/activity/:id` have no detail screens (activity is a single list).
+
+**Receptionist column corrected 2026-10-02 (F-40).** The earlier draft said `Limited` for the `/settings*` rows and `Yes` for `/automations`, `/automations/activity`, `/automations/:id`, `/patients/:id/edit` and `/appointments/:id/reschedule`. The backend rejects receptionists with 403 on every settings read, every observability/activity read, the dashboard, patient create/edit, appointment cancel/complete/reschedule and recall close, so those values were never implementable; the frontend route guards now match the backend. Receptionist lead editing is status-only (the backend rejects every other field on a lead), so the Notes editor on `/leads/:id` remains manager-only.
 
 ## 2.2 Operational/Admin Routes
 
@@ -3436,6 +3440,8 @@ These routes are not necessarily visible in normal clinic navigation.
 
 Operational screens must only be exposed when the authenticated user has the corresponding permission.
 
+In the build, `Conditional` resolves to the `admin.webhooks.view`, `admin.automation_failures.view` and `admin.audit.view` capabilities: owner and admin hold them, the receptionist does not, and the backend returns 403 for receptionists on all of these endpoints.
+
 ## 2.3 Permission Model
 
 Frontend permissions must be capability-based rather than hard-coded exclusively around role names.
@@ -3448,6 +3454,7 @@ dashboard.view
 leads.view
 leads.create
 leads.edit
+leads.notes.edit
 
 patients.view
 patients.create
@@ -3485,6 +3492,8 @@ admin.audit.view
 ```
 
 The exact backend permission names may differ, but the frontend architecture must support capability-based authorization.
+
+**Implemented 2026-10-02 (F-40).** `frontend/src/lib/capabilities.ts` holds the capability set per role and the `can(user, capability)` helper. Route guards check one capability through `RequireCapability` (`frontend/src/app/guards.tsx`), and screens gate their actions with the same helper (`patients.create` on the Add-patient button, `leads.notes.edit` on the notes editor, `appointments.edit` and `automations.activity.view` on the appointment detail screen, `recall.manage` on recall close, `admin.audit.view` on the operational-screen links). Owner and admin hold every capability. Receptionists hold only `leads.view`, `leads.create`, `leads.edit`, `patients.view`, `appointments.view`, `appointments.create`, `appointments.rebook`, `communications.view` and `recall.view`; every other capability corresponds to a backend 403 for receptionists. `leads.notes.edit` is an addition to the example list because the backend lets a receptionist change a lead's status only.
 
 ## 2.4 Permission Behavior
 
