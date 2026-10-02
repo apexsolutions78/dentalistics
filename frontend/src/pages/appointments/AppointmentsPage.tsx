@@ -133,25 +133,30 @@ export function AppointmentsPage() {
         title="Appointments"
         subtitle="Schedule, confirmations, no-shows and rebooking"
         actions={
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={() => {
-              const next = new URLSearchParams(searchParams);
-              if (showForm) {
-                next.delete('new');
-                next.delete('leadId');
-                next.delete('phone');
-              } else {
-                next.set('new', '1');
-              }
-              setSearchParams(next);
-              clearFeedback();
-              setFlash(null);
-            }}
-          >
-            {showForm ? 'Hide form' : 'Book appointment'}
-          </button>
+          <div className="btn-row">
+            <Link className="btn btn-secondary" to="/appointments/calendar">
+              Calendar
+            </Link>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => {
+                const next = new URLSearchParams(searchParams);
+                if (showForm) {
+                  next.delete('new');
+                  next.delete('leadId');
+                  next.delete('phone');
+                } else {
+                  next.set('new', '1');
+                }
+                setSearchParams(next);
+                clearFeedback();
+                setFlash(null);
+              }}
+            >
+              {showForm ? 'Hide form' : 'Book appointment'}
+            </button>
+          </div>
         }
       />
 

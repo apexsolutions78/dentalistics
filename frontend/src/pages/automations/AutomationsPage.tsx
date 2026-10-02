@@ -88,7 +88,16 @@ export function AutomationsPage() {
       <PageHeader
         title="Automations"
         subtitle="What runs automatically, and what happened recently"
-        actions={<Link className="btn btn-secondary" to="/settings">Configure in Settings</Link>}
+        actions={
+          <div className="btn-row">
+            <Link className="btn btn-secondary" to="/automations/activity">
+              Activity log
+            </Link>
+            <Link className="btn btn-secondary" to="/settings">
+              Configure in Settings
+            </Link>
+          </div>
+        }
       />
 
       <section className="card">

@@ -718,3 +718,107 @@ button:focus-visible,
     max-width: 140px;
   }
 }
+
+
+/* Appointment calendar */
+.calendar-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.calendar-scroll {
+  overflow-x: auto;
+}
+
+.calendar-weekdays,
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(104px, 1fr));
+  gap: var(--space-2);
+}
+
+.calendar-weekdays {
+  margin-bottom: var(--space-2);
+}
+
+.calendar-weekdays div {
+  font-size: var(--fs-label);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+.calendar-cell {
+  min-height: 96px;
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+}
+
+.calendar-cell.empty {
+  border-color: transparent;
+  background: transparent;
+}
+
+.calendar-day {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 var(--space-1);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  font: inherit;
+  font-size: var(--fs-label);
+  font-weight: 600;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.calendar-day:hover {
+  background: var(--badge-muted-bg);
+}
+
+.calendar-day.today {
+  border-color: var(--color-primary);
+}
+
+.calendar-day.selected {
+  background: var(--color-primary);
+  color: #ffffff;
+}
+
+.calendar-events {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.calendar-events a {
+  display: block;
+  font-size: var(--fs-caption);
+  line-height: 1.35;
+  color: var(--color-text);
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.calendar-events a:hover {
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+
+.calendar-more {
+  font-size: var(--fs-caption);
+  color: var(--color-text-secondary);
+}

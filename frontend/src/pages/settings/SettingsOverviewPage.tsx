@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { useAuth } from '../../lib/auth';
+import { useAuth, canManageSettings } from '../../lib/auth';
 import { useSettings } from '../../lib/settings';
 import { PageHeader } from '../../components/PageHeader';
 import { StatusBadge } from '../../components/states';
@@ -20,6 +20,12 @@ const CATEGORIES: CategoryCard[] = [
   { to: '/settings/recall', title: 'Recall', description: 'Inactive-patient recall cadence' },
   { to: '/settings/reviews', title: 'Reviews', description: 'Review request timing and destination' },
   { to: '/settings/automation', title: 'Automation', description: 'Lead acknowledgement and missed-call replies' },
+];
+
+const OPERATIONAL_SCREENS: CategoryCard[] = [
+  { to: '/admin/audit', title: 'Audit log', description: 'Who changed what, and when' },
+  { to: '/admin/automation-failures', title: 'Failed jobs', description: 'Automation failures with retry' },
+  { to: '/admin/webhooks', title: 'Webhook deliveries', description: 'Incoming WhatsApp and telephony events' },
 ];
 
 export function SettingsOverviewPage() {
@@ -73,6 +79,19 @@ export function SettingsOverviewPage() {
           </div>
         )}
       </SettingsBody>
+      {canManageSettings(user) ? (
+        <section className="card" style={{ marginTop: 'var(--space-4)' }}>
+          <h2 className="card-title">Operational screens</h2>
+          <div className="card-grid">
+            {OPERATIONAL_SCREENS.map((cat) => (
+              <Link key={cat.to} to={cat.to} className="category-card">
+                <strong>{cat.title}</strong>
+                <span className="desc">{cat.description}</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

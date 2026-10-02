@@ -129,6 +129,40 @@ describe('route access', () => {
     expect(await screen.findByText('Access denied')).toBeInTheDocument();
   });
 
+  it('denies a receptionist access to the webhook screen', async () => {
+    await renderAt('/admin/webhooks', makeUser({ role: 'receptionist', email: 'desk@example.com' }));
+    expect(await screen.findByText('Access denied')).toBeInTheDocument();
+  });
+
+  it('denies a receptionist access to the failed-jobs screen', async () => {
+    await renderAt('/admin/automation-failures', makeUser({ role: 'receptionist', email: 'desk@example.com' }));
+    expect(await screen.findByText('Access denied')).toBeInTheDocument();
+  });
+
+  it('denies a receptionist access to the audit log', async () => {
+    await renderAt('/admin/audit', makeUser({ role: 'receptionist', email: 'desk@example.com' }));
+    expect(await screen.findByText('Access denied')).toBeInTheDocument();
+  });
+
+  it('denies a receptionist access to automation activity', async () => {
+    await renderAt('/automations/activity', makeUser({ role: 'receptionist', email: 'desk@example.com' }));
+    expect(await screen.findByText('Access denied')).toBeInTheDocument();
+  });
+
+  it('lets an owner open the audit log and the automation activity log', async () => {
+    await renderAt('/admin/audit', makeUser({ role: 'owner' }));
+    expect(await screen.findByRole('heading', { name: 'Audit log' })).toBeInTheDocument();
+    expect(screen.queryByText('Access denied')).not.toBeInTheDocument();
+  });
+
+  it('lets a receptionist open the appointment calendar', async () => {
+    await renderAt('/appointments/calendar', makeUser({ role: 'receptionist', email: 'desk@example.com' }));
+    expect(
+      await screen.findByRole('heading', { name: 'Appointment calendar' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Access denied')).not.toBeInTheDocument();
+  });
+
   it('lets every member open the workspace and the leads list', async () => {
     await renderAt('/workspace', makeUser({ role: 'admin', email: 'admin@example.com' }));
     expect(await screen.findByRole('heading', { name: 'Workspace' })).toBeInTheDocument();

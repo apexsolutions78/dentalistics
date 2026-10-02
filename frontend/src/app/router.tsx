@@ -1,4 +1,4 @@
-import { Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import { RequireAuth, RequireManagerRole, RequireSettingsRole } from './guards';
 import { AppShell } from './shell/AppShell';
 import { LoginPage } from '../pages/LoginPage';
@@ -14,10 +14,15 @@ import { LeadDetailPage } from '../pages/leads/LeadDetailPage';
 import { PatientsPage } from '../pages/patients/PatientsPage';
 import { PatientProfilePage } from '../pages/patients/PatientProfilePage';
 import { AppointmentsPage } from '../pages/appointments/AppointmentsPage';
+import { AppointmentCalendarPage } from '../pages/appointments/AppointmentCalendarPage';
 import { AppointmentDetailPage } from '../pages/appointments/AppointmentDetailPage';
 import { CommunicationsPage } from '../pages/communications/CommunicationsPage';
 import { RecallPage } from '../pages/recall/RecallPage';
 import { AutomationsPage } from '../pages/automations/AutomationsPage';
+import { AutomationActivityPage } from '../pages/automations/AutomationActivityPage';
+import { WebhooksPage } from '../pages/admin/WebhooksPage';
+import { AutomationFailuresPage } from '../pages/admin/AutomationFailuresPage';
+import { AuditLogPage } from '../pages/admin/AuditLogPage';
 import { SettingsOverviewPage } from '../pages/settings/SettingsOverviewPage';
 import { ClinicSettingsPage } from '../pages/settings/ClinicSettingsPage';
 import { UsersRolesPage } from '../pages/settings/UsersRolesPage';
@@ -47,12 +52,22 @@ export function AppRouter() {
           <Route path="leads/:leadId" element={<LeadDetailPage />} />
           <Route path="patients" element={<PatientsPage />} />
           <Route path="patients/:patientId" element={<PatientProfilePage />} />
-          <Route path="appointments" element={<AppointmentsPage />} />
-          <Route path="appointments/:appointmentId" element={<AppointmentDetailPage />} />
+          <Route path="appointments">
+            <Route index element={<AppointmentsPage />} />
+            <Route path="calendar" element={<AppointmentCalendarPage />} />
+            <Route path=":appointmentId" element={<AppointmentDetailPage />} />
+          </Route>
           <Route path="communications" element={<CommunicationsPage />} />
           <Route path="recall" element={<RecallPage />} />
           <Route path="automations" element={<RequireManagerRole />}>
             <Route index element={<AutomationsPage />} />
+            <Route path="activity" element={<AutomationActivityPage />} />
+          </Route>
+          <Route path="admin" element={<RequireManagerRole />}>
+            <Route index element={<Navigate to="/admin/audit" replace />} />
+            <Route path="webhooks" element={<WebhooksPage />} />
+            <Route path="automation-failures" element={<AutomationFailuresPage />} />
+            <Route path="audit" element={<AuditLogPage />} />
           </Route>
           <Route path="settings" element={<RequireSettingsRole />}>
             <Route index element={<SettingsOverviewPage />} />
