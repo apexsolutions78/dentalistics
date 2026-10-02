@@ -4597,3 +4597,65 @@ review; F2 report delivered at rev 58, commit `eeba730`, MATCH=OK).
 COMPLETE - M0-M23 + F1 + F2 all PASSED. No new phase started; awaiting
 owner instruction for next work (Rule 1).
 
+## Session 32 - post-completion backlog (Options 1-4) executed; deployment instructed
+
+**2026-10-01/02 - owner instructions (recorded across this working
+session):** "all 5 one by one" (execute the rev 59 PROPOSED backlog one
+item at a time); "I don't really understand the technical glitches...
+make correction to the best of logical application to all and whatever
+the issues are" (scope authorization for the F-40 doc-vs-code
+corrections); "Continue if you have next steps" (recap delivered, then
+continuation - this session); closing instruction: "Lets commit and push
+then we will start deployment on DirectAdmin with Node.js, MySql and
+Server based SSH Terminal" (Rule 11 owner instruction - deployment start
+approved; commit/push happen first, deployment NOT started in this
+entry).
+
+- **Option 1/5 M21 deferred UX polish - commit `1c23b0e`
+  (2026-10-01):** session-expired 401 flow, unsaved-changes guards,
+  dialog focus trap, error boundary, per-route document.title, login
+  validation, template status badges. Gate: verify:frontend **67/67**
+  (15 files).
+- **Option 2/5 CSP header (M18 carry-over) - commit `a735aec`
+  (2026-10-01):** Content-Security-Policy on all responses (style-src
+  'unsafe-inline' for React inline styles), +1 app test, +1 Playwright
+  security spec. Gates: verify **344/344**, E2E **6/6**.
+- **Option 3/5 FrontEnd Appendix A routes - commit `dc50060`
+  (2026-10-02):** /admin/webhooks, /admin/automation-failures,
+  /admin/audit (Result column derived from reason/status),
+  /automations/activity (owner|admin), /appointments/calendar (all
+  members; month grid + day panel); settings "Operational screens"
+  section, header links, calendar CSS; 3 new test files, routeAccess
+  additions, tests/e2e/appendixAScreens.spec.ts. Gates:
+  verify:frontend **87/87**, verify **344/344**, E2E **8/8**.
+- **Option 4/5 F-40 settings-access matrix check - commit `3ed1134`
+  (2026-10-02):** full doc-vs-code audit of route guards vs
+  FrontEnd_Planning 2.1; new capability layer
+  frontend/src/lib/capabilities.ts (32 capabilities + lock test) +
+  RequireCapability route guard; canManageSettings deleted; Add-patient
+  button gated by patients.create (backend truth: owner|admin); lead
+  notes confirmed manager-only (backend services/leads.ts status-only
+  rule for receptionist - the doc's receptionist column was wrong; code
+  was right for settings/automations); FrontEnd_Planning 2.1
+  receptionist column corrected (settings/automations Limited/Yes ->
+  No; patients/:id/edit + appointments/:id/reschedule -> No), footnotes
+  for 10 non-routed appendix rows, 2.2/2.3 resolution notes. Gates:
+  verify:frontend **92/92** (19 files), verify **344/344** (31 suites),
+  E2E **8/8**.
+- **Option 5:** reframed by the owner's closing instruction -
+  deployment on DirectAdmin (Node.js + MySQL, server SSH terminal)
+  replaces the owner-side placeholder. Not started in this entry.
+- **Environment incident:** Docker engine down at session start (backend
+  tests ECONNREFUSED 127.0.0.1:3306) -> Docker Desktop started,
+  dentalistics-mysql container started, port 3306 verified, full gates
+  re-run green (verify 344/344, E2E 8/8).
+- **Docs (this entry):** PROJECT_STATE rev 60; M0_Project_Audit F2-row
+  backlog clause updated (items now executed). Still untracked:
+  AGENTS.md (owner to decide whether to track it).
+
+**Status:** Options 1-4 complete and committed (4 commits ahead of
+origin before this docs commit). PROJECT remains COMPLETE - M0-M23 +
+F1 + F2 all PASSED, backlog Options 1-4 done. Next (same session):
+push all commits with MATCH=OK, then DirectAdmin deployment prep per
+owner instruction.
+
