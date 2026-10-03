@@ -47,6 +47,7 @@ export function Sidebar() {
   const { user } = useAuth();
   const showManagement = can(user, 'dashboard.view');
   const showSettingsSections = can(user, 'settings.view');
+  const showTrials = can(user, 'admin.trials.view');
   const location = useLocation();
   const inSettings = location.pathname.startsWith('/settings');
 
@@ -62,6 +63,11 @@ export function Sidebar() {
           {MANAGER_LINKS.map((link) => (
             <NavLinkItem key={link.to} link={link} />
           ))}
+        </ul>
+      ) : null}
+      {showTrials ? (
+        <ul className="nav-list" aria-label="Platform" style={{ marginTop: '16px' }}>
+          <NavLinkItem link={{ to: '/admin/trials', label: 'Trials' }} />
         </ul>
       ) : null}
       {showSettingsSections && inSettings ? (

@@ -35,7 +35,11 @@ const MANAGER_CAPABILITIES = [
   'admin.audit.view',
 ] as const;
 
-export type Capability = (typeof MANAGER_CAPABILITIES)[number];
+const PLATFORM_ADMIN_CAPABILITIES = ['admin.trials.view'] as const;
+
+export type Capability =
+  | (typeof MANAGER_CAPABILITIES)[number]
+  | (typeof PLATFORM_ADMIN_CAPABILITIES)[number];
 
 const RECEPTIONIST_CAPABILITIES: readonly Capability[] = [
   'leads.view',
@@ -51,7 +55,7 @@ const RECEPTIONIST_CAPABILITIES: readonly Capability[] = [
 
 export const CAPABILITIES: Record<Role, readonly Capability[]> = {
   owner: MANAGER_CAPABILITIES,
-  admin: MANAGER_CAPABILITIES,
+  admin: [...MANAGER_CAPABILITIES, ...PLATFORM_ADMIN_CAPABILITIES],
   receptionist: RECEPTIONIST_CAPABILITIES,
 };
 

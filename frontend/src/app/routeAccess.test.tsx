@@ -83,6 +83,9 @@ function routeFor(user: SessionUser | null, organization?: SessionOrganization |
     if (url.includes('/users')) {
       return jsonResponse(200, { users: [] });
     }
+    if (url.includes('/api/admin/trials')) {
+      return jsonResponse(200, { trials: [] });
+    }
     return jsonResponse(404, { error: { code: 'not_found', message: 'Not found' } });
   };
 }
@@ -261,5 +264,60 @@ describe('route access', () => {
       await screen.findByText('Your session has expired. Please sign in again.'),
     ).toBeInTheDocument();
     expect(await screen.findByText('Sign in to your clinic account')).toBeInTheDocument();
+  });
+
+  it('lets the platform administrator open the trials screen', async () => {
+    await renderAt(
+      '/admin/trials',
+      makeUser({ role: 'admin', email: 'platform@example.com', organizationId: null }),
+    );
+    expect(await screen.findByRole('heading', { name: 'Trial clinics' })).toBeInTheDocument();
+    expect(screen.queryByText('Access denied')).not.toBeInTheDocument();
+  });
+
+  it('denies a clinic owner the trials screen', async () => {
+    await renderAt('/admin/trials', makeUser({ role: 'owner' }));
+    expect(await screen.findByText('Access denied')).toBeInTheDocument();
+  });
+
+  it('denies a receptionist the trials screen', async () => {
+    await renderAt('/admin/trials', makeUser({ role: 'receptionist', email: 'desk@example.com' }));
+    expect(await screen.findByText('Access denied')).toBeInTheDocument();
+  });
+
+  it('shows the read-only lock banner after the trial expires', async () => {
+    await renderAt(
+      '/dashboard',
+      makeUser({ role: 'owner' }),
+      makeOrganization({ plan: 'trial', trialEndsAt: '2020-01-01T00:00:00.000Z' }),
+    );
+    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
+    expect(screen.getByText(/Free trial ended/)).toBeInTheDocument();
+    expect(screen.getByText(/read-only/)).toBeInTheDocument();
+  });
+
+  it('shows no lock banner while the trial is still active', async () => {
+    await renderAt(
+      '/dashboard',
+      makeUser({ role: 'owner' }),
+      makeOrganization({ plan: 'trial', trialEndsAt: '2099-01-01T00:00:00.000Z' }),
+    );
+    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
+    expect(screen.queryByText(/Free trial ended/)).not.toBeInTheDocument();
+  });
+
+  it('keeps an expired trial out of the onboarding wizard', async () => {
+    await renderAt(
+      '/dashboard',
+      makeUser({ role: 'owner' }),
+      makeOrganization({
+        plan: 'trial',
+        trialEndsAt: '2020-01-01T00:00:00.000Z',
+        onboardingCompletedAt: null,
+      }),
+    );
+    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Set up your clinic' })).not.toBeInTheDocument();
+    expect(screen.getByText(/read-only/)).toBeInTheDocument();
   });
 });

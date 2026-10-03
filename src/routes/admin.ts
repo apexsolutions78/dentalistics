@@ -24,6 +24,21 @@ interface OrganizationRow extends RowDataPacket {
   created_at: Date;
 }
 
+interface TrialRow extends RowDataPacket {
+  id: number;
+  name: string;
+  status: 'active' | 'disabled';
+  trial_ends_at: Date | null;
+}
+
+interface ActivateRow extends RowDataPacket {
+  id: number;
+  name: string;
+  status: 'active' | 'disabled';
+  plan: 'trial' | 'full';
+  trial_ends_at: Date | null;
+}
+
 interface AdminUserTargetRow extends RowDataPacket {
   id: number;
   email: string;
@@ -62,6 +77,56 @@ export function createAdminRouter(deps: AdminRouterDeps): Router {
       'SELECT id, name, status, created_at FROM organizations ORDER BY id',
     );
     res.status(200).json({ organizations: rows.map(orgDto) });
+  });
+
+  router.get('/trials', async (_req: Request, res: Response) => {
+    const [rows] = await deps.db.query<TrialRow[]>(
+      `SELECT id, name, status, trial_ends_at FROM organizations
+       WHERE plan = 'trial'
+       ORDER BY (trial_ends_at IS NULL), trial_ends_at, id`,
+    );
+    res.status(200).json({
+      trials: rows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        status: row.status,
+        trialEndsAt: row.trial_ends_at,
+      })),
+    });
+  });
+
+  router.post('/organizations/:orgId/activate', async (req: Request, res: Response) => {
+    const organizationId = parsePathId(req.params.orgId ?? '');
+    const actor = req.user as SessionUser;
+    const [rows] = await deps.db.query<ActivateRow[]>(
+      'SELECT id, name, status, plan, trial_ends_at FROM organizations WHERE id = ?',
+      [organizationId],
+    );
+    const row = rows[0];
+    if (row === undefined) {
+      throw new AppError('Organization not found', 404, 'not_found', true);
+    }
+    if (row.plan !== 'trial') {
+      res.status(200).json({
+        organization: { id: row.id, name: row.name, status: row.status, plan: row.plan },
+        activated: false,
+      });
+      return;
+    }
+    await deps.db.query(
+      "UPDATE organizations SET plan = 'full', trial_ends_at = NULL WHERE id = ?",
+      [organizationId],
+    );
+    await recordAudit(deps.db, deps.logger, {
+      organizationId,
+      userId: actor.id,
+      action: 'trial_activated',
+      detail: 'from=trial to=full',
+    });
+    res.status(200).json({
+      organization: { id: row.id, name: row.name, status: row.status, plan: 'full' },
+      activated: true,
+    });
   });
 
   router.post('/organizations/:orgId/users', async (req: Request, res: Response) => {

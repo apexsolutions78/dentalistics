@@ -1,6 +1,7 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { can, type Capability } from '../lib/capabilities';
+import { trialLocked } from '../lib/trial';
 import { EmptyState, LoadingState } from '../components/states';
 import { UnauthorizedPage } from '../pages/UnauthorizedPage';
 
@@ -53,8 +54,20 @@ export function RequireClinic() {
 
 export function RequireOnboarding() {
   const { organization } = useAuth();
-  if (organization !== null && organization.onboardingCompletedAt === null) {
+  if (
+    organization !== null &&
+    organization.onboardingCompletedAt === null &&
+    !trialLocked(organization)
+  ) {
     return <Navigate to="/onboarding" replace />;
+  }
+  return <Outlet />;
+}
+
+export function RequirePlatformAdmin() {
+  const { user } = useAuth();
+  if (user === null || user.role !== 'admin' || user.organizationId !== null) {
+    return <UnauthorizedPage />;
   }
   return <Outlet />;
 }

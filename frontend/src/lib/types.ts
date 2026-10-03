@@ -26,6 +26,13 @@ export interface PublicPlan {
 
 export type ConfigSource = 'org' | 'deployment' | 'default';
 
+export interface TrialRow {
+  id: number;
+  name: string;
+  status: 'active' | 'disabled';
+  trialEndsAt: string | null;
+}
+
 export interface BusinessDay {
   open: string;
   close: string;

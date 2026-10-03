@@ -5,10 +5,12 @@ import { makeUser } from '../test/fixtures';
 const ALL: readonly Capability[] = CAPABILITIES.owner;
 
 describe('capability map', () => {
-  it('gives owners and admins the full capability set', () => {
+  it('gives owners the full set and admins the extra trials screen', () => {
     expect(CAPABILITIES.owner).toEqual(ALL);
-    expect(CAPABILITIES.admin).toEqual(ALL);
+    expect(CAPABILITIES.admin).toEqual([...ALL, 'admin.trials.view']);
     expect(ALL.length).toBe(32);
+    expect(can(makeUser({ role: 'owner' }), 'admin.trials.view')).toBe(false);
+    expect(can(makeUser({ role: 'admin' }), 'admin.trials.view')).toBe(true);
   });
 
   it('keeps receptionists on member-facing capabilities only', () => {
@@ -22,6 +24,7 @@ describe('capability map', () => {
       'admin.webhooks.view',
       'admin.automation_failures.view',
       'admin.audit.view',
+      'admin.trials.view',
       'patients.create',
       'patients.edit',
       'appointments.edit',

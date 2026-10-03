@@ -1,6 +1,7 @@
 import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { AccountMenu } from './AccountMenu';
+import { TrialLockBanner } from './TrialLockBanner';
 
 const SECTION_TITLES: Record<string, string> = {
   dashboard: 'Dashboard',
@@ -29,6 +30,7 @@ export function AppShell() {
         </span>
         <AccountMenu />
       </header>
+      <TrialLockBanner />
       <Sidebar />
       <main className="app-main">
         <Outlet />

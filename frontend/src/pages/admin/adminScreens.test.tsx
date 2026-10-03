@@ -6,6 +6,7 @@ import { AuthProvider } from '../../lib/auth';
 import { WebhooksPage } from './WebhooksPage';
 import { AutomationFailuresPage } from './AutomationFailuresPage';
 import { AuditLogPage } from './AuditLogPage';
+import { TrialsPage } from './TrialsPage';
 import { makeUser, makeMembers, jsonResponse } from '../../test/fixtures';
 
 afterEach(() => {
@@ -231,5 +232,81 @@ describe('AuditLogPage', () => {
     });
     renderPage(<AuditLogPage />);
     expect(await screen.findByText('No audit records')).toBeInTheDocument();
+  });
+});
+
+const trialsList = {
+  trials: [
+    { id: 11, name: 'Expired Dental', status: 'active', trialEndsAt: '2020-01-01T00:00:00.000Z' },
+    { id: 12, name: 'Active Dental', status: 'active', trialEndsAt: '2099-01-01T00:00:00.000Z' },
+  ],
+};
+
+describe('TrialsPage', () => {
+  it('lists trial clinics with active and expired states', async () => {
+    stub((url) => (url.includes('/api/admin/trials') ? jsonResponse(200, trialsList) : null));
+    renderPage(<TrialsPage />);
+    expect(await screen.findByText('Expired Dental')).toBeInTheDocument();
+    expect(screen.getByText('Active Dental')).toBeInTheDocument();
+    expect(screen.getByText(/^Expired /, { selector: '.badge' })).toBeInTheDocument();
+    expect(screen.getByText(/^Active until /, { selector: '.badge' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Activate' })).toHaveLength(2);
+  });
+
+  it('activates a trial and refreshes the list', async () => {
+    let listCalls = 0;
+    const fn = stub((url, init) => {
+      if (url.includes('/api/admin/organizations/12/activate') && init?.method === 'POST') {
+        return jsonResponse(200, {
+          organization: { id: 12, name: 'Active Dental', status: 'active', plan: 'full' },
+          activated: true,
+        });
+      }
+      if (url.includes('/api/admin/trials')) {
+        listCalls += 1;
+        return jsonResponse(200, listCalls === 1 ? trialsList : { trials: [trialsList.trials[0]] });
+      }
+      return null;
+    });
+    renderPage(<TrialsPage />);
+    const buttons = await screen.findAllByRole('button', { name: 'Activate' });
+    const activeButton = buttons[1];
+    if (activeButton === undefined) throw new Error('expected two activate buttons');
+    fireEvent.click(activeButton);
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Active Dental is now on the Full Plan.',
+    );
+    expect(
+      fn.mock.calls.some(
+        ([input, init]) =>
+          String(input).includes('/api/admin/organizations/12/activate') &&
+          init?.method === 'POST',
+      ),
+    ).toBe(true);
+    expect(
+      fn.mock.calls.filter(([input]) => String(input).includes('/api/admin/trials')).length,
+    ).toBeGreaterThanOrEqual(2);
+    expect(await screen.findByText('Expired Dental')).toBeInTheDocument();
+  });
+
+  it('shows an activation failure from the API', async () => {
+    stub((url, init) => {
+      if (url.includes('/activate') && init?.method === 'POST') {
+        return jsonResponse(403, { error: { code: 'forbidden', message: 'Forbidden' } });
+      }
+      if (url.includes('/api/admin/trials')) {
+        return jsonResponse(200, { trials: [trialsList.trials[0]] });
+      }
+      return null;
+    });
+    renderPage(<TrialsPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Activate' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Forbidden');
+  });
+
+  it('shows the empty state when there are no trials', async () => {
+    stub((url) => (url.includes('/api/admin/trials') ? jsonResponse(200, { trials: [] }) : null));
+    renderPage(<TrialsPage />);
+    expect(await screen.findByText('No trial clinics')).toBeInTheDocument();
   });
 });

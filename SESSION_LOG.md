@@ -4986,3 +4986,83 @@ still not executed.
 what exactly happens after the 8 days (PROPOSED read-only lock + admin
 activate) - the ONE blocking question for S1c; (2) when to deploy this
 increment; (3) confirm USD display for the $20 monthly subscription.
+
+## Session 37 - S1c + S1g: day-9 read-only lock and platform-admin activation
+
+**Owner answer recorded verbatim:** "Yes, 9th day - read ony lock with
+an 'activate' button" - approving the PROPOSED read-only lock + admin
+activate from Session 36. A3 is now CONFIRMED; the remaining design
+reads: activation is performed by the platform administrator (role
+`admin`, the account approved in the proposal the owner answered "Yes"
+to), not by the locked clinic itself - a clinic-side activate button
+would bypass billing, so the Activate button lives on the platform-admin
+trials screen, and the clinic sees a read-only banner telling it to
+contact the administrator.
+
+**Backend (CONFIRMED by tests):**
+
+- `src/middleware/trialLock.ts` - `createTrialLock(db)` mounted in
+  `src/app.ts` right after `attachSession`. For non-safe methods with a
+  session bound to an organization (platform admins exempt), one SQL
+  check (`plan='trial' AND trial_ends_at <= UTC_TIMESTAMP()` - compared
+  in SQL, same clock as the signup INSERT, no client timezone involved)
+  -> `403 {code: 'trial_expired', message: 'Your free trial has ended.
+  This clinic is now read-only until it is activated.'}`. Exempt
+  prefixes: `/api/auth` (login/logout/password reset must work while
+  locked), `/api/public` (anonymous lead forms), `/api/webhooks`.
+  GET/HEAD/OPTIONS pass through -> reads stay available (read-only).
+- `src/routes/admin.ts` (behind the existing `requireRole('admin')`):
+  `GET /api/admin/trials` lists plan='trial' orgs
+  `{id,name,status,trialEndsAt}`; `POST /api/admin/organizations/:orgId/activate`
+  sets `plan='full', trial_ends_at=NULL`, audits `trial_activated`
+  once per actual transition (repeat calls return `activated:false`
+  without a second audit row), 404 for unknown orgs.
+
+**Frontend (CONFIRMED by tests):**
+
+- `lib/trial.ts` `trialLocked(organization)` (client-side display only -
+  the server is authoritative); `TrialLockBanner` rendered in the
+  AppShell grid (new `banner` row, desktop + mobile) shows "Free trial
+  ended <date>. This clinic is now read-only. The platform administrator
+  can activate full access." for expired trial orgs.
+- `RequireOnboarding` no longer forces an expired-trial clinic into the
+  wizard (its writes would 403); it stays on the dashboard read-only.
+- New `RequirePlatformAdmin` guard + sibling route branch under AppShell
+  (`/admin/trials`, plus its own NotFound) so the platform admin
+  (organizationId null) can reach a screen without passing RequireClinic.
+- Capability `admin.trials.view` exists ONLY for role `admin`
+  (`capabilities.test.ts` updated: owner set unchanged at 32, admin set
+  = owner set + trials); sidebar shows a "Trials" link when granted.
+- `pages/admin/TrialsPage.tsx` - list with Active until/Expired badges,
+  Activate button per row, success + failure banners, empty state.
+
+**Tests actually executed (all exit 0):**
+
+- backend `npm run verify` = **362/362** (34 files, +7 in new
+  `tests/trialLock.integration.test.ts`: active write, expired
+  read-vs-write, login/logout still work while locked, trials list
+  admin-only, activate + single audit + lift, non-admin refused,
+  full-plan never locked) + lint + typecheck + build.
+- `npm run verify:frontend` = eslint + **115/115** (21 files, +10:
+  4 TrialsPage, 6 routeAccess incl. banner/active-banner/onboarding-lock
+  and trials access matrix; capabilities test updated for the new
+  platform-admin capability) + `tsc -b` + vite build.
+- Playwright E2E **11/11** (31.6s) - new `tests/e2e/trialLock.spec.ts`
+  runs the whole money path against the real API: expire via SQL ->
+  owner sees the banner + GET 200 + POST 403 trial_expired -> platform
+  admin signs in, opens /admin/trials, clicks Activate -> success
+  banner, row gone -> owner POST 201. Spec restores org/admin state in
+  afterAll.
+
+**Not done / NOT VERIFIED:** nothing deployed (Rule 11); S1f
+trial-days-remaining banner during an ACTIVE trial not started (the
+owner has not asked for it); payment gateway still deferred; the
+read-only UX is banner + server 403s (forms are not individually
+greyed out); USD display still ASSUMED; a trial org that never
+finishes onboarding before day 9 lands on the dashboard read-only
+(tested, PROPOSED acceptable).
+
+**Open questions for the owner:** (1) when to deploy this increment to
+`dentalistics.apexsol.pk`; (2) confirm USD display for the $20 monthly
+subscription; (3) optional S1f "X days left" banner - PROPOSED, awaiting
+instruction (Rule 1).

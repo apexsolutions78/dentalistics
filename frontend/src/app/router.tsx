@@ -1,5 +1,11 @@
 import { Navigate, Outlet, Route, Routes } from 'react-router-dom';
-import { RequireAuth, RequireCapability, RequireClinic, RequireOnboarding } from './guards';
+import {
+  RequireAuth,
+  RequireCapability,
+  RequireClinic,
+  RequireOnboarding,
+  RequirePlatformAdmin,
+} from './guards';
 import { AppShell } from './shell/AppShell';
 import { LoginPage } from '../pages/LoginPage';
 import { SignupPage } from '../pages/SignupPage';
@@ -25,6 +31,7 @@ import { AutomationActivityPage } from '../pages/automations/AutomationActivityP
 import { WebhooksPage } from '../pages/admin/WebhooksPage';
 import { AutomationFailuresPage } from '../pages/admin/AutomationFailuresPage';
 import { AuditLogPage } from '../pages/admin/AuditLogPage';
+import { TrialsPage } from '../pages/admin/TrialsPage';
 import { SettingsOverviewPage } from '../pages/settings/SettingsOverviewPage';
 import { ClinicSettingsPage } from '../pages/settings/ClinicSettingsPage';
 import { UsersRolesPage } from '../pages/settings/UsersRolesPage';
@@ -102,6 +109,10 @@ export function AppRouter() {
                 </Route>
                 <Route path="*" element={<NotFoundPage />} />
               </Route>
+            </Route>
+            <Route element={<RequirePlatformAdmin />}>
+              <Route path="admin/trials" element={<TrialsPage />} />
+              <Route path="*" element={<NotFoundPage />} />
             </Route>
           </Route>
         </Route>

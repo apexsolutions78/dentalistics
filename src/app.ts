@@ -10,6 +10,7 @@ import { errorHandler, notFoundHandler } from './errors';
 import { createLogger, redactUrl } from './logger';
 import type { Logger } from './logger';
 import { attachSession } from './middleware/auth';
+import { createTrialLock } from './middleware/trialLock';
 import { createAdminRouter } from './routes/admin';
 import { createAppointmentsRouter } from './routes/appointments';
 import { createAuthRouter } from './routes/auth';
@@ -158,6 +159,7 @@ export function createApp(deps: AppDeps = {}): Express {
   if (deps.db !== undefined) {
     const db = deps.db;
     app.use(attachSession(db));
+    app.use(createTrialLock(db));
     app.use(
       '/api/auth',
       createAuthRouter({
