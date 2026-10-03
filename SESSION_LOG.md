@@ -4774,3 +4774,82 @@ builds (build memory + public source exposure), SaaS onboarding
 requirements. Note for any future server build: export the three caps
 before `npm run build` in `frontend/`.
 
+
+## Session 34 - SaaS phase opened (plans decided, payment deferred); S1a+b signup + plans backend
+
+**2026-10-03 - owner instructions (recorded verbatim):** Payoneer
+receiving-bank details were supplied in chat (Citibank US account,
+beneficiary Ali Akber) with "You can work away with everything else.
+We will do that payment gateway process in the end"; plan decisions:
+"Free Plan for 7 days trial / Full plan $20 per month". Security note:
+the Payoneer account values exist only in the chat transcript and are
+deliberately NOT written into any repository file (public GitHub repo);
+payment-gateway work is DEFERRED to the end by owner instruction.
+
+**Phase S1 opened (Rule 1 satisfied - explicit owner instruction to
+build everything except the payment gateway).** Product decisions
+CONFIRMED: two public plans - Free Plan = **7-day trial, $0**; Full Plan
+= **$20/month, USD**; payment deferred. Phase decomposition PROPOSED by
+Codex and started without further questioning (owner pre-authorized
+"everything else"): S1a schema + plan constants, S1b public signup API,
+S1c trial enforcement middleware (BLOCKED on A3 below), S1d public
+marketing/pricing + signup UI, S1e onboarding wizard (reuses the
+existing org-settings API from migration 0014), S1f trial banner/expiry
+UI, S1g minimal platform-admin screen (trial list + "Mark Full"
+activation, exempt from RequireClinic).
+
+**ASSUMPTIONS recorded (Rule 4 - must be confirmed or deleted before
+being relied on):** A1 trial = full feature set for 7 days (no feature
+gating yet); A2 signup starts the trial immediately - pay-first cannot
+be enforced before the payment gateway exists; A3 post-trial day-8
+behavior = PROPOSED read-only lock + manual admin activation (NOT
+confirmed - owner has not answered); A4 prices in USD; A5 the existing
+admin-created-clinic flow stays as an internal fallback.
+
+**Work completed this session (all gates green):**
+
+1. **sourcemap:false executed** (PROPOSED at rev 62, owner pre-authorized
+   "work away with everything else") - `frontend/vite.config.ts` now
+   emits no `.map` files: removes the dominant build-memory chunk AND
+   stops publishing full source of a commercial product (the public
+   GitHub repo already exposes it; this stops the built artifact from
+   doubling the exposure). Build output confirms no `map:` line. Commit
+   `bfb00e1`.
+2. **S1a schema:** `migrations/0017_org_plans_and_trial.sql` adds
+   `plan ENUM('trial','full') DEFAULT 'full'` + `trial_ends_at DATETIME
+   NULL` to `organizations`; existing production rows default to `full`
+   (no retroactive trials). `src/plans.ts` exports TRIAL_DAYS=7 and the
+   PLANS array (id/priceUsdCents/interval/trialDays/name).
+3. **S1b endpoints:** `GET /api/public/plans` (no auth, returns PLANS);
+   `POST /api/auth/signup` {clinicName, email, password} -> validates
+   (normalizeEmail/requirePassword 12-200/requireString 2-120), signup
+   rate limit `${ip}|signup` reusing the existing login limiter
+   (10/min), duplicate-email 409 `email_taken`, inserts organization
+   (plan='trial', trial_ends_at=now+7d computed server-side via
+   DATE_ADD(UTC_TIMESTAMP())) + owner user, audits
+   `organization_created` + `signup_success`, creates session, returns
+   201 with user + organization + Set-Cookie (auto-login). ER_DUP_ENTRY
+   race on email caught -> same 409.
+4. **Test:** `tests/signup.integration.test.ts` (4 tests: plans shape
+   exact per owner pricing; signup 201 + /me works + trial_ends_at
+   within 7d +/-1h asserted via SQL TIMESTAMPDIFF (timezone-safe) +
+   audit row; duplicate 409; validation 400s).
+
+**Gates actually executed (exit 0 each):** backend `npm run verify`
+= lint + typecheck + **348/348 tests (32 files, +4)** + build;
+`npm run verify:frontend` = eslint + **94/94 (19 files)** + `tsc -b &&
+vite build` (index-DPjn0nuz.js, no sourcemap emitted); `npm run migrate`
+applied 0017 to the dev DB then re-run **0/17 idempotent**; Playwright
+E2E **8/8** (1.0m). Commits: `bfb00e1` (sourcemap), `b7c1e96` (S1a+b).
+
+**Not done / blocked:** S1c trial enforcement (needs A3 answer); S1d-g
+UI work not started; NOTHING deployed this session (Rule 11 - a
+server `git pull` + migrate 0017 + rebuild + restart requires explicit
+owner instruction); the previously-asked clinic bootstrap values are
+now largely SUPERSEDED by self-serve signup (owner may discard them).
+
+**Open questions for the owner:** (1) A3 - what happens on day 8 when
+the trial expires: PROPOSED read-only lock with admin "activate"
+button, or something else? (2) A1 - should Free differ from Full in
+features now, or gate later? (3) confirm USD for billing display.
+(4) when to deploy this increment to production.
