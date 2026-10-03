@@ -4927,3 +4927,62 @@ un-onboarded clinic would hit a 403 on the profile step (assertCanManageMembers)
 behavior (PROPOSED read-only lock + admin activate); (2) A1 - feature
 gating between plans; (3) confirm USD display; (4) when to deploy this
 increment; (5) optional e2e signup-flow coverage (PROPOSED).
+
+## Session 36 - A3/A4 answered: trial = 8 days, all features; marketing feature list added
+
+**Owner answers recorded verbatim:** A3 - "8 days trial to use all
+features in the app built so far with no restrictions"; A4 - "Free is
+for 8 days only. Full Feature is full access to all with monthly
+subscriptions."; plus instruction - "You can list all the features by
+going through the planning and designing."
+
+**Changes (all gates green, nothing deployed):**
+
+- Trial constant 7 -> 8 days: `src/plans.ts` TRIAL_DAYS=8 (the signup
+  SQL binds the constant, so `trial_ends_at` = now+8d automatically);
+  Free headline -> "8-day free trial with every feature"; Full headline
+  -> "Full access to every feature, $20 per month".
+- Tests updated for 8 days: `tests/signup.integration.test.ts`
+  (trialDays 8, 8*86400 window assertions, test title),
+  `frontend/src/test/fixtures.ts` makePlans, `publicPages.test.tsx`
+  headline assertions.
+- Marketing feature list per the owner instruction: FEATURES array (12
+  cards) + "Everything your clinic needs" section between hero and
+  pricing in `MarketingPage.tsx`, CSS block in `frontend/src/styles/global.css`,
+  +1 test ("lists the planned product features"). Every card is sourced
+  from `Project_Planning_Dentalistics.md` (CORE PRODUCT FEATURES 1-8 +
+  MVP-1..16) and `FrontEnd_Planning.md` (Sections 5/9/15/18) - no
+  invented claims.
+
+**Assumption states after this session:** A1 CONFIRMED (trial = all
+features, no restrictions - owner verbatim; no gating to implement
+during the trial); trial length + A4 CONFIRMED (8 days; Free ends day
+8; Full = full access, monthly subscription); A3 day-9 enforcement
+mechanism still UNKNOWN - the owner described the trial terms, not the
+post-trial behavior, so the PROPOSED read-only lock + admin activate
+remains unapproved and must not be implemented without an explicit
+answer.
+
+**Tests actually executed (all exit 0):** backend `npm run verify` =
+**355/355** (33 files) + tsc build; `npm run verify:frontend` = eslint +
+**105/105** (21 files, +1 feature-list test) + `tsc -b` + vite build;
+Playwright E2E **8/8** (36.1s).
+
+**Process note:** `tests/signup.integration.test.ts` was updated with
+one PowerShell string-replace round-trip (a deviation from the
+no-Get-Content/Set-Content rule); verified immediately after - the file
+is pure ASCII (0 non-ASCII bytes) and `git diff` shows only the
+intended 4 lines, so no corruption occurred; all other edits used the
+edit tool.
+
+**Not done / NOT VERIFIED:** nothing deployed (Rule 11 - server pull +
+migrate 0018 + frontend rebuild + restart awaits explicit owner
+instruction); day-9 enforcement (S1c) still blocked on the A3 mechanism
+question; S1f trial banner UI and S1g platform-admin trial
+list/activation not started; the joined browser signup->onboarding flow
+still not executed.
+
+**Open questions for the owner:** (1) day-9 trial expiry behavior -
+what exactly happens after the 8 days (PROPOSED read-only lock + admin
+activate) - the ONE blocking question for S1c; (2) when to deploy this
+increment; (3) confirm USD display for the $20 monthly subscription.

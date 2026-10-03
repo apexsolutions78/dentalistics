@@ -11,6 +11,65 @@ function priceLabel(plan: PublicPlan): string {
   return `$${value}`;
 }
 
+const FEATURES: Array<{ title: string; description: string }> = [
+  {
+    title: 'Lead capture',
+    description:
+      'Website forms, manual entry, missed calls, and webhook sources flow into one pipeline with a complete activity history.',
+  },
+  {
+    title: 'Instant lead acknowledgement',
+    description: 'Configurable automated replies go out the moment a new lead arrives.',
+  },
+  {
+    title: 'Missed-call recovery',
+    description: 'Missed calls become leads that get an automated response and staff notification.',
+  },
+  {
+    title: 'Appointment management',
+    description: 'Appointment list, detail, and calendar views for the whole schedule.',
+  },
+  {
+    title: 'Appointment reminders',
+    description:
+      'Configurable reminder sequences - 48 hours, 24 hours, and 2 hours before by default - with confirmations and rescheduling.',
+  },
+  {
+    title: 'No-show recovery',
+    description:
+      'Automated rebooking outreach when a patient misses an appointment, with follow-up until they rebook.',
+  },
+  {
+    title: 'Recall automation',
+    description: 'Overdue hygiene, check-up, and treatment follow-up recalls with tracked responses.',
+  },
+  {
+    title: 'Review requests',
+    description:
+      'Automatic review requests after eligible appointments, respecting consent rules and preventing duplicates.',
+  },
+  {
+    title: 'Receptionist workspace',
+    description:
+      'New leads, missed calls, patient replies, and upcoming appointments in priority queues.',
+  },
+  {
+    title: 'Communication center',
+    description:
+      'Messages and patient replies across your configured channels, with delivery tracking.',
+  },
+  {
+    title: 'Owner dashboard',
+    description:
+      'Leads, bookings, no-shows, recalls, and message delivery, with trends over time.',
+  },
+  {
+    title: 'Templates and settings',
+    description:
+      'Message templates, clinic profile, business hours, users and roles, and automation configuration.',
+  },
+];
+
 export function MarketingPage() {
   useDocumentTitle('Dental practice management software');
   const [plans, setPlans] = useState<PublicPlan[] | null>(null);
@@ -45,6 +104,18 @@ export function MarketingPage() {
         <Link to="/signup" className="btn btn-primary">
           Start your free trial
         </Link>
+      </section>
+
+      <section className="marketing-features" aria-label="Features">
+        <h2>Everything your clinic needs</h2>
+        <div className="card-grid marketing-feature-grid">
+          {FEATURES.map((feature) => (
+            <div className="card marketing-feature" key={feature.title}>
+              <div className="card-title">{feature.title}</div>
+              <p className="sub">{feature.description}</p>
+            </div>
+          ))}
+        </div>
       </section>
 
       <section className="marketing-pricing" aria-label="Pricing">

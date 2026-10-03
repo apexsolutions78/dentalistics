@@ -31,7 +31,10 @@ describe('MarketingPage', () => {
     );
     expect(await screen.findByText('Free Plan')).toBeInTheDocument();
     expect(screen.getByText('$0')).toBeInTheDocument();
-    expect(screen.getByText('7-day free trial with every feature')).toBeInTheDocument();
+    expect(screen.getByText('8-day free trial with every feature')).toBeInTheDocument();
+    expect(
+      screen.getByText('Full access to every feature, $20 per month'),
+    ).toBeInTheDocument();
     expect(await screen.findByText('Full Plan')).toBeInTheDocument();
     expect(screen.getByText('$20')).toBeInTheDocument();
     expect(screen.getByText('/month')).toBeInTheDocument();
@@ -41,6 +44,35 @@ describe('MarketingPage', () => {
       expect(link).toHaveAttribute('href', '/login');
     }
     expect(screen.getAllByRole('link', { name: /Start free trial/i }).length).toBeGreaterThan(0);
+  });
+
+  it('lists the planned product features', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes('/api/public/plans')) {
+          return Promise.resolve(jsonResponse(200, { plans: makePlans() }));
+        }
+        return Promise.resolve(
+          jsonResponse(404, { error: { code: 'not_found', message: 'Not found' } }),
+        );
+      }),
+    );
+    render(
+      <MemoryRouter>
+        <MarketingPage />
+      </MemoryRouter>,
+    );
+    expect(
+      await screen.findByRole('heading', { name: 'Everything your clinic needs' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Lead capture')).toBeInTheDocument();
+    expect(screen.getByText('Missed-call recovery')).toBeInTheDocument();
+    expect(screen.getByText('Recall automation')).toBeInTheDocument();
+    expect(screen.getByText('Review requests')).toBeInTheDocument();
+    expect(screen.getByText('Owner dashboard')).toBeInTheDocument();
+    expect(screen.getByText('Templates and settings')).toBeInTheDocument();
   });
 
   it('shows a fallback when pricing cannot be loaded', async () => {

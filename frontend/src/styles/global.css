@@ -930,3 +930,23 @@ button:focus-visible,
 .onboarding-review dd {
   margin: 0;
 }
+
+.marketing-features {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 0 var(--space-4) var(--space-5);
+  text-align: center;
+  width: 100%;
+}
+
+.marketing-features h2 {
+  margin-bottom: var(--space-4);
+}
+
+.marketing-feature-grid {
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+
+.marketing-feature {
+  text-align: left;
+}

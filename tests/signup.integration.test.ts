@@ -118,7 +118,7 @@ describe.skipIf(testHost === undefined || testHost === '')(
         name: 'Free Plan',
         priceUsdCents: 0,
         interval: 'trial',
-        trialDays: 7,
+        trialDays: 8,
       });
 
       const full = plans.find((p) => p.id === 'full');
@@ -130,7 +130,7 @@ describe.skipIf(testHost === undefined || testHost === '')(
       });
     });
 
-    it('signs up a clinic owner, starts the 7-day trial, and logs them in', async () => {
+    it('signs up a clinic owner, starts the 8-day trial, and logs them in', async () => {
       const res = await request(app).post('/api/auth/signup').send({
         clinicName: 'Signup Test Dental',
         email: signupEmail,
@@ -158,8 +158,8 @@ describe.skipIf(testHost === undefined || testHost === '')(
       );
       const org = orgRows[0];
       expect(org?.plan).toBe('trial');
-      expect(org?.trial_secs).toBeGreaterThan(7 * 86400 - 3600);
-      expect(org?.trial_secs).toBeLessThan(7 * 86400 + 3600);
+      expect(org?.trial_secs).toBeGreaterThan(8 * 86400 - 3600);
+      expect(org?.trial_secs).toBeLessThan(8 * 86400 + 3600);
 
       const [userRows] = await pool.query<mysql.RowDataPacket[]>(
         `SELECT role, organization_id, last_login_at FROM users WHERE email = ?`,
