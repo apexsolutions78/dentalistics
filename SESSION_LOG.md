@@ -4659,3 +4659,101 @@ F1 + F2 all PASSED, backlog Options 1-4 done. Next (same session):
 push all commits with MATCH=OK, then DirectAdmin deployment prep per
 owner instruction.
 
+## Session 33 - production deployment executed; null-org loading root cause + fix; SaaS direction recorded
+
+**2026-10-03 - owner instructions (recorded across this session):**
+deployment answers supplied in an interview (commands are executed by
+the owner in the DirectAdmin server SSH terminal, blocks prepared by
+Codex with pasted output returned); domain
+`https://dentalistics.apexsol.pk`; GitHub repo public; "save session
+log when done"; defect decision "Fix now (Recommended)" for the
+no-clinic infinite-loading issue; product-direction statement: "The
+main concept of this application was to sell it to dental clinics
+globally... an onboarding process where a dental clinic's owner would
+subscribe to monthly plans and signup after payment... the Onboarding
+process asks details regarding the clinic intelligently and smartly...
+the name of the clinic and login and everything should be according to
+the client's profile"; "Continue if you have next steps, or stop and
+ask for clarification if you are unsure how to proceed".
+
+**Deployment EXECUTED (owner ran the prepared blocks; results observed
+in chat):** server user `apexsolp` on `dwh1`, app root
+`/home/apexsolp/domains/dentalistics.apexsol.pk/app`; Node **22.23.2**
+installed to `~/local/node22` (server lacks `xz`; .tar.gz route; PATH
+exported in `~/.bashrc`); `npm ci` at root **and** in `frontend/`
+(separate package - `cd frontend && npm ci` is mandatory); `.env`
+created (11 keys, chmod 600; NODE_ENV=production, PORT=3000,
+TRUST_PROXY=1, RESET_BASE_URL=https://dentalistics.apexsol.pk, DB
+`apexsolp_dental`@127.0.0.1, SMTP_* intentionally unset - values never
+written into this file); backend build + `frontend` `tsc -b && vite
+build` green; `migrate` **16/16 applied (22 tables, matches dev)**;
+`seed:admin` complete (admin email
+`admin@dentalistics.apexsol.pk`, organizationId null); DA Node app
+created - absolute startup paths errored, **relative form
+`domains/dentalistics.apexsol.pk/app` + `dist/index.js` CONFIRMED
+working**; webserver is **LiteSpeed** (not nginx).
+
+**Production verification (CONFIRMED from this machine over HTTPS):**
+`/health` 200 `{"status":"ok","database":"up"}`; admin login POST 200;
+`/login` serves the SPA (hashed assets 200: 422 KB JS + CSS); security
+headers (nosniff, X-Frame-Options DENY, Referrer-Policy, full CSP)
+present on responses via LiteSpeed passthrough. NOT VERIFIED: bare `/`
+(earlier served the LiteSpeed placeholder - owner was told to
+`mv public_html/index.html public_html/index.html.disabled`; outcome
+never confirmed in chat).
+
+**Defect reported: clinic screens stuck on "Loading…" - root cause
+CONFIRMED by code (not a server issue):** `useApi.ts:32` returns
+without fetching when `path === null`, and `useApi.ts:50` keeps status
+`loading` for a null path; every org-scoped page builds
+`path = orgId === null ? null : '/api/organizations/...'`
+(DashboardPage:55, LeadsPage:54, AuditLogPage:38 and ~15 pages), while
+the platform admin logs in with `organizationId: null` (backend
+`auth.ts:92` emits `?? null`) -> permanent spinner by construction.
+Secondary CONFIRMED finding: the frontend contains **zero `/api/admin`
+references** - no UI exists to create a clinic; clinic creation exists
+only in the admin API (`POST /api/admin/organizations` `{name}`;
+`POST /api/admin/organizations/:orgId/users`
+`{email,password,role}`).
+
+**Fix executed per owner instruction "Fix now" - commit `aadd21b`:**
+`RequireClinic` guard (frontend/src/app/guards.tsx) renders "No clinic
+linked to this account" (EmptyState) instead of the shell contents when
+`user.organizationId` is null; router wraps all AppShell children with
+it; `SessionUser.organizationId` corrected to `number | null` in
+frontend/src/lib/types.ts (latent type hole vs backend runtime -
+TemplateEditorPage preview added a null guard); +2 tests in
+routeAccess.test.tsx (dashboard + settings null-org). **Gates actually
+executed: verify 344/344 (31 suites), verify:frontend lint + 94/94
+(19 files, +2) + vite build, both exit 0.** Fix NOT yet on the server
+(owner must `git pull` + `npm run build:frontend` + DA app restart).
+
+**Product direction recorded (owner-stated intent CONFIRMED; all
+implementation requirements UNKNOWN):** the application is to be sold
+globally to dental clinics as a subscription SaaS - the clinic owner
+subscribes to a monthly plan, signs up after payment, then a smart,
+progressive onboarding collects clinic details; clinic name, login and
+content derive from that profile. NO code started (Rule 1 - a new
+phase requires explicit owner instruction). Prepared questions for the
+owner: payment provider/methods, plan tiers + prices + currency,
+exact payment-to-signup order, onboarding questionnaire scope, and
+whether the current admin-created-clinic flow stays as an internal
+fallback.
+
+**Open items:** (1) clinic bootstrap values (clinic name / owner email
+/ owner password) requested twice - the question tool did not carry the
+owner's custom text (returned labels only), awaiting a plain-text
+reply; (2) placeholder `public_html/index.html` rename unconfirmed;
+(3) onboarding requirements pending answers; (4) `AGENTS.md` untracked
+(owner to decide); (5) carried owner-side items unchanged: SMTP_*
+(reset mail inert), K-I4 provider accounts, Force HTTPS/HSTS unconfirmed
+(HTTPS+DNS themselves CONFIRMED live), K-I3 process persistence across
+reboot NOT VERIFIED (the DA app process is running now), backups,
+external monitoring, B4 legal position.
+
+**Status:** fix `aadd21b` committed; this docs entry committed next;
+push with MATCH=OK follows. Deployment live and loginable; the no-clinic
+message reaches production only after the owner's frontend rebuild.
+Next: owner redeploys frontend, supplies clinic bootstrap values,
+answers onboarding questions.
+
