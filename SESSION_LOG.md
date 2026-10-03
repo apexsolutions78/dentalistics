@@ -4757,3 +4757,20 @@ message reaches production only after the owner's frontend rebuild.
 Next: owner redeploys frontend, supplies clinic bootstrap values,
 answers onboarding questions.
 
+**[Update 2026-10-03 - deployment converged]:** server rebuild
+succeeded with memory caps (`GOMAXPROCS=1 GOMEMLIMIT=256MiB
+NODE_OPTIONS=--max-old-space-size=768`; vite built in 5.67s; the prior
+esbuild crash's fatal-error header was never captured, so OOM remains
+ASSUMED, though the GC-thrash goroutine dump + success-under-caps are
+consistent with it); DA app restarted (/health 200, uptimeSeconds 1).
+**CONFIRMED from here:** `/login` serves `index-DPjn0nuz.js` -
+hash-identical to the locally verified build - and the served bundle
+contains "No clinic linked to this account" -> **RequireClinic fix LIVE
+in production** (unit-tested + bundle-verified; a real-browser
+admin-session walkthrough is still NOT VERIFIED). Root `/` now serves
+the SPA (395 B, `id="root"`) -> placeholder rename resolved. Open:
+clinic bootstrap values (3), PROPOSED `sourcemap: false` for production
+builds (build memory + public source exposure), SaaS onboarding
+requirements. Note for any future server build: export the three caps
+before `npm run build` in `frontend/`.
+
