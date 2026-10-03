@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import type { Pool, RowDataPacket } from 'mysql2/promise';
+import type { Pool, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { recordAudit } from '../audit';
 import { getDummyHash, hashPassword, verifyPassword } from '../auth/password';
 import {
@@ -16,8 +16,9 @@ import { buildClearCookie, buildSessionCookie, SESSION_TTL_HOURS } from '../http
 import type { Logger } from '../logger';
 import type { PasswordResetMailer } from '../mail/passwordResetMailer';
 import { requireAuth } from '../middleware/auth';
+import { TRIAL_DAYS } from '../plans';
 import type { RateLimiter } from '../security/rateLimit';
-import { normalizeEmail, requirePassword } from '../validate';
+import { normalizeEmail, requirePassword, requireString } from '../validate';
 
 export interface AuthRouterDeps {
   db: Pool;
@@ -134,6 +135,73 @@ export function createAuthRouter(deps: AuthRouterDeps): Router {
       buildSessionCookie(session.token, deps.secureCookies, SESSION_TTL_HOURS * 60 * 60),
     );
     res.status(200).json({ user: userDto(user) });
+  });
+
+  router.post('/signup', async (req: Request, res: Response) => {
+    const body = readJsonBody(req);
+
+    if (!deps.loginLimiter.check(`${req.ip ?? 'unknown'}|signup`)) {
+      deps.logger.warn('signup rate limited', { ip: req.ip });
+      throw new AppError('Too many signup attempts, try again later', 429, 'rate_limited', true);
+    }
+
+    const clinicName = requireString(body.clinicName, 'clinicName', { min: 2, max: 120 });
+    const email = normalizeEmail(body.email);
+    const password = requirePassword(body.password);
+
+    const [existing] = await deps.db.query<RowDataPacket[]>(
+      'SELECT id FROM users WHERE email = ?',
+      [email],
+    );
+    if (existing.length > 0) {
+      throw new AppError('An account with this email already exists', 409, 'email_taken', true);
+    }
+
+    const passwordHash = await hashPassword(password);
+    const [orgResult] = await deps.db.query<ResultSetHeader>(
+      `INSERT INTO organizations (name, plan, trial_ends_at)
+       VALUES (?, 'trial', DATE_ADD(UTC_TIMESTAMP(), INTERVAL ? DAY))`,
+      [clinicName, TRIAL_DAYS],
+    );
+    const organizationId = orgResult.insertId;
+
+    let userId: number;
+    try {
+      const [userResult] = await deps.db.query<ResultSetHeader>(
+        `INSERT INTO users (organization_id, email, password_hash, role, last_login_at)
+         VALUES (?, ?, ?, 'owner', UTC_TIMESTAMP())`,
+        [organizationId, email, passwordHash],
+      );
+      userId = userResult.insertId;
+    } catch (err) {
+      if (err instanceof Error && 'code' in err && err.code === 'ER_DUP_ENTRY') {
+        throw new AppError('An account with this email already exists', 409, 'email_taken', true);
+      }
+      throw err;
+    }
+
+    await recordAudit(deps.db, deps.logger, {
+      organizationId,
+      userId,
+      action: 'organization_created',
+      detail: `name=${clinicName} plan=trial`,
+    });
+    await recordAudit(deps.db, deps.logger, {
+      organizationId,
+      userId,
+      action: 'signup_success',
+      detail: 'plan=trial',
+    });
+
+    const session = await createSession(deps.db, userId);
+    res.setHeader(
+      'Set-Cookie',
+      buildSessionCookie(session.token, deps.secureCookies, SESSION_TTL_HOURS * 60 * 60),
+    );
+    res.status(201).json({
+      user: { id: userId, email, role: 'owner', organizationId },
+      organization: { id: organizationId, name: clinicName, plan: 'trial', trialDays: TRIAL_DAYS },
+    });
   });
 
   router.post('/logout', async (req: Request, res: Response) => {

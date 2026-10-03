@@ -5,6 +5,7 @@ import { triggerLeadCreated } from '../automation/leadCreated';
 import { AppError } from '../errors';
 import { readJsonBody } from '../http/body';
 import type { Logger } from '../logger';
+import { PLANS } from '../plans';
 import type { RateLimiter } from '../security/rateLimit';
 import { createPublicLead } from '../services/leads';
 
@@ -21,6 +22,10 @@ interface SiteKeyOrgRow extends RowDataPacket {
 
 export function createPublicRouter(deps: PublicRouterDeps): Router {
   const router = Router();
+
+  router.get('/plans', (_req: Request, res: Response) => {
+    res.status(200).json({ plans: PLANS });
+  });
 
   router.post('/leads', async (req: Request, res: Response) => {
     const rawKey = req.header('x-site-key');
