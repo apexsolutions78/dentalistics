@@ -4853,3 +4853,77 @@ the trial expires: PROPOSED read-only lock with admin "activate"
 button, or something else? (2) A1 - should Free differ from Full in
 features now, or gate later? (3) confirm USD for billing display.
 (4) when to deploy this increment to production.
+
+## Session 35 - S1d+e: public marketing, signup UI, onboarding wizard complete
+
+**2026-10-03 - owner instruction:** "yes" (continue with S1d public
+pricing/signup page + S1e onboarding wizard, per the Session 34
+recommendation).
+
+**S1d - public marketing + self-serve signup UI (CONFIRMED shipped in
+code, commit `92816bf`):** `/` for anonymous visitors now renders a
+marketing page (`MarketingPage.tsx`) - hero, two pricing cards fetched
+live from `GET /api/public/plans` (Free Plan $0 with the 7-day-trial
+headline; Full Plan $20/month), Sign in / Start free trial CTAs; an
+authenticated `/` keeps its previous behavior (capability-based redirect
+to dashboard or workspace). New `/signup` (`SignupPage.tsx`) collects
+clinic name + email + password, client-validates, calls the new
+AuthProvider `signup()`, then lands the fresh owner session on
+`/onboarding`. Router restructured: the AppShell subtree is now wrapped
+by a pathless `RequireAuth` under the `/` route with the index route
+outside it (named routes, URLs, session-expiry and no-clinic behavior
+unchanged - covered by the existing routeAccess tests).
+
+**S1e - smart onboarding wizard (CONFIRMED shipped):** migration
+**0018** adds `organizations.onboarding_completed_at DATETIME NULL` and
+backfills all existing rows to `UTC_TIMESTAMP()` (so no existing clinic
+- including production - is forced into the wizard); signups start with
+NULL. `POST /api/organizations/:orgId/onboarding/complete` (owner/admin
+only via assertCanManageMembers, audit `onboarding_completed`, updates
+only when still NULL - a second call is a no-op 200). `/api/auth/login`,
+`/me` and `/signup` now return `organization` `{id, name, plan,
+trialEndsAt, onboardingCompletedAt}` so the client knows the state.
+Frontend: `RequireOnboarding` guard (redirects to `/onboarding` while
+the session organization exists and `onboardingCompletedAt` is null;
+organizations absent from the response - test fixtures, platform admin
+via RequireClinic - are not redirected); `OnboardingPage` = 3 steps:
+(1) clinic profile (name/phone/email/address, prefilled from
+`GET /settings/clinic`, saved with the existing
+`PATCH .../settings/clinic`), (2) business hours (7-day editor,
+Mon-Fri 09:00-17:00 defaults, same validation rules as the settings
+page), (3) review + Finish -> complete endpoint -> `refreshSession()` ->
+`/dashboard`. A `finished` flag prevents the page's own
+"already-complete -> leave" redirect from racing the finish navigation
+(this race was caught by the test suite, not assumed away).
+
+**Tests actually executed (all exit 0):** backend `npm run verify` =
+**355/355** (33 files, +7 in `tests/onboarding.integration.test.ts`,
+signup test extended for the new response shape), lint/typecheck/build;
+`npm run verify:frontend` = eslint + **104/104** (21 files, +10: 2
+marketing, 3 signup, 2 onboarding, 3 routeAccess) + `tsc -b` + vite
+build; Playwright E2E **8/8** (59.8s) against the real API with the
+updated seed (seeded org now created with `onboarding_completed_at` set
+so e2e stays out of the wizard). Migration 0018 applied to the dev DB
+(then idempotent); the test DB applies it via each suite's runMigrations.
+
+**Test-side fixes made along the way (no product defects):**
+makeDashboard fixture in routeAccess lacked `trends` (DashboardPage
+reads `data.trends.daily` - the resulting crash was timing-flaky and
+surfaced only under the new parallel load); two tuple-typing/lint issues
+in the new tests. The marketing "Sign in" assertion needed getAllByRole
+(header + footer both link to /login).
+
+**Not done / NOT VERIFIED:** nothing deployed (Rule 11 - production
+needs owner-run `git pull`, migrate 0018, frontend rebuild, restart);
+the signup->onboarding flow end-to-end in a real browser (each side is
+tested and the response shapes are asserted on both ends, but the joined
+browser flow was not executed); S1c trial-enforcement middleware still
+BLOCKED on A3 (day-8 behavior); S1f trial banner UI and S1g
+platform-admin trial list/activation not started; receptionist in an
+un-onboarded clinic would hit a 403 on the profile step (assertCanManageMembers)
+- realistic flows start from the owner signup.
+
+**Open questions for the owner (carried + new):** (1) A3 - day-8 trial
+behavior (PROPOSED read-only lock + admin activate); (2) A1 - feature
+gating between plans; (3) confirm USD display; (4) when to deploy this
+increment; (5) optional e2e signup-flow coverage (PROPOSED).
