@@ -9,27 +9,32 @@ import {
 } from 'react';
 import type { ReactNode } from 'react';
 import { apiFetch, onUnauthorized } from './api';
-import type { SessionUser } from './types';
+import type { SessionOrganization, SessionUser } from './types';
 
 export type AuthStatus = 'loading' | 'authenticated' | 'anonymous';
 
 interface AuthContextValue {
   user: SessionUser | null;
+  organization: SessionOrganization | null;
   status: AuthStatus;
   sessionExpired: boolean;
   login: (email: string, password: string) => Promise<void>;
+  signup: (clinicName: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  refreshSession: () => Promise<void>;
   clearSessionExpired: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-interface MeResponse {
+interface SessionResponse {
   user: SessionUser;
+  organization?: SessionOrganization | null;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null);
+  const [organization, setOrganization] = useState<SessionOrganization | null>(null);
   const [status, setStatus] = useState<AuthStatus>('loading');
   const [sessionExpired, setSessionExpired] = useState(false);
   const hadSessionRef = useRef(false);
@@ -39,38 +44,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!hadSessionRef.current) return;
       hadSessionRef.current = false;
       setUser(null);
+      setOrganization(null);
       setStatus('anonymous');
       setSessionExpired(true);
     });
   }, []);
 
-  const checkSession = useCallback((): void => {
-    apiFetch<MeResponse>('/api/auth/me')
+  const checkSession = useCallback((): Promise<void> => {
+    return apiFetch<SessionResponse>('/api/auth/me')
       .then((res) => {
         hadSessionRef.current = true;
         setUser(res.user);
+        setOrganization(res.organization ?? null);
         setStatus('authenticated');
       })
       .catch(() => {
         setUser(null);
+        setOrganization(null);
         setStatus('anonymous');
       });
   }, []);
 
   useEffect(() => {
-    checkSession();
+    void checkSession();
   }, [checkSession]);
 
   const login = useCallback(async (email: string, password: string): Promise<void> => {
-    const res = await apiFetch<{ user: SessionUser }>('/api/auth/login', {
+    const res = await apiFetch<SessionResponse>('/api/auth/login', {
       method: 'POST',
       body: { email, password },
     });
     hadSessionRef.current = true;
     setSessionExpired(false);
     setUser(res.user);
+    setOrganization(res.organization ?? null);
     setStatus('authenticated');
   }, []);
+
+  const signup = useCallback(
+    async (clinicName: string, email: string, password: string): Promise<void> => {
+      const res = await apiFetch<SessionResponse>('/api/auth/signup', {
+        method: 'POST',
+        body: { clinicName, email, password },
+      });
+      hadSessionRef.current = true;
+      setSessionExpired(false);
+      setUser(res.user);
+      setOrganization(res.organization ?? null);
+      setStatus('authenticated');
+    },
+    [],
+  );
 
   const logout = useCallback(async (): Promise<void> => {
     try {
@@ -78,6 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       hadSessionRef.current = false;
       setUser(null);
+      setOrganization(null);
       setStatus('anonymous');
     }
   }, []);
@@ -87,8 +112,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, status, sessionExpired, login, logout, clearSessionExpired }),
-    [user, status, sessionExpired, login, logout, clearSessionExpired],
+    () => ({
+      user,
+      organization,
+      status,
+      sessionExpired,
+      login,
+      signup,
+      logout,
+      refreshSession: checkSession,
+      clearSessionExpired,
+    }),
+    [
+      user,
+      organization,
+      status,
+      sessionExpired,
+      login,
+      signup,
+      logout,
+      checkSession,
+      clearSessionExpired,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

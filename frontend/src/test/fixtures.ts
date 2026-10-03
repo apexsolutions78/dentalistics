@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import type { MemberUser, SessionUser, Settings } from '../lib/types';
+import type { MemberUser, PublicPlan, SessionOrganization, SessionUser, Settings } from '../lib/types';
 
 export function makeUser(overrides: Partial<SessionUser> = {}): SessionUser {
   return {
@@ -9,6 +9,40 @@ export function makeUser(overrides: Partial<SessionUser> = {}): SessionUser {
     organizationId: 1,
     ...overrides,
   };
+}
+
+export function makeOrganization(
+  overrides: Partial<SessionOrganization> = {},
+): SessionOrganization {
+  return {
+    id: 1,
+    name: 'Test Clinic',
+    plan: 'full',
+    trialEndsAt: null,
+    onboardingCompletedAt: '2026-10-01T09:00:00.000Z',
+    ...overrides,
+  };
+}
+
+export function makePlans(): PublicPlan[] {
+  return [
+    {
+      id: 'trial',
+      name: 'Free Plan',
+      headline: '7-day free trial with every feature',
+      priceUsdCents: 0,
+      interval: 'trial',
+      trialDays: 7,
+    },
+    {
+      id: 'full',
+      name: 'Full Plan',
+      headline: 'Everything your clinic needs, $20 per month',
+      priceUsdCents: 2000,
+      interval: 'month',
+      trialDays: null,
+    },
+  ];
 }
 
 export function makeSettings(overrides: Partial<Settings> = {}): Settings {

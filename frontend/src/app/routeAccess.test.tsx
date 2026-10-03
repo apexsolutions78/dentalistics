@@ -3,8 +3,15 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppRouter } from './router';
 import { AuthProvider } from '../lib/auth';
-import type { SessionUser } from '../lib/types';
-import { makeSettings, makeUser, jsonResponse, mockFetch } from '../test/fixtures';
+import type { SessionOrganization, SessionUser } from '../lib/types';
+import {
+  makeSettings,
+  makeUser,
+  makeOrganization,
+  makePlans,
+  jsonResponse,
+  mockFetch,
+} from '../test/fixtures';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -45,15 +52,24 @@ function makeDashboard() {
       failures: { failed: 0, failedRate: null },
     },
     definitions: { metrics: {}, planMetrics: {} },
+    trends: { daily: [] },
   };
 }
 
-function routeFor(user: SessionUser | null) {
+function routeFor(user: SessionUser | null, organization?: SessionOrganization | null) {
   return (url: string): Response => {
     if (url.includes('/api/auth/me')) {
       return user === null
         ? jsonResponse(401, { error: { code: 'unauthorized', message: 'Sign in required' } })
-        : jsonResponse(200, { user });
+        : jsonResponse(200, {
+            user,
+            organization:
+              organization ??
+              (user.organizationId === null ? null : makeOrganization()),
+          });
+    }
+    if (url.includes('/api/public/plans')) {
+      return jsonResponse(200, { plans: makePlans() });
     }
     if (url.includes('/receptionist/workspace')) {
       return jsonResponse(200, makeWorkspace());
@@ -71,8 +87,12 @@ function routeFor(user: SessionUser | null) {
   };
 }
 
-async function renderAt(path: string, user: SessionUser | null): Promise<void> {
-  mockFetch(routeFor(user));
+async function renderAt(
+  path: string,
+  user: SessionUser | null,
+  organization?: SessionOrganization | null,
+): Promise<void> {
+  mockFetch(routeFor(user, organization));
   render(
     <MemoryRouter initialEntries={[path]}>
       <AuthProvider>
@@ -114,6 +134,30 @@ describe('route access', () => {
   it('sends anonymous visitors to the login page', async () => {
     await renderAt('/settings', null);
     expect(await screen.findByText('Sign in to your clinic account')).toBeInTheDocument();
+  });
+
+  it('shows the public pricing page to anonymous visitors at "/"', async () => {
+    await renderAt('/', null);
+    expect(await screen.findByRole('heading', { name: 'Run your dental clinic from one place' })).toBeInTheDocument();
+    expect(await screen.findByText('Free Plan')).toBeInTheDocument();
+    expect(await screen.findByText('Full Plan')).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: /Start free trial/i }).length).toBeGreaterThan(0);
+  });
+
+  it('sends a clinic with unfinished onboarding to the setup wizard', async () => {
+    await renderAt(
+      '/dashboard',
+      makeUser({ role: 'owner' }),
+      makeOrganization({ onboardingCompletedAt: null }),
+    );
+    expect(await screen.findByRole('heading', { name: 'Set up your clinic' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Dashboard' })).not.toBeInTheDocument();
+  });
+
+  it('keeps a clinic with completed onboarding on the dashboard', async () => {
+    await renderAt('/dashboard', makeUser({ role: 'owner' }), makeOrganization());
+    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Set up your clinic' })).not.toBeInTheDocument();
   });
 
   it('shows the not-found page for unknown routes', async () => {

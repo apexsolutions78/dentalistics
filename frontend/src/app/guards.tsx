@@ -50,3 +50,11 @@ export function RequireClinic() {
   }
   return <Outlet />;
 }
+
+export function RequireOnboarding() {
+  const { organization } = useAuth();
+  if (organization !== null && organization.onboardingCompletedAt === null) {
+    return <Navigate to="/onboarding" replace />;
+  }
+  return <Outlet />;
+}

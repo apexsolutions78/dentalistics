@@ -54,6 +54,35 @@ function userDto(user: SessionUser): Record<string, unknown> {
   };
 }
 
+interface OrgSummaryRow extends RowDataPacket {
+  id: number;
+  name: string;
+  plan: 'trial' | 'full';
+  trial_ends_at: Date | null;
+  onboarding_completed_at: Date | null;
+}
+
+async function loadSessionOrganization(
+  db: Pool,
+  organizationId: number,
+): Promise<Record<string, unknown> | null> {
+  const [rows] = await db.query<OrgSummaryRow[]>(
+    'SELECT id, name, plan, trial_ends_at, onboarding_completed_at FROM organizations WHERE id = ?',
+    [organizationId],
+  );
+  const row = rows[0];
+  if (row === undefined) {
+    return null;
+  }
+  return {
+    id: row.id,
+    name: row.name,
+    plan: row.plan,
+    trialEndsAt: row.trial_ends_at,
+    onboardingCompletedAt: row.onboarding_completed_at,
+  };
+}
+
 export function createAuthRouter(deps: AuthRouterDeps): Router {
   const router = Router();
 
@@ -134,7 +163,11 @@ export function createAuthRouter(deps: AuthRouterDeps): Router {
       'Set-Cookie',
       buildSessionCookie(session.token, deps.secureCookies, SESSION_TTL_HOURS * 60 * 60),
     );
-    res.status(200).json({ user: userDto(user) });
+    const organization =
+      row.organization_id === null
+        ? null
+        : await loadSessionOrganization(deps.db, row.organization_id);
+    res.status(200).json({ user: userDto(user), organization });
   });
 
   router.post('/signup', async (req: Request, res: Response) => {
@@ -198,9 +231,10 @@ export function createAuthRouter(deps: AuthRouterDeps): Router {
       'Set-Cookie',
       buildSessionCookie(session.token, deps.secureCookies, SESSION_TTL_HOURS * 60 * 60),
     );
+    const organization = await loadSessionOrganization(deps.db, organizationId);
     res.status(201).json({
       user: { id: userId, email, role: 'owner', organizationId },
-      organization: { id: organizationId, name: clinicName, plan: 'trial', trialDays: TRIAL_DAYS },
+      organization,
     });
   });
 
@@ -219,8 +253,13 @@ export function createAuthRouter(deps: AuthRouterDeps): Router {
     res.status(200).json({ ok: true });
   });
 
-  router.get('/me', requireAuth, (req: Request, res: Response) => {
-    res.status(200).json({ user: userDto(req.user as SessionUser) });
+  router.get('/me', requireAuth, async (req: Request, res: Response) => {
+    const user = req.user as SessionUser;
+    const organization =
+      user.organizationId === null
+        ? null
+        : await loadSessionOrganization(deps.db, user.organizationId);
+    res.status(200).json({ user: userDto(user), organization });
   });
 
   router.post('/password', requireAuth, async (req: Request, res: Response) => {

@@ -822,3 +822,111 @@ button:focus-visible,
   font-size: var(--fs-caption);
   color: var(--color-text-secondary);
 }
+
+/* ---------- public marketing ---------- */
+
+.marketing-page {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg);
+}
+
+.marketing-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.marketing-nav {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.marketing-hero {
+  text-align: center;
+  padding: var(--space-6) var(--space-4);
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.marketing-hero h1 {
+  font-size: var(--fs-page-title);
+  margin-bottom: var(--space-3);
+}
+
+.marketing-hero .sub {
+  color: var(--color-text-secondary);
+  font-size: var(--fs-label);
+  margin-bottom: var(--space-4);
+}
+
+.marketing-pricing {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0 var(--space-4) var(--space-6);
+  text-align: center;
+  width: 100%;
+}
+
+.marketing-pricing h2 {
+  margin-bottom: var(--space-4);
+}
+
+.marketing-plans {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.marketing-plan {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  text-align: left;
+}
+
+.marketing-price {
+  font-size: var(--fs-page-title);
+  font-weight: 700;
+}
+
+.marketing-price span {
+  font-size: var(--fs-label);
+  font-weight: 400;
+  color: var(--color-text-secondary);
+}
+
+.marketing-footer {
+  margin-top: auto;
+  display: flex;
+  justify-content: space-between;
+  padding: var(--space-4) var(--space-5);
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: var(--fs-label);
+}
+
+/* ---------- onboarding wizard ---------- */
+
+.onboarding-card {
+  width: min(560px, 100%);
+}
+
+.onboarding-review {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: var(--space-2) var(--space-3);
+  margin: var(--space-3) 0 0;
+}
+
+.onboarding-review dt {
+  color: var(--color-text-secondary);
+  font-size: var(--fs-label);
+}
+
+.onboarding-review dd {
+  margin: 0;
+}

@@ -140,13 +140,16 @@ describe.skipIf(testHost === undefined || testHost === '')(
       expect(res.body.user.role).toBe('owner');
       expect(res.body.user.email).toBe(signupEmail);
       expect(typeof res.body.user.organizationId).toBe('number');
-      expect(res.body.organization).toMatchObject({ plan: 'trial', trialDays: 7 });
+      expect(res.body.organization).toMatchObject({ plan: 'trial', onboardingCompletedAt: null });
+      expect(res.body.organization.trialEndsAt).not.toBeNull();
       expect(res.headers['set-cookie']).toBeDefined();
 
       const sid = sidFrom(res);
       const me = await request(app).get('/api/auth/me').set('Cookie', `sid=${sid}`);
       expect(me.status).toBe(200);
       expect(me.body.user.organizationId).toBe(res.body.user.organizationId);
+      expect(me.body.organization.onboardingCompletedAt).toBeNull();
+      expect(me.body.organization.plan).toBe('trial');
 
       const [orgRows] = await pool.query<mysql.RowDataPacket[]>(
         `SELECT plan, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), trial_ends_at) AS trial_secs

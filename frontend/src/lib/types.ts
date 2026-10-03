@@ -7,6 +7,23 @@ export interface SessionUser {
   organizationId: number | null;
 }
 
+export interface SessionOrganization {
+  id: number;
+  name: string;
+  plan: 'trial' | 'full';
+  trialEndsAt: string | null;
+  onboardingCompletedAt: string | null;
+}
+
+export interface PublicPlan {
+  id: 'trial' | 'full';
+  name: string;
+  headline: string;
+  priceUsdCents: number;
+  interval: 'trial' | 'month';
+  trialDays: number | null;
+}
+
 export type ConfigSource = 'org' | 'deployment' | 'default';
 
 export interface BusinessDay {

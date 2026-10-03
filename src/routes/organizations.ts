@@ -26,6 +26,9 @@ interface OrganizationRow extends RowDataPacket {
   review_url: string | null;
   created_at: Date;
   site_key: string | null;
+  plan: 'trial' | 'full';
+  trial_ends_at: Date | null;
+  onboarding_completed_at: Date | null;
 }
 
 interface UserListRow extends RowDataPacket {
@@ -54,9 +57,14 @@ async function loadOrganization(
   reviewUrl: string | null;
   createdAt: Date;
   siteKey: string;
+  plan: 'trial' | 'full';
+  trialEndsAt: Date | null;
+  onboardingCompletedAt: Date | null;
 }> {
   const [rows] = await db.query<OrganizationRow[]>(
-    'SELECT id, name, status, timezone, review_url, created_at, site_key FROM organizations WHERE id = ?',
+    `SELECT id, name, status, timezone, review_url, created_at, site_key,
+            plan, trial_ends_at, onboarding_completed_at
+     FROM organizations WHERE id = ?`,
     [organizationId],
   );
   const row = rows[0];
@@ -84,6 +92,9 @@ async function loadOrganization(
     reviewUrl: row.review_url,
     createdAt: row.created_at,
     siteKey,
+    plan: row.plan,
+    trialEndsAt: row.trial_ends_at,
+    onboardingCompletedAt: row.onboarding_completed_at,
   };
 }
 
@@ -96,6 +107,9 @@ function organizationDto(org: Awaited<ReturnType<typeof loadOrganization>>): Rec
     reviewUrl: org.reviewUrl,
     createdAt: org.createdAt,
     siteKey: org.siteKey,
+    plan: org.plan,
+    trialEndsAt: org.trialEndsAt,
+    onboardingCompletedAt: org.onboardingCompletedAt,
   };
 }
 
@@ -143,6 +157,26 @@ export function createOrganizationsRouter(deps: OrganizationsRouterDeps): Router
       throw new AppError('Organization not found', 404, 'not_found', true);
     }
     deps.logger.info('organization settings updated', { organizationId, fields: provided });
+    const org = await loadOrganization(deps.db, organizationId);
+    res.status(200).json({ organization: organizationDto(org) });
+  });
+
+  router.post('/:orgId/onboarding/complete', async (req: Request, res: Response) => {
+    const organizationId = parsePathId(req.params.orgId ?? '');
+    const actor = req.user as SessionUser;
+    assertCanManageMembers(actor, organizationId);
+    const [result] = await deps.db.query(
+      'UPDATE organizations SET onboarding_completed_at = UTC_TIMESTAMP() WHERE id = ? AND onboarding_completed_at IS NULL',
+      [organizationId],
+    );
+    if ((result as { affectedRows: number }).affectedRows > 0) {
+      await recordAudit(deps.db, deps.logger, {
+        organizationId,
+        userId: actor.id,
+        action: 'onboarding_completed',
+      });
+      deps.logger.info('onboarding completed', { organizationId });
+    }
     const org = await loadOrganization(deps.db, organizationId);
     res.status(200).json({ organization: organizationDto(org) });
   });

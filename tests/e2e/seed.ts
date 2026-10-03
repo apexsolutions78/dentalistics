@@ -66,7 +66,8 @@ export async function seedE2E(pool: Pool): Promise<E2EIds> {
   }
 
   const [orgResult] = await pool.query(
-    'INSERT INTO organizations (name, status, site_key) VALUES (?, \'active\', SHA2(CONCAT(UUID(), UUID()), 256))',
+    `INSERT INTO organizations (name, status, onboarding_completed_at, site_key)
+     VALUES (?, 'active', UTC_TIMESTAMP(), SHA2(CONCAT(UUID(), UUID()), 256))`,
     [E2E_ORG_NAME],
   );
   const orgId = Number((orgResult as ResultSetHeader).insertId);
