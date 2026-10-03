@@ -94,6 +94,23 @@ describe('route access', () => {
     expect(await screen.findByText('Access denied')).toBeInTheDocument();
   });
 
+  it('shows a no-clinic message on the dashboard for an account without a clinic', async () => {
+    await renderAt('/dashboard', makeUser({ role: 'admin', email: 'admin@example.com', organizationId: null }));
+    expect(
+      await screen.findByRole('heading', { name: 'No clinic linked to this account' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.queryByText('Access denied')).not.toBeInTheDocument();
+  });
+
+  it('shows the no-clinic message on settings for an account without a clinic', async () => {
+    await renderAt('/settings', makeUser({ role: 'admin', email: 'admin@example.com', organizationId: null }));
+    expect(
+      await screen.findByRole('heading', { name: 'No clinic linked to this account' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Settings' })).not.toBeInTheDocument();
+  });
+
   it('sends anonymous visitors to the login page', async () => {
     await renderAt('/settings', null);
     expect(await screen.findByText('Sign in to your clinic account')).toBeInTheDocument();

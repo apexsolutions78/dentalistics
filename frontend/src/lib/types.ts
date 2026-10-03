@@ -4,7 +4,7 @@ export interface SessionUser {
   id: number;
   email: string;
   role: Role;
-  organizationId: number;
+  organizationId: number | null;
 }
 
 export type ConfigSource = 'org' | 'deployment' | 'default';

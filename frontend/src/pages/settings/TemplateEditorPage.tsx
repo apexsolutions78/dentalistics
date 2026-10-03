@@ -73,7 +73,7 @@ export function TemplateEditorPage() {
   };
 
   const runPreview = async (): Promise<PreviewResult | null> => {
-    if (user === null) return null;
+    if (user === null || user.organizationId === null) return null;
     setPreviewBusy(true);
     setPreviewErrors((prev) => ({ ...prev, [name]: null }));
     try {
