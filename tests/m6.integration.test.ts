@@ -350,7 +350,7 @@ describe.skipIf(testHost === undefined || testHost === '')(
       await pool.query('DELETE FROM app_meta WHERE meta_key = ?', [ACK_CONFIG_META_KEY]);
     });
 
-    it('acknowledges staff-created website leads but not manual leads (source filter)', async () => {
+    it('acknowledges staff-created website and manual leads but not missed-call leads (source filter)', async () => {
       const manual = await request(app)
         .post(`/api/organizations/${orgAId}/leads`)
         .set('Cookie', ownerCookie)
@@ -362,10 +362,26 @@ describe.skipIf(testHost === undefined || testHost === '')(
         });
       expect(manual.status).toBe(201);
       const manualLeadId = manual.body.lead.id;
-      expect(await ackRows(manualLeadId)).toHaveLength(0);
+      const manualRows = await ackRows(manualLeadId);
+      expect(manualRows).toHaveLength(1);
+      expect(manualRows[0]?.status).toBe('SENT');
+      expect(manualRows[0]?.body).toContain('Walk');
+
+      const missed = await request(app)
+        .post(`/api/organizations/${orgAId}/leads`)
+        .set('Cookie', ownerCookie)
+        .send({
+          firstName: 'Missed',
+          lastName: 'Caller',
+          phone: '15550202006',
+          source: 'MISSED_CALL',
+        });
+      expect(missed.status).toBe(201);
+      const missedLeadId = missed.body.lead.id;
+      expect(await ackRows(missedLeadId)).toHaveLength(0);
       const skipped = logger.entries.filter((e) => e.message === 'lead automation skipped');
       expect(skipped[skipped.length - 1]?.fields).toMatchObject({
-        leadId: manualLeadId,
+        leadId: missedLeadId,
         reason: 'source_not_configured',
       });
 

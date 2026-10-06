@@ -33,6 +33,7 @@ export function LeadDetailPage() {
   const [statusDraft, setStatusDraft] = useState<string | null>(null);
   const [notesDraft, setNotesDraft] = useState<string | null>(null);
   const canEditNotes = can(user, 'leads.notes.edit');
+  const canCreatePatient = can(user, 'patients.create');
 
   const saveStatus = async (): Promise<void> => {
     if (orgId === null || leadId === undefined || statusDraft === null || data === null) return;
@@ -172,7 +173,29 @@ export function LeadDetailPage() {
           >
             View messages
           </Link>
+          {canCreatePatient ? (
+            <Link
+              className="btn btn-secondary"
+              to={`/patients?new=1&leadId=${lead.id}&firstName=${encodeURIComponent(lead.firstName)}&lastName=${encodeURIComponent(lead.lastName)}&phone=${encodeURIComponent(lead.phone)}${
+                lead.email !== null && lead.email !== ''
+                  ? `&email=${encodeURIComponent(lead.email)}`
+                  : ''
+              }`}
+            >
+              Convert to patient
+            </Link>
+          ) : null}
         </div>
+        <p
+          style={{
+            margin: '8px 0 0',
+            color: 'var(--color-text-secondary)',
+            fontSize: 'var(--fs-label)',
+          }}
+        >
+          Next steps: contact the lead → Convert to patient → Book appointment (the status moves to
+          Appointment booked automatically).
+        </p>
       </section>
 
       {canEditNotes ? (

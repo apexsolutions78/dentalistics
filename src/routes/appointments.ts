@@ -19,6 +19,7 @@ import { readJsonBody } from '../http/body';
 import type { Logger } from '../logger';
 import { requireAuth } from '../middleware/auth';
 import { assertCanManageMembers, assertOrgExists } from '../middleware/tenant';
+import { markLeadAppointmentBooked } from '../services/leads';
 import {
   cancelAppointment,
   completeAppointment,
@@ -50,6 +51,32 @@ function requireAppointment(
 function appointmentIdOf(result: Record<string, unknown>): number {
   const appt = result.appointment as { id: number } | undefined;
   return appt?.id ?? 0;
+}
+
+function appointmentLeadIdOf(result: Record<string, unknown>): number | null {
+  const appt = result.appointment as { leadId?: number | null } | undefined;
+  return appt?.leadId ?? null;
+}
+
+async function safeMarkLeadBooked(
+  db: Pool,
+  logger: Logger,
+  organizationId: number,
+  leadId: number | null,
+  actorId: number,
+): Promise<void> {
+  if (leadId === null) {
+    return;
+  }
+  try {
+    await markLeadAppointmentBooked(db, logger, { organizationId, leadId, actorId });
+  } catch (err) {
+    logger.error('lead appointment status update failed', {
+      leadId,
+      organizationId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
 }
 
 async function safeScheduleReminders(
@@ -227,6 +254,13 @@ export function createAppointmentsRouter(deps: AppointmentsRouterDeps): Router {
     });
     await safeScheduleReminders(deps.db, deps.logger, appointmentIdOf(created));
     await safeCloseRecallOnBooking(deps.db, deps.logger, appointmentIdOf(created));
+    await safeMarkLeadBooked(
+      deps.db,
+      deps.logger,
+      organizationId,
+      appointmentLeadIdOf(created),
+      actor.id,
+    );
     res.status(201).json(created);
   });
 

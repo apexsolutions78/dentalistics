@@ -169,6 +169,58 @@ export async function recordLeadActivity(
   await writeActivity(db, logger, leadId, actorId, action, detail);
 }
 
+const BOOKING_CLOSED_STATUSES = ['LOST', 'CLOSED'] as const;
+
+export interface MarkLeadAppointmentBookedInput {
+  organizationId: number;
+  leadId: number;
+  actorId: number;
+}
+
+export async function markLeadAppointmentBooked(
+  db: Pool,
+  logger: Logger,
+  input: MarkLeadAppointmentBookedInput,
+): Promise<boolean> {
+  const [rows] = await db.query<LeadRow[]>(
+    'SELECT id, status FROM leads WHERE id = ? AND organization_id = ?',
+    [input.leadId, input.organizationId],
+  );
+  const lead = rows[0];
+  if (lead === undefined) {
+    return false;
+  }
+  if (
+    lead.status === 'APPOINTMENT_BOOKED' ||
+    (BOOKING_CLOSED_STATUSES as readonly string[]).includes(lead.status)
+  ) {
+    return false;
+  }
+  const previous = lead.status;
+  const [result] = await db.query(
+    `UPDATE leads SET status = 'APPOINTMENT_BOOKED', last_activity_at = UTC_TIMESTAMP()
+     WHERE id = ? AND organization_id = ? AND status = ?`,
+    [input.leadId, input.organizationId, previous],
+  );
+  if ((result as { affectedRows: number }).affectedRows === 0) {
+    return false;
+  }
+  await writeActivity(
+    db,
+    logger,
+    input.leadId,
+    input.actorId,
+    'status_changed',
+    `status: ${previous} -> APPOINTMENT_BOOKED (appointment booked)`,
+  );
+  logger.info('lead marked appointment booked', {
+    leadId: input.leadId,
+    organizationId: input.organizationId,
+    previousStatus: previous,
+  });
+  return true;
+}
+
 export interface CreateLeadInput {
   organizationId: number;
   actorId: number;

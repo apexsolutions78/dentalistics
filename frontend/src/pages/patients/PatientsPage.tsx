@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../lib/auth';
 import { can } from '../../lib/capabilities';
 import { useApi } from '../../lib/useApi';
@@ -15,6 +15,28 @@ import { ErrorState, LoadingState, EmptyState, StatusBadge } from '../../compone
 
 const PAGE_SIZE = 20;
 
+interface PatientForm {
+  firstName: string;
+  lastName: string;
+  phone: string;
+  email: string;
+}
+
+function prefillFrom(params: URLSearchParams): PatientForm {
+  return {
+    firstName: params.get('firstName') ?? '',
+    lastName: params.get('lastName') ?? '',
+    phone: params.get('phone') ?? '',
+    email: params.get('email') ?? '',
+  };
+}
+
+function hasPrefill(form: PatientForm): boolean {
+  return (
+    form.firstName !== '' || form.lastName !== '' || form.phone !== '' || form.email !== ''
+  );
+}
+
 export function PatientsPage() {
   const { user } = useAuth();
   const orgId = user?.organizationId ?? null;
@@ -22,7 +44,10 @@ export function PatientsPage() {
   const [draft, setDraft] = useState('');
   const [query, setQuery] = useState('');
   const [offset, setOffset] = useState(0);
-  const [adding, setAdding] = useState(false);
+  const [searchParams] = useSearchParams();
+  const paramsKey = searchParams.toString();
+  const [syncedKey, setSyncedKey] = useState(paramsKey);
+  const [adding, setAdding] = useState(() => searchParams.get('new') === '1');
 
   const path = useMemo(() => {
     if (orgId === null) return null;
@@ -34,7 +59,18 @@ export function PatientsPage() {
   const { status, data, error, reload } = useApi<Paged & { patients: Patient[] }>(path);
   const { submit, saving, error: formError, clearFeedback, setError } = useSubmit();
   const [flash, setFlash] = useState<string | null>(null);
-  const [form, setForm] = useState({ firstName: '', lastName: '', phone: '', email: '' });
+  const [form, setForm] = useState<PatientForm>(() => prefillFrom(searchParams));
+
+  if (syncedKey !== paramsKey) {
+    setSyncedKey(paramsKey);
+    if (searchParams.get('new') === '1') {
+      setAdding(true);
+    }
+    const next = prefillFrom(searchParams);
+    if (hasPrefill(next)) {
+      setForm(next);
+    }
+  }
 
   const createPatient = async (): Promise<void> => {
     if (orgId === null) return;
@@ -54,7 +90,12 @@ export function PatientsPage() {
     });
     if (ok !== null) {
       setForm({ firstName: '', lastName: '', phone: '', email: '' });
-      setFlash('Patient added.');
+      const leadId = searchParams.get('leadId');
+      setFlash(
+        leadId !== null && leadId !== ''
+          ? 'Patient added. Open the lead to book the appointment.'
+          : 'Patient added.',
+      );
       reload();
     }
   };
@@ -81,7 +122,7 @@ export function PatientsPage() {
         }
       />
 
-      {adding ? (
+      {adding && canCreate ? (
         <section className="card">
           <h2 className="card-title">Add a patient</h2>
           {flash ? <Flash kind="success" message={flash} onDismiss={() => setFlash(null)} /> : null}

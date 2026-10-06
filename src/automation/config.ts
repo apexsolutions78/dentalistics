@@ -16,7 +16,7 @@ export const DEFAULT_ACK_CONFIG: AckAutomationConfig = {
   enabled: true,
   channel: 'SMS',
   provider: 'mock',
-  sources: ['WEBSITE'],
+  sources: ['WEBSITE', 'MANUAL', 'OTHER'],
   template: DEFAULT_LEAD_ACK_TEMPLATE,
 };
 

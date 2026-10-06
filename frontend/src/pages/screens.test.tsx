@@ -4,6 +4,8 @@ import type { ReactElement } from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from '../lib/auth';
 import { LeadsPage } from './leads/LeadsPage';
+import { LeadDetailPage } from './leads/LeadDetailPage';
+import { PatientsPage } from './patients/PatientsPage';
 import { RecallPage } from './recall/RecallPage';
 import { CommunicationsPage } from './communications/CommunicationsPage';
 import { AppointmentDetailPage } from './appointments/AppointmentDetailPage';
@@ -246,5 +248,64 @@ describe('DashboardPage', () => {
     renderPage(<DashboardPage />, '/dashboard');
     expect(await screen.findByText('Forbidden')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+  });
+});
+
+describe('LeadDetailPage workflow actions', () => {
+  const leadDetail = {
+    lead: leadRow,
+    notes: null,
+    activity: [],
+    communicationHistory: [],
+    appointments: [],
+  };
+
+  it('offers Convert to patient with the lead details prefilled', async () => {
+    stub(jsonIf('/leads/7', leadDetail), makeUser({ role: 'owner' }));
+    renderPage(<LeadDetailPage />, '/leads/7');
+    const link = await screen.findByRole('link', { name: 'Convert to patient' });
+    expect(link).toHaveAttribute(
+      'href',
+      '/patients?new=1&leadId=7&firstName=Sara&lastName=Halim&phone=%2B15550300001',
+    );
+    expect(screen.getByText(/Next steps: contact the lead/)).toBeInTheDocument();
+  });
+
+  it('keeps Convert to patient away from receptionists', async () => {
+    stub(
+      jsonIf('/leads/7', leadDetail),
+      makeUser({ role: 'receptionist', email: 'desk@example.com' }),
+    );
+    renderPage(<LeadDetailPage />, '/leads/7');
+    await screen.findByRole('link', { name: 'Book appointment' });
+    expect(screen.queryByRole('link', { name: 'Convert to patient' })).not.toBeInTheDocument();
+  });
+});
+
+describe('PatientsPage lead conversion', () => {
+  it('opens the add-patient form prefilled from the lead', async () => {
+    stub(
+      jsonIf('/patients?', { patients: [], total: 0, limit: 20, offset: 0 }),
+      makeUser({ role: 'owner' }),
+    );
+    renderPage(
+      <PatientsPage />,
+      '/patients?new=1&leadId=7&firstName=Sara&lastName=Halim&phone=%2B15550300001&email=sara%40example.com',
+    );
+    expect(await screen.findByText('Add a patient')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Sara')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Halim')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('+15550300001')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('sara@example.com')).toBeInTheDocument();
+  });
+
+  it('keeps the add-patient form closed for a receptionist', async () => {
+    stub(
+      jsonIf('/patients?', { patients: [], total: 0, limit: 20, offset: 0 }),
+      makeUser({ role: 'receptionist', email: 'desk@example.com' }),
+    );
+    renderPage(<PatientsPage />, '/patients?new=1&firstName=Sara');
+    await screen.findByText('All patients');
+    expect(screen.queryByText('Add a patient')).not.toBeInTheDocument();
   });
 });
