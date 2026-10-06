@@ -5149,12 +5149,12 @@ form (the section and its button are both capability-gated).
   started it and `docker start dentalistics-mysql` (healthy) before the
   DB suites; `TEST_DB_HOST=127.0.0.1` used for the isolated runs.
 
-**Not done / NOT VERIFIED:** nothing committed or pushed (Rule: commit
-only when explicitly asked); nothing deployed (Rule 11); no
+**Not done / NOT VERIFIED:** nothing deployed (Rule 11); no
 reconciliation/merge of duplicate leads; no automated browser E2E for
 the new two-step convert-and-book path (covered by component tests, not
 Playwright); no API response for "what happened to the lead" beyond the
-lead-detail activity row.
+lead-detail activity row. (Originally nothing was committed either -
+that changed later in this session, see "Saved and pushed" below.)
 
 **Owner statement recorded after the report (verbatim, recorded as
 decision D11 in PROJECT_STATE §6):** "What the reall intention on the
@@ -5172,6 +5172,44 @@ conformance audit is PROPOSED awaiting instruction (Rule 1).
 
 **Open questions for the owner:** (1) accept MISSED_CALL staying out of
 the default ack sources, or add it and accept two texts? (2) confirm
-the LOST/CLOSED not-reopened choice; (3) when to commit/push and when
-to deploy this increment; (4) run the D11 automation-conformance audit
-(automate / manual-fallback / auto-resume walk-through of every flow)?
+the LOST/CLOSED not-reopened choice; (3) run the D11
+automation-conformance audit (automate / manual-fallback / auto-resume
+walk-through of every flow)?
+
+**Saved and pushed (this session, end state):**
+
+- Docs commit `a739f65` - "docs: Session 38 / rev 67-68 - lead workflow
+  increment and D11 automation intent" (SESSION_LOG.md +
+  PROJECT_STATE.md).
+- Code commit `867ceb0` - "Lead workflow: booking marks lead
+  APPOINTMENT_BOOKED, Convert-to-patient button, broader lead
+  acknowledgement sources" (8 files: `src/automation/config.ts`,
+  `src/routes/appointments.ts`, `src/services/leads.ts`,
+  `LeadDetailPage.tsx`, `PatientsPage.tsx`, `screens.test.tsx`,
+  `tests/m6.integration.test.ts`, new `tests/leadBooking.integration.test.ts`).
+  Owner instruction verbatim: "if they are 100% working then go ahead
+  and push them too" - so the code was re-verified with a fresh full
+  run before committing: `npm run verify` = lint 0 + typecheck 0 +
+  **366/366 tests (35 files, live MySQL)** + build 0, and
+  `npm run verify:frontend` = eslint 0 + **119/119 tests (21 files)** +
+  `tsc -b` + vite build 0. MATCH=OK after push (local = remote
+  `867ceb0`).
+- Not staged: `AGENTS.md` (pre-existing untracked file, unrelated to
+  this increment).
+
+**What is left (durable, for the next session):**
+
+1. Deploy `867ceb0`/`a739f65` to `dentalistics.apexsol.pk` - NOT done,
+   needs explicit owner instruction (Rule 11).
+2. D11 conformance audit - PROPOSED, not started (Rule 1): walk every
+   automation end-to-end against "automate -> manual fallback ->
+   auto-resume".
+3. Owner decisions outstanding: MISSED_CALL excluded from default ack
+   sources; `LOST`/`CLOSED` not reopened by a booking; USD display for
+   the $20 plan; S1f active-trial "days left" banner (Rule 1).
+4. Known gaps in this increment: no Playwright E2E for the
+   convert-then-book path; no duplicate-lead merge/reconciliation; lead
+   activity shows the status change but no dedicated "conversion"
+   API response.
+5. Deferred by owner/plan: payment gateway (S1), S1f banner, and the
+   broader backlog recorded in earlier sessions.
