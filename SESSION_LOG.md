@@ -5066,3 +5066,112 @@ finishes onboarding before day 9 lands on the dashboard read-only
 `dentalistics.apexsol.pk`; (2) confirm USD display for the $20 monthly
 subscription; (3) optional S1f "X days left" banner - PROPOSED, awaiting
 instruction (Rule 1).
+
+---
+
+## Session 38 - Lead workflow: booking marks the lead booked, Convert-to-patient, lead acknowledgement sources
+
+**Owner instruction this session:** "yes" - approving the three PROPOSED
+lead-workflow fixes put forward at the end of the previous session:
+(a) booking an appointment moves the lead to `APPOINTMENT_BOOKED`,
+(b) a "Convert to patient" button on the lead detail page,
+(c) broadening which lead sources receive the acknowledgement message.
+
+**Implementation (CONFIRMED by tests):**
+
+- `src/services/leads.ts` - new exported
+  `markLeadAppointmentBooked(db, logger, { leadId, organizationId,
+  appointmentId, actorUserId })`. Statuses `LOST`/`CLOSED` are skipped
+  (already-decided leads are not reopened by a booking); the write is a
+  guarded UPDATE (`AND status <> 'APPOINTMENT_BOOKED'`) so re-booking
+  does not double-write, and it appends a `status_changed` activity
+  (`NEW -> APPOINTMENT_BOOKED (appointment booked)`). Lives in the leads
+  service because `leads.ts` already imports `appointmentsForLead` from
+  `appointments.ts` - calling it from `appointments.ts` would have
+  created a require cycle, so the route layer does the call.
+- `src/routes/appointments.ts` - `POST /:orgId/appointments` calls
+  `safeMarkLeadBooked(...)` (never-throw, logged, same pattern as the
+  existing `safeCloseRecallOnBooking`) after reminder scheduling, using
+  the `leadId` the client sent.
+- `src/automation/config.ts` - `DEFAULT_ACK_CONFIG.sources` changed from
+  `['WEBSITE']` to `['WEBSITE', 'MANUAL', 'OTHER']`.
+- `frontend/src/pages/leads/LeadDetailPage.tsx` - "Convert to patient"
+  link (capability `patients.create`) to
+  `/patients?new=1&leadId=..&firstName=..&lastName=..&phone=..&email=..`
+  plus a "Next steps:" hint under the booking action.
+- `frontend/src/pages/patients/PatientsPage.tsx` - reads the query
+  params, opens the Add-patient form prefilled, and flashes
+  "Patient added. Open the lead to book the appointment." when a
+  `leadId` param was supplied (mirrors the AppointmentsPage `?new=1`
+  pattern).
+
+**Decisions taken (PROPOSED -> applied, subject to owner correction):**
+
+- **MISSED_CALL is NOT in the default acknowledgement sources.**
+  `src/automation/missedCall.ts` already sends its own
+  `missed_call_response`, so including MISSED_CALL in the generic lead
+  ack would double-text a missed caller. Clinics can still add it under
+  Settings -> Automation (the UI already accepts a comma-separated
+  source list).
+- **`LOST`/`CLOSED` leads are not reopened by a booking.** Reported as
+  a deliberate choice rather than a limitation.
+- `tests/m6.integration.test.ts` - the source-filter test was
+  **rewritten, not weakened**: it now asserts that a MANUAL staff-created
+  lead gets exactly 1 acknowledgement and a new MISSED_CALL lead gets 0
+  (with `source_not_configured` in the skip log). This is a deliberate
+  behavior change from "website leads only", disclosed under Rule 8.
+
+**Defect found and fixed during testing (root cause, not symptom):**
+
+The PatientsPage test failed - the prefilled form never opened. Cause:
+`useState(() => canCreate && searchParams.get('new') === '1')` ran on
+the first render, while the AuthProvider had not yet resolved the
+session user, so `canCreate` was `false` and the state latched closed.
+This would also have broken a hard refresh on the direct link, not just
+the test. Fix: `adding` is initialized from the URL alone, the render
+guard became `{adding && canCreate ? ...}`, and the render-phase sync
+dropped the `canCreate` condition. Receptionists still cannot see the
+form (the section and its button are both capability-gated).
+
+**Tests actually executed (all exit 0):**
+
+- `npm run verify` = lint 0 + typecheck 0 + **366/366 tests (35 files)**
+  + production build 0.
+- `npm run verify:frontend` = eslint 0 + **119/119 tests (21 files, +4 in
+  `screens.test.tsx`)** + `tsc -b` + vite build 0.
+- Isolated re-runs against the live MySQL container:
+  `tests/leadBooking.integration.test.ts` **4/4** (NEW lead ->
+  `APPOINTMENT_BOOKED` + one `status_changed` row; re-booking does not
+  duplicate the activity; LOST/CLOSED untouched; no lead attached ->
+  no lead touched), `tests/m6.integration.test.ts` **11/11** (rewritten
+  source-filter test passes against the real DB).
+- Environment: Docker Desktop was not running at session start -
+  started it and `docker start dentalistics-mysql` (healthy) before the
+  DB suites; `TEST_DB_HOST=127.0.0.1` used for the isolated runs.
+
+**Not done / NOT VERIFIED:** nothing committed or pushed (Rule: commit
+only when explicitly asked); nothing deployed (Rule 11); no
+reconciliation/merge of duplicate leads; no automated browser E2E for
+the new two-step convert-and-book path (covered by component tests, not
+Playwright); no API response for "what happened to the lead" beyond the
+lead-detail activity row.
+
+**Owner statement recorded after the report (verbatim, recorded as
+decision D11 in PROJECT_STATE §6):** "What the reall intention on the
+first place was to get everything automated but if in case there is
+something that cannot be adjusted then the manual process of a
+particular task comes in. When that particular task is completed, the
+automated process takes over again and keeps working." - i.e. the
+governing acceptance test for every task is: automate it; if it cannot
+be automated, expose a manual path; once the manual action finishes,
+automation must resume unattended. No code change was made in response
+(yet); the statement is recorded, the existing pause->manual->resume
+hooks were re-inspected as evidence (appointments route wiring, config
+re-read per tick, retry endpoints, lazy backstops), and a full D11
+conformance audit is PROPOSED awaiting instruction (Rule 1).
+
+**Open questions for the owner:** (1) accept MISSED_CALL staying out of
+the default ack sources, or add it and accept two texts? (2) confirm
+the LOST/CLOSED not-reopened choice; (3) when to commit/push and when
+to deploy this increment; (4) run the D11 automation-conformance audit
+(automate / manual-fallback / auto-resume walk-through of every flow)?
