@@ -93,6 +93,19 @@ export function AppointmentsPage() {
       : `/api/organizations/${orgId}/patients?q=${encodeURIComponent(pickerSearch.trim())}&limit=10`;
   const picker = useApi<Paged & { patients: Patient[] }>(pickerPath);
 
+  const prefillPatientId = showForm ? (searchParams.get('patientId') ?? '') : '';
+  const prefillPatientPath =
+    orgId === null || prefillPatientId === ''
+      ? null
+      : `/api/organizations/${orgId}/patients/${prefillPatientId}`;
+  const prefillPatient = useApi<{ patient: Patient }>(prefillPatientPath);
+  const prefetchedPatient = prefillPatient.data?.patient ?? null;
+  const [appliedPrefillId, setAppliedPrefillId] = useState('');
+  if (prefetchedPatient !== null && appliedPrefillId !== prefillPatientId) {
+    setAppliedPrefillId(prefillPatientId);
+    setSelectedPatient(prefetchedPatient);
+  }
+
   const createAppointment = async (): Promise<void> => {
     if (orgId === null || selectedPatient === null) return;
     clearFeedback();
@@ -113,6 +126,7 @@ export function AppointmentsPage() {
       setFlash('Appointment booked.');
       setForm({ date: '', time: '', service: '', provider: '' });
       setSelectedPatient(null);
+      setAppliedPrefillId('');
       setPickerQuery('');
       setPickerSearch('');
       const next = new URLSearchParams(searchParams);
@@ -126,6 +140,12 @@ export function AppointmentsPage() {
 
   const patients = data?.appointments ?? [];
   const filtered = applied.status !== '' || applied.from !== '' || applied.to !== '' || applied.patientId !== '';
+  const pickerLoading =
+    pickerPath !== null && picker.status === 'loading' && picker.data === null;
+  const prefillLoading =
+    prefillPatientPath !== null &&
+    prefillPatient.data === null &&
+    prefillPatient.error === null;
 
   return (
     <div>
@@ -195,7 +215,7 @@ export function AppointmentsPage() {
                     Change
                   </button>
                 </div>
-              ) : picker.status === 'loading' && picker.data === null ? (
+              ) : prefillLoading || pickerLoading ? (
                 <LoadingState label="Searching…" />
               ) : picker.data !== null && picker.data.patients.length > 0 ? (
                 <select
