@@ -21,8 +21,8 @@ export function AccountMenu() {
   };
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-      <span style={{ fontSize: 'var(--fs-label)' }}>{user.email}</span>
+    <div className="account-menu">
+      <span>{user.email}</span>
       <StatusBadge
         label={user.role}
         tone={user.role === 'owner' ? 'new' : user.role === 'admin' ? 'success' : 'default'}

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
+import logoBlue from '../assets/apex-logo-blue.png';
 import { useAuth } from '../lib/auth';
 import { errorMessage } from '../lib/api';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
@@ -72,7 +73,9 @@ export function SignupPage() {
   return (
     <div className="login-page">
       <div className="login-card">
-        <h1>Apex Dentalistics</h1>
+        <h1>
+          <img className="brand-logo" src={logoBlue} alt="Apex Dentalistics" />
+        </h1>
         <div className="sub">Start your free trial - no card required</div>
         {error ? <Flash kind="error" message={error} onDismiss={() => setError(null)} /> : null}
         <form onSubmit={(e) => void onSubmit(e)} noValidate>

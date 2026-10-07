@@ -19,7 +19,7 @@ function MetricCard({ label, value, definition, to }: MetricCardProps) {
   const body = (
     <>
       <div style={{ fontSize: 'var(--fs-label)', color: 'var(--color-text-secondary)' }}>{label}</div>
-      <div style={{ fontSize: '28px', fontWeight: 700, lineHeight: 1.2 }}>{value}</div>
+      <div style={{ fontSize: '28px', fontWeight: 800, lineHeight: 1.2, letterSpacing: '-0.02em' }}>{value}</div>
     </>
   );
   if (to !== undefined) {
@@ -238,7 +238,7 @@ export function DashboardPage() {
         </div>
       </section>
 
-      <section className="card">
+      <section className="card card-dark">
         <h2 className="card-title">Daily trends</h2>
         <div className="table-scroll" tabIndex={0} role="region" aria-label="Daily trends table">
           <table className="table">

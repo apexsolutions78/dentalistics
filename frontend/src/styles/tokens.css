@@ -1,9 +1,9 @@
 :root {
-  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 
-  --fs-page-title: 20px;
-  --fs-section-title: 16px;
-  --fs-card-title: 14px;
+  --fs-page-title: 28px;
+  --fs-section-title: 17px;
+  --fs-card-title: 15px;
   --fs-body: 14px;
   --fs-label: 13px;
   --fs-small: 12px;
@@ -16,30 +16,67 @@
   --space-5: 24px;
   --space-6: 32px;
 
-  --color-bg: #f5f6f8;
+  /* --- SURFACES --- */
+  --color-bg: #ebebed;
   --color-surface: #ffffff;
-  --color-border: #d9dde3;
-  --color-border-control: #868c96;
-  --color-text: #1f2430;
-  --color-text-secondary: #5c6474;
-  --color-primary: #1d5fd0;
-  --color-primary-hover: #174cab;
-  --color-danger: #b3261e;
-  --color-danger-hover: #8f1e18;
-  --color-success: #1c7c47;
-  --color-warning: #7f641a;
+  --color-border: #e3e3e7;
+  --color-border-control: #d1d1d6;
 
-  --badge-new-bg: #e7f0ff;
-  --badge-new-text: #174cab;
-  --badge-active-bg: #e6f4ec;
-  --badge-active-text: #1c7c47;
-  --badge-muted-bg: #eceef2;
-  --badge-muted-text: #4a5261;
-  --badge-warn-bg: #fdf3d7;
-  --badge-warn-text: #7f641a;
-  --badge-danger-bg: #fbe9e7;
-  --badge-danger-text: #8f1e18;
+  /* --- INK / DARK SURFACES --- */
+  --color-ink: #0e0e10;
+  --color-ink-hover: #26262a;
+  --color-sidebar-bg: #0e0e10;
+  --color-sidebar-text: #e8e8ec;
+  --color-sidebar-text-dim: #9a9aa4;
+  --color-sidebar-hover: rgba(255, 255, 255, 0.08);
+  --color-sidebar-active-bg: #ffffff;
+  --color-sidebar-active-text: #0e0e10;
 
-  --radius: 6px;
-  --shadow: 0 1px 2px rgba(16, 24, 40, 0.08);
+  /* --- TEXT --- */
+  --color-text: #101014;
+  --color-text-secondary: #6a6a73;
+
+  /* --- ACTIONS --- */
+  --color-primary: #0e0e10;
+  --color-primary-hover: #26262a;
+
+  /* --- ACCENTS --- */
+  --color-accent: #d8f84f;
+  --color-accent-hover: #c8ee3a;
+  --color-accent-contrast: #0e0e10;
+  --color-lavender: #c3b7fb;
+  --color-lavender-strong: #a896f5;
+
+  /* --- SEMANTIC --- */
+  --color-danger: #d92d20;
+  --color-danger-hover: #b42318;
+  --color-success: #16a34a;
+  --color-warning: #b45309;
+
+  /* --- BADGES --- */
+  --badge-new-bg: #d8f84f;
+  --badge-new-text: #0e0e10;
+  --badge-active-bg: #dcfce7;
+  --badge-active-text: #15803d;
+  --badge-muted-bg: #f1f1f4;
+  --badge-muted-text: #3f3f46;
+  --badge-warn-bg: #fef3c7;
+  --badge-warn-text: #92400e;
+  --badge-danger-bg: #fee4e2;
+  --badge-danger-text: #b42318;
+
+  /* --- SHAPE --- */
+  --radius: 12px;
+  --radius-card: 16px;
+  --radius-pill: 999px;
+
+  /* --- ELEVATION --- */
+  --shadow: 0 1px 2px rgba(16, 16, 20, 0.04), 0 12px 24px -16px rgba(16, 16, 20, 0.18);
+  --shadow-raised: 0 2px 6px rgba(16, 16, 20, 0.06), 0 20px 40px -24px rgba(16, 16, 20, 0.28);
+  --shadow-dialog: 0 24px 60px -24px rgba(16, 16, 20, 0.45);
+
+  /* --- MOTION --- */
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-1: 160ms;
+  --dur-2: 320ms;
 }

@@ -1,4 +1,5 @@
 import { Outlet, useLocation } from 'react-router-dom';
+import logoWhite from '../../assets/apex-logo-white.png';
 import { Sidebar } from './Sidebar';
 import { AccountMenu } from './AccountMenu';
 import { TrialLockBanner } from './TrialLockBanner';
@@ -23,7 +24,9 @@ export function AppShell() {
 
   return (
     <div className="app-shell">
-      <div className="app-brand">Apex Dentalistics</div>
+      <div className="app-brand">
+        <img className="brand-logo" src={logoWhite} alt="Apex Dentalistics" />
+      </div>
       <header className="app-header">
         <span style={{ fontSize: 'var(--fs-label)', color: 'var(--color-text-secondary)' }}>
           {title}

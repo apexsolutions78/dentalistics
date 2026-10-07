@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import logoBlue from '../assets/apex-logo-blue.png';
 import { apiFetch } from '../lib/api';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
 import type { PublicPlan } from '../lib/types';
@@ -84,7 +85,7 @@ export function MarketingPage() {
   return (
     <div className="marketing-page">
       <header className="marketing-header">
-        <span className="app-brand">Apex Dentalistics</span>
+        <img className="brand-logo" src={logoBlue} alt="Apex Dentalistics" />
         <nav className="marketing-nav">
           <Link to="/login" className="btn btn-ghost">
             Sign in
