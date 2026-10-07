@@ -5356,3 +5356,24 @@ display for the  plan; S1f trial banner; D11 conformance audit
    walk-through but no dedicated E2E spec; backend 
 pm run verify
    (366/366) was NOT re-run this session because no backend file changed.
+
+**[Update 2026-10-07 - production deployment]:** owner instruction
+verbatim "deplot" -> "deploy" (Rule 11). Reconcile: server repo was
+already clean at 3de9534 (owner pulled) but rontend/dist/ was
+stale and the process predated the push, so the prepared block (DB
+dump -> 
+pm run build -> 
+pm run migrate -> capped frontend build)
+was executed by the owner in the DirectAdmin SSH terminal, then the DA
+app restarted. VERIFIED from here: health 200 uptimeSeconds:1
+(13:54:37Z); /login serves index-BHggrpmV.js + index-6EdNMCa7.css
+(hash-identical to the locally verified build); served CSS has the
+brand-logo/centering rules, served JS has the booking-fix marker;
+/api/public/plans returns S1 data (new backend live); root serves the
+SPA; sourcemaps absent (.js.map = SPA HTML fallback); security
+headers intact. Migrations confirmed by the owner re-running the
+idempotent migrate: pplied=0, skipped=18 (0017 + 0018 present,
+13:59Z). NOT VERIFIED: existence of the pre-migration DB dump (output
+never pasted), authenticated browser walkthrough on production
+(credentials not used without instruction). Deployment state recorded
+as PROJECT_STATE rev 72.
