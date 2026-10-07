@@ -5213,3 +5213,146 @@ walk-through of every flow)?
    API response.
 5. Deferred by owner/plan: payment gateway (S1), S1f banner, and the
    broader backlog recorded in earlier sessions.
+
+---
+
+## Session 39 - 2026-10-07 - UI re-theme (rev 69), brand logo (rev 70), booking-from-patient fix (rev 71)
+
+**Owner instructions this session (verbatim):**
+
+- "What did we do so far?" -> recap delivered (the re-theme of the whole
+  app to the attached reference design was already complete at that
+  point; the owner had confirmed "Frontend is good and working.").
+- Logo plan change: "I have added 2 new files for the logo /
+  ApexDentalistics-Logo1-White-PNG.png file for places where background
+  is dark. / ApexDentalistics-Logo1-Blue-PNG.png file for places where
+  background is white. You may adjust the size accordingly. Also both
+  the files are with transparent background".
+- "The logo should be a bit bigger and centered to the nav column or
+  card where ever it is displayed." plus a bug report with the exact
+  workflow: add a lead manually -> add a patient manually -> open the
+  patient from the list -> click "book appointment" -> "the next screen
+  ... is searching for the patient and keeps on doing that. I cannot
+  book appointment for the patient in any way".
+- After verification: "Works fine. Commit and push please then save
+  session log".
+
+**Work executed this session (PROJECT_STATE rev 69-71; rev 69, the
+re-theme itself, was recorded at the start of this session):**
+
+1. **Brand logo installed (rev 70).** Both owner PNGs are 400x229 with
+   transparent corners, wordmark content ~2.68:1 (pixel-sampled: White
+   variant = near-white + lime accent, Blue variant = deep indigo +
+   lime accent). Copied to rontend/src/assets/apex-logo-white.png
+   and pex-logo-blue.png. White variant in the dark sidebar brand
+   block (AppShell.tsx, lime-square .app-brand::before removed);
+   Blue variant in the login/signup <h1> (img lt keeps the
+   accessible heading name, so the authPages heading test still
+   passes) and the marketing header.
+2. **Logo enlarged and centered (rev 71).** Transparent margins cropped
+   off the derived assets (400x229 -> 367x139; the owner's source files
+   in the repo root were committed untouched). Sizes: sidebar 40px,
+   login/signup card 44px, marketing header 34px. Centered everywhere
+   per instruction: .app-brand centers in the nav column, the login
+   card centers logo + subtitle, and .marketing-header was switched
+   from flex to a `1fr auto 1fr` grid so the logo is truly centered
+   with the nav right; a max-width: 640px fallback keeps the logo
+   left in two columns so it cannot overlap the nav on phones.
+3. **Booking-from-patient defect FIXED (rev 71).** Root cause
+   (CONFIRMED by code inspection, two defects in
+   rontend/src/pages/appointments/AppointmentsPage.tsx + the known
+   useApi behavior): (a) useApi reports status:'loading' whenever
+   its path is 
+ull - i.e. before any patient search has run - and
+   the Patient field treated any loading && data === null as an
+   active search, so a freshly opened booking form spun on
+   "Searching..." forever; (b) the patientId URL param sent by the
+   patient profile's "Book appointment" link was only used to filter
+   the appointments list - the patient was never fetched into the
+   form, so the known patient could not be selected (and the permanent
+   spinner made the manual re-search look impossible too). Fix
+   (frontend-only, minimum): the spinner now shows only while a
+   request is actually in flight (picker path active with no data, or
+   the new prefill path pending); otherwise the "Enter a name or phone
+   to search." hint shows. A prefill fetch of
+   GET /api/organizations/:orgId/patients/:id runs while the form is
+   open and applies the patient once per param value (render-phase
+   state adjustment, same pattern as the existing params-sync block),
+   and is reset after a successful booking so a second booking for the
+   same patient re-selects it.
+
+**Tests actually executed (all exit 0):**
+
+- 
+pm run verify:frontend = eslint 0 + **122/122 tests (22 files, +3
+  in new rontend/src/pages/appointments/AppointmentsPage.test.tsx:
+  hint-not-spinner, patientId preselect, manual search+pick)** +
+  	sc -b + vite build (both cropped logos bundled). Final run
+  2026-10-07 17:04, after the last CSS edit - the committed tree is the
+  tested tree.
+- Playwright against the real API (Docker dentalistics-mysql healthy,
+  e2e harness on :3000) - **10/10 checks PASS**: login logo 44px
+  centered (delta 0.01px), sidebar logo 40px centered (0.01px), empty
+  form shows the hint and never the spinner, patient profile ->
+  "Book appointment" preselects the patient (Change button visible, 0
+  spinners), Book button enables with date+time, booking succeeds with
+  the "Appointment booked." flash and the row in the list, marketing
+  logo centered in header (0.01px), mobile marketing logo does not
+  overlap the nav (right=98 < navLeft=190). Login and the booking flow
+  were also confirmed visually from screenshots; the marketing/mobile
+  shots were confirmed numerically because the chat image-attachment
+  glitch kept returning the wrong files (fresh unique filenames worked
+  intermittently - same workaround as Session 38).
+
+**Environment observations (CONFIRMED, for the next session):**
+
+- The dev database had been reset since Session 38: e2e-owner@e2e.test
+  was no longer in users (login returned 401), while the real account
+  li.a@jaiclan.com had last_login 2026-10-07 10:35 and was left
+  untouched. The sanctioned e2e seed was re-run (org=1937, migrations
+  0/18) for verification; one test appointment (2026-10-12 10:30, Rosa
+  Recall) now sits in that e2e-seed org.
+- Image/tooling: g is not installed on this machine (PowerShell
+  Select-String used); Start-Process -FilePath npx fails (use
+  
+ode node_modules/tsx/dist/cli.mjs).
+
+**Saved and pushed (this session, end state):**
+
+- Code commit d29057 - "Re-theme UI to owner reference design and
+  install brand logo (dark sidebar, pill nav, centered logos)" (14
+  files: tokens.css, global.css, AccountMenu/AppShell, Login/Signup/
+  Marketing/Dashboard pages, rontend/src/assets/ cropped logos, and
+  the four owner logo source files in the repo root).
+- Code commit cb76409 - "Fix appointment booking stuck on Searching
+  when opened from a patient profile" (AppointmentsPage.tsx + new
+  AppointmentsPage.test.tsx).
+- Both pushed on the owner instruction "Works fine. Commit and push
+  please then save session log"; pushed range de3ffb0..cb76409,
+  MATCH=OK (local = remote cb76409).
+- This docs commit - this entry + PROJECT_STATE rev 69-71
+  (SESSION_LOG.md + PROJECT_STATE.md).
+- Not staged: AGENTS.md (pre-existing untracked file - owner to
+  decide whether to track it).
+
+**Open questions for the owner:** (1) accept the logo sizes/centering
+choices (marketing-header grid + 640px fallback, centered login
+subtitle), or adjust? (2) deploy d29057/cb76409 now, later, or not
+yet (Rule 11)? Carried-over decisions unchanged: MISSED_CALL excluded
+from default ack sources; LOST/CLOSED not reopened by booking; USD
+display for the  plan; S1f trial banner; D11 conformance audit
+(PROPOSED, Rule 1).
+
+**What is left (durable, for the next session):**
+
+1. Deploy d29057/cb76409 to dentalistics.apexsol.pk - NOT done,
+   needs explicit owner instruction (Rule 11). Note the server rebuild
+   needs the memory caps used in Session 33.
+2. D11 conformance audit - PROPOSED, not started (Rule 1).
+3. Owner decisions outstanding: MISSED_CALL default-ack exclusion;
+   LOST/CLOSED not reopened; USD display; S1f banner; payment gateway
+   (deferred by owner to the end).
+4. Known gaps: the booking fix has component tests + one live Playwright
+   walk-through but no dedicated E2E spec; backend 
+pm run verify
+   (366/366) was NOT re-run this session because no backend file changed.
