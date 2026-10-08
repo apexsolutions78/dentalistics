@@ -111,6 +111,19 @@ export interface MissedCallConfig {
   template: string;
 }
 
+export interface LeadAutomationConfig {
+  enabled: boolean;
+  highKeywords: string[];
+  highSources: string[];
+  staleHours: number;
+  slotsCount: number;
+  lookaheadDays: number;
+  slaDays: { high: number; medium: number; low: number };
+  channel: 'SMS' | 'WHATSAPP';
+  provider: string;
+  template: string;
+}
+
 export interface AutomationSection<C> {
   config: C;
   source: ConfigSource;
@@ -154,6 +167,7 @@ export interface Settings {
     review: AutomationSection<ReviewConfig>;
     leadAck: AutomationSection<AckConfig>;
     missedCall: AutomationSection<MissedCallConfig>;
+    leadAutomation: AutomationSection<LeadAutomationConfig>;
   };
   providers: {
     telephony: TelephonyProviderView;
@@ -187,6 +201,37 @@ export type LeadStatus =
 
 export type LeadSource = 'WEBSITE' | 'MISSED_CALL' | 'MANUAL' | 'OTHER';
 
+export type UrgencyLevel = 'LOW' | 'MEDIUM' | 'HIGH';
+
+export interface LeadSlotSuggestion {
+  id: number;
+  leadId: number;
+  doctorId: number;
+  doctor: { id: number; name: string; specialty: string | null } | null;
+  slotDate: string;
+  slotTime: string;
+  urgencyLevel: UrgencyLevel;
+  status: 'PENDING' | 'ACCEPTED' | 'RESCHEDULED' | 'DECLINED' | 'EXPIRED';
+  appointmentId: number | null;
+  decidedBy: number | null;
+  decidedAt: string | null;
+  createdAt: string;
+}
+
+export interface Doctor {
+  id: number;
+  name: string;
+  specialty: string | null;
+  phone: string | null;
+  email: string | null;
+  workHours: BusinessHours;
+  slotMinutes: number;
+  isActive: boolean;
+  createdBy: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Lead {
   id: number;
   firstName: string;
@@ -200,6 +245,10 @@ export interface Lead {
   assignedUserEmail: string | null;
   notes: string | null;
   lastActivityAt: string | null;
+  urgencyLevel: UrgencyLevel;
+  urgencyScore: number;
+  urgencyReasons: string[];
+  urgencyComputedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -219,6 +268,7 @@ export interface LeadDetail {
   activity: LeadActivityItem[];
   communicationHistory: Message[];
   appointments: Appointment[];
+  suggestions: LeadSlotSuggestion[];
 }
 
 export interface Patient {
@@ -243,6 +293,8 @@ export interface Appointment {
   status: string;
   service: string | null;
   provider: string | null;
+  doctorId: number | null;
+  doctor: { id: number; name: string } | null;
   previousAppointmentId: number | null;
   patient: { id: number; firstName: string; lastName: string; phone: string };
   createdBy: number | null;
@@ -386,6 +438,67 @@ export interface ReceptionistWorkspace {
     }>;
   };
   definitions: Record<string, string>;
+}
+
+export interface PaymentRow {
+  orderId: string;
+  status: 'pending' | 'paid' | 'failed' | 'expired' | 'cancelled';
+  amountUsdCents: number;
+  currency: string;
+  provider: string;
+  checkoutUrl: string | null;
+  lastError: string | null;
+  createdAt: string;
+  paidAt: string | null;
+}
+
+export interface BillingSummary {
+  organization: {
+    id: number;
+    name: string;
+    plan: 'trial' | 'full';
+    trialEndsAt: string | null;
+  };
+  price: {
+    amountUsdCents: number;
+    currency: string;
+    interval: string;
+    name: string;
+  };
+  gateway: {
+    enabled: boolean;
+    provider: string;
+    configured: boolean;
+    reasons: string[];
+  };
+  payments: PaymentRow[];
+}
+
+export interface CheckoutPayment {
+  orderId: string;
+  checkoutUrl: string;
+  amountUsdCents: number;
+  currency: string;
+  provider: string;
+  status: 'pending';
+}
+
+export interface PaymentStatusResult {
+  orderId: string;
+  status: 'pending' | 'paid' | 'failed' | 'expired' | 'cancelled';
+  plan: 'trial' | 'full';
+  payment: PaymentRow;
+}
+
+export interface PaymentGatewayConfig {
+  enabled: boolean;
+  provider: 'mock' | 'assanpay';
+  merchantId: string;
+  storeName: string;
+  baseUrl: string;
+  returnUrlBase: string;
+  state: 'green' | 'red';
+  reasons: string[];
 }
 
 export type { Paged } from './useApi';

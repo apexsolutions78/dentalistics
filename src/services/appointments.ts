@@ -8,6 +8,7 @@ import {
   parseListParams,
   parseTimeOnly,
 } from '../validate';
+import { assertSlotAvailable, assertDoctorInOrg } from './doctors';
 
 export const APPOINTMENT_STATUSES = [
   'SCHEDULED',
@@ -39,6 +40,8 @@ interface AppointmentRow extends RowDataPacket {
   status: string;
   service: string | null;
   provider: string | null;
+  doctor_id: number | null;
+  doctor_name: string | null;
   previous_appointment_id: number | null;
   created_by: number | null;
   created_at: Date;
@@ -54,11 +57,13 @@ interface CountRow extends RowDataPacket {
 
 const APPOINTMENT_SELECT = `SELECT a.id, a.organization_id, a.patient_id, a.lead_id,
     DATE_FORMAT(a.appointment_date, '%Y-%m-%d') AS appointment_date,
-    a.appointment_time, a.status, a.service, a.provider,
+    a.appointment_time, a.status, a.service, a.provider, a.doctor_id,
+    d.name AS doctor_name,
     a.previous_appointment_id, a.created_by, a.created_at, a.updated_at,
     p.first_name AS patient_first_name, p.last_name AS patient_last_name, p.phone AS patient_phone
   FROM appointments a
-  JOIN patients p ON p.id = a.patient_id`;
+  JOIN patients p ON p.id = a.patient_id
+  LEFT JOIN doctors d ON d.id = a.doctor_id`;
 
 function appointmentDto(row: AppointmentRow): Record<string, unknown> {
   return {
@@ -71,6 +76,11 @@ function appointmentDto(row: AppointmentRow): Record<string, unknown> {
     status: row.status,
     service: row.service,
     provider: row.provider,
+    doctorId: row.doctor_id,
+    doctor:
+      row.doctor_id === null || row.doctor_name === null
+        ? null
+        : { id: row.doctor_id, name: row.doctor_name },
     previousAppointmentId: row.previous_appointment_id,
     patient: {
       id: row.patient_id,
@@ -141,6 +151,7 @@ interface CreateFields {
   time: string;
   service: string | null;
   provider: string | null;
+  doctorId: number | null;
 }
 
 async function parseCreateFields(
@@ -161,11 +172,16 @@ async function parseCreateFields(
   const time = parseTimeOnly(b.time, 'time');
   const service = optionalText(b.service, 'service', 120);
   const provider = optionalText(b.provider, 'provider', 120);
+  const doctorId = optionalUserId(b.doctorId, 'doctorId');
   await assertPatientInOrg(db, organizationId, patientId);
   if (leadId !== null) {
     await assertLeadInOrg(db, organizationId, leadId);
   }
-  return { patientId, leadId, date, time, service, provider };
+  if (doctorId !== null) {
+    await assertDoctorInOrg(db, organizationId, doctorId, { requireActive: true });
+    await assertSlotAvailable(db, organizationId, doctorId, date, time);
+  }
+  return { patientId, leadId, date, time, service, provider, doctorId };
 }
 
 export interface CreateAppointmentInput {
@@ -183,8 +199,8 @@ export async function createAppointment(
   const [result] = await db.query(
     `INSERT INTO appointments
        (organization_id, patient_id, lead_id, appointment_date, appointment_time,
-        status, service, provider, created_by)
-     VALUES (?, ?, ?, ?, ?, 'SCHEDULED', ?, ?, ?)`,
+        status, service, provider, doctor_id, created_by)
+     VALUES (?, ?, ?, ?, ?, 'SCHEDULED', ?, ?, ?, ?)`,
     [
       input.organizationId,
       fields.patientId,
@@ -193,6 +209,7 @@ export async function createAppointment(
       fields.time,
       fields.service,
       fields.provider,
+      fields.doctorId,
       input.actorId,
     ],
   );
@@ -241,6 +258,19 @@ export async function listAppointments(
     }
     where.push('a.patient_id = ?');
     params.push(patientId);
+  }
+  if (input.query.doctorId !== undefined) {
+    const rawDoctor = input.query.doctorId;
+    if (rawDoctor === 'none') {
+      where.push('a.doctor_id IS NULL');
+    } else {
+      const doctorId = Number(rawDoctor);
+      if (!Number.isInteger(doctorId) || doctorId <= 0) {
+        throw new ValidationError('Invalid input', ['doctorId must be a positive integer or "none"']);
+      }
+      where.push('a.doctor_id = ?');
+      params.push(doctorId);
+    }
   }
   if (input.query.from !== undefined) {
     where.push('a.appointment_date >= ?');
@@ -478,11 +508,17 @@ export async function rescheduleAppointment(
         true,
       );
     }
+    if (old.doctor_id !== null) {
+      await assertSlotAvailable(conn, input.organizationId, old.doctor_id, move.date, move.time, {
+        excludeAppointmentId: old.id,
+        requireActive: false,
+      });
+    }
     const [result] = await conn.query(
       `INSERT INTO appointments
          (organization_id, patient_id, lead_id, appointment_date, appointment_time,
-          status, service, provider, previous_appointment_id, created_by)
-       VALUES (?, ?, ?, ?, ?, 'SCHEDULED', ?, ?, ?, ?)`,
+          status, service, provider, doctor_id, previous_appointment_id, created_by)
+       VALUES (?, ?, ?, ?, ?, 'SCHEDULED', ?, ?, ?, ?, ?)`,
       [
         old.organization_id,
         old.patient_id,
@@ -491,6 +527,7 @@ export async function rescheduleAppointment(
         move.time,
         old.service,
         old.provider,
+        old.doctor_id,
         old.id,
         input.actorId,
       ],
@@ -550,11 +587,17 @@ export async function rebookAppointment(
         true,
       );
     }
+    if (old.doctor_id !== null) {
+      await assertSlotAvailable(conn, input.organizationId, old.doctor_id, move.date, move.time, {
+        excludeAppointmentId: old.id,
+        requireActive: false,
+      });
+    }
     const [result] = await conn.query(
       `INSERT INTO appointments
          (organization_id, patient_id, lead_id, appointment_date, appointment_time,
-          status, service, provider, previous_appointment_id, created_by)
-       VALUES (?, ?, ?, ?, ?, 'SCHEDULED', ?, ?, ?, ?)`,
+          status, service, provider, doctor_id, previous_appointment_id, created_by)
+       VALUES (?, ?, ?, ?, ?, 'SCHEDULED', ?, ?, ?, ?, ?)`,
       [
         old.organization_id,
         old.patient_id,
@@ -563,6 +606,7 @@ export async function rebookAppointment(
         move.time,
         old.service,
         old.provider,
+        old.doctor_id,
         old.id,
         input.actorId,
       ],

@@ -31,6 +31,20 @@ interface NoShowForm {
   followUpDelayHours: number;
 }
 
+interface LeadAutomationForm {
+  enabled: boolean;
+  channel: string;
+  provider: string;
+  keywordsText: string;
+  sourcesText: string;
+  staleHours: number;
+  slotsCount: number;
+  lookaheadDays: number;
+  slaHigh: number;
+  slaMedium: number;
+  slaLow: number;
+}
+
 function toLeadAck(settings: Settings): LeadAckForm {
   const cfg = settings.automations.leadAck.config;
   return { enabled: cfg.enabled, channel: cfg.channel, provider: cfg.provider, sourcesText: cfg.sources.join(', ') };
@@ -46,31 +60,55 @@ function toNoShow(settings: Settings): NoShowForm {
   return { enabled: cfg.enabled, channel: cfg.channel, provider: cfg.provider, followUpDelayHours: cfg.followUpDelayHours };
 }
 
+function toLeadAutomation(settings: Settings): LeadAutomationForm {
+  const cfg = settings.automations.leadAutomation.config;
+  return {
+    enabled: cfg.enabled,
+    channel: cfg.channel,
+    provider: cfg.provider,
+    keywordsText: cfg.highKeywords.join(', '),
+    sourcesText: cfg.highSources.join(', '),
+    staleHours: cfg.staleHours,
+    slotsCount: cfg.slotsCount,
+    lookaheadDays: cfg.lookaheadDays,
+    slaHigh: cfg.slaDays.high,
+    slaMedium: cfg.slaDays.medium,
+    slaLow: cfg.slaDays.low,
+  };
+}
+
 export function AutomationSettingsPage() {
   const { state, reload, patchAutomation } = useSettings();
   const ackSubmit = useSubmit();
   const missedSubmit = useSubmit();
   const noShowSubmit = useSubmit();
+  const leadSubmit = useSubmit();
   const settings = state.settings;
   const [ackDraft, setAckDraft] = useState<LeadAckForm | null>(null);
   const [missedDraft, setMissedDraft] = useState<MissedCallForm | null>(null);
   const [noShowDraft, setNoShowDraft] = useState<NoShowForm | null>(null);
+  const [leadDraft, setLeadDraft] = useState<LeadAutomationForm | null>(null);
   const ack = ackDraft ?? (settings !== null ? toLeadAck(settings) : null);
   const missed = missedDraft ?? (settings !== null ? toMissedCall(settings) : null);
   const noShow = noShowDraft ?? (settings !== null ? toNoShow(settings) : null);
+  const lead = leadDraft ?? (settings !== null ? toLeadAutomation(settings) : null);
   const [clientError, setClientError] = useState<string | null>(null);
   const dirty =
     (ackDraft !== null && settings !== null && JSON.stringify(ackDraft) !== JSON.stringify(toLeadAck(settings))) ||
     (missedDraft !== null &&
       settings !== null &&
       JSON.stringify(missedDraft) !== JSON.stringify(toMissedCall(settings))) ||
-    (noShowDraft !== null && settings !== null && JSON.stringify(noShowDraft) !== JSON.stringify(toNoShow(settings)));
+    (noShowDraft !== null && settings !== null && JSON.stringify(noShowDraft) !== JSON.stringify(toNoShow(settings))) ||
+    (leadDraft !== null &&
+      settings !== null &&
+      JSON.stringify(leadDraft) !== JSON.stringify(toLeadAutomation(settings)));
   useUnsavedChanges(dirty);
 
   const clearAll = (): void => {
     ackSubmit.clearFeedback();
     missedSubmit.clearFeedback();
     noShowSubmit.clearFeedback();
+    leadSubmit.clearFeedback();
     setClientError(null);
   };
 
@@ -89,6 +127,12 @@ export function AutomationSettingsPage() {
   const updateNoShow = (patch: Partial<NoShowForm>): void => {
     if (settings === null) return;
     setNoShowDraft((prev) => ({ ...prev ?? toNoShow(settings), ...patch }));
+    clearAll();
+  };
+
+  const updateLead = (patch: Partial<LeadAutomationForm>): void => {
+    if (settings === null) return;
+    setLeadDraft((prev) => ({ ...prev ?? toLeadAutomation(settings), ...patch }));
     clearAll();
   };
 
@@ -152,6 +196,50 @@ export function AutomationSettingsPage() {
     );
   };
 
+  const saveLead = async (): Promise<void> => {
+    if (lead === null) return;
+    if (lead.provider.trim().length === 0) {
+      setClientError('Provider cannot be empty.');
+      return;
+    }
+    const within = (value: number, min: number, max: number): boolean =>
+      Number.isInteger(value) && value >= min && value <= max;
+    if (!within(lead.staleHours, 1, 720)) {
+      setClientError('Stale threshold must be a whole number of hours between 1 and 720.');
+      return;
+    }
+    if (!within(lead.slotsCount, 1, 10)) {
+      setClientError('Slot suggestions per lead must be between 1 and 10.');
+      return;
+    }
+    if (!within(lead.lookaheadDays, 1, 30)) {
+      setClientError('Lookahead must be a whole number of days between 1 and 30.');
+      return;
+    }
+    if (!within(lead.slaHigh, 1, 30) || !within(lead.slaMedium, 1, 30) || !within(lead.slaLow, 1, 30)) {
+      setClientError('SLA days must be whole numbers between 1 and 30.');
+      return;
+    }
+    const toList = (raw: string): string[] =>
+      raw
+        .split(',')
+        .map((item) => item.trim())
+        .filter((item) => item.length > 0);
+    await leadSubmit.submit(() =>
+      patchAutomation('leadAutomation', {
+        enabled: lead.enabled,
+        channel: lead.channel,
+        provider: lead.provider.trim(),
+        highKeywords: toList(lead.keywordsText),
+        highSources: toList(lead.sourcesText),
+        staleHours: lead.staleHours,
+        slotsCount: lead.slotsCount,
+        lookaheadDays: lead.lookaheadDays,
+        slaDays: { high: lead.slaHigh, medium: lead.slaMedium, low: lead.slaLow },
+      }),
+    );
+  };
+
   return (
     <div>
       <PageHeader
@@ -160,10 +248,11 @@ export function AutomationSettingsPage() {
       />
       <SettingsBody state={state} onRetry={reload}>
         {(settings: Settings) => {
-          if (ack === null || missed === null || noShow === null) return null;
+          if (ack === null || missed === null || noShow === null || lead === null) return null;
           const ackCfg = settings.automations.leadAck;
           const missedCfg = settings.automations.missedCall;
           const noShowCfg = settings.automations.noShow;
+          const leadCfg = settings.automations.leadAutomation;
           return (
             <div>
               {clientError ? (
@@ -308,6 +397,112 @@ export function AutomationSettingsPage() {
                 />
                 <div className="meta-line">
                   Attempt cap: {noShowCfg.config.maxAttempts} attempts (deployment-wide, not editable here).
+                </div>
+              </div>
+
+              <div className="card">
+                <h2 className="card-title">Lead automation &amp; slot suggestions</h2>
+                <div className="provider-status">
+                  <StatusBadge label={`Source: ${sourceLabel(leadCfg.source)}`} tone={leadCfg.source === 'org' ? 'new' : 'default'} />
+                  <StatusBadge label={leadCfg.config.enabled ? 'Enabled' : 'Disabled'} tone={leadCfg.config.enabled ? 'success' : 'default'} />
+                </div>
+                {leadSubmit.saved ? (
+                  <Flash kind="success" message="Lead automation saved." onDismiss={leadSubmit.clearFeedback} />
+                ) : null}
+                {leadSubmit.error ? (
+                  <Flash kind="error" message={leadSubmit.error} onDismiss={leadSubmit.clearFeedback} />
+                ) : null}
+                <AutomationFields
+                  enabled={lead.enabled}
+                  channel={lead.channel}
+                  provider={lead.provider}
+                  onEnabled={(v) => updateLead({ enabled: v })}
+                  onChannel={(v) => updateLead({ channel: v })}
+                  onProvider={(v) => updateLead({ provider: v })}
+                />
+                <div className="form-grid">
+                  <FormField label="High-urgency keywords" hint="Comma-separated, matched against the requested service.">
+                    <input
+                      className="input"
+                      value={lead.keywordsText}
+                      onChange={(e) => updateLead({ keywordsText: e.target.value })}
+                    />
+                  </FormField>
+                  <FormField label="High-urgency sources" hint="Comma-separated lead sources, e.g. MISSED_CALL.">
+                    <input
+                      className="input"
+                      value={lead.sourcesText}
+                      onChange={(e) => updateLead({ sourcesText: e.target.value })}
+                    />
+                  </FormField>
+                  <NumberField
+                    label="Stale threshold (hours)"
+                    hint="1–720. Leads untouched longer than this score as urgent."
+                    value={lead.staleHours}
+                    min={1}
+                    max={720}
+                    onChange={(v) => updateLead({ staleHours: v })}
+                  />
+                  <NumberField
+                    label="Suggestions per lead"
+                    hint="1–10 free slots to propose."
+                    value={lead.slotsCount}
+                    min={1}
+                    max={10}
+                    onChange={(v) => updateLead({ slotsCount: v })}
+                  />
+                  <NumberField
+                    label="Lookahead (days)"
+                    hint="1–30 days into the future to search for free slots."
+                    value={lead.lookaheadDays}
+                    min={1}
+                    max={30}
+                    onChange={(v) => updateLead({ lookaheadDays: v })}
+                  />
+                  <NumberField
+                    label="SLA — high urgency (days)"
+                    hint="1–30."
+                    value={lead.slaHigh}
+                    min={1}
+                    max={30}
+                    onChange={(v) => updateLead({ slaHigh: v })}
+                  />
+                  <NumberField
+                    label="SLA — medium urgency (days)"
+                    hint="1–30."
+                    value={lead.slaMedium}
+                    min={1}
+                    max={30}
+                    onChange={(v) => updateLead({ slaMedium: v })}
+                  />
+                  <NumberField
+                    label="SLA — low urgency (days)"
+                    hint="1–30."
+                    value={lead.slaLow}
+                    min={1}
+                    max={30}
+                    onChange={(v) => updateLead({ slaLow: v })}
+                  />
+                </div>
+                <div className="btn-row">
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => void saveLead()}
+                    disabled={leadSubmit.saving}
+                  >
+                    {leadSubmit.saving ? 'Saving…' : 'Save lead automation'}
+                  </button>
+                </div>
+                <TemplateLinkRow
+                  to="/settings/templates/appointment_confirmation"
+                  slot="Appointment confirmation template"
+                  content={settings.templates['appointment_confirmation'] ?? ''}
+                />
+                <div className="meta-line">
+                  Approving a suggestion creates the appointment and queues the confirmation through
+                  the selected channel. Manage the Doctors Panel from the{' '}
+                  <Link to="/doctors">Doctors</Link> page.
                 </div>
               </div>
             </div>

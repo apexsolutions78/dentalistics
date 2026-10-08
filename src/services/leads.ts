@@ -54,6 +54,10 @@ interface LeadRow extends RowDataPacket {
   assigned_user_email: string | null;
   notes: string | null;
   last_activity_at: Date;
+  urgency_level: string;
+  urgency_score: number;
+  urgency_reasons: string | null;
+  urgency_computed_at: Date | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -74,9 +78,22 @@ interface LeadDetailRow extends RowDataPacket {
 
 const LEAD_SELECT = `SELECT l.id, l.organization_id, l.first_name, l.last_name, l.phone, l.email,
     l.requested_service, l.source, l.status, l.assigned_user_id, au.email AS assigned_user_email,
-    l.notes, l.last_activity_at, l.created_at, l.updated_at
+    l.notes, l.last_activity_at, l.urgency_level, l.urgency_score, l.urgency_reasons,
+    l.urgency_computed_at, l.created_at, l.updated_at
   FROM leads l
   LEFT JOIN users au ON au.id = l.assigned_user_id`;
+
+function parseUrgencyReasons(raw: string | null): string[] {
+  if (raw === null || raw === '') {
+    return [];
+  }
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
+  } catch {
+    return [];
+  }
+}
 
 function leadDto(row: LeadRow): Record<string, unknown> {
   return {
@@ -92,6 +109,10 @@ function leadDto(row: LeadRow): Record<string, unknown> {
     assignedUserEmail: row.assigned_user_email,
     notes: row.notes,
     lastActivityAt: row.last_activity_at,
+    urgencyLevel: row.urgency_level,
+    urgencyScore: row.urgency_score,
+    urgencyReasons: parseUrgencyReasons(row.urgency_reasons),
+    urgencyComputedAt: row.urgency_computed_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

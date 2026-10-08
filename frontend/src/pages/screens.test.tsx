@@ -6,6 +6,7 @@ import { AuthProvider } from '../lib/auth';
 import { LeadsPage } from './leads/LeadsPage';
 import { LeadDetailPage } from './leads/LeadDetailPage';
 import { PatientsPage } from './patients/PatientsPage';
+import { DoctorsPage } from './doctors/DoctorsPage';
 import { RecallPage } from './recall/RecallPage';
 import { CommunicationsPage } from './communications/CommunicationsPage';
 import { AppointmentDetailPage } from './appointments/AppointmentDetailPage';
@@ -67,6 +68,10 @@ const leadRow = {
   assignedUserEmail: null,
   notes: null,
   lastActivityAt: null,
+  urgencyLevel: 'LOW',
+  urgencyScore: 0,
+  urgencyReasons: [],
+  urgencyComputedAt: null,
   createdAt: '2026-09-30T10:00:00.000Z',
   updatedAt: '2026-09-30T10:00:00.000Z',
 };
@@ -251,6 +256,58 @@ describe('DashboardPage', () => {
   });
 });
 
+describe('DoctorsPage', () => {
+  const doctorRow = {
+    id: 3,
+    name: 'Dr Noor',
+    specialty: 'General dentistry',
+    phone: null,
+    email: null,
+    workHours: {
+      mon: { open: '09:00', close: '17:00' },
+      tue: { open: '09:00', close: '17:00' },
+      wed: { open: '09:00', close: '17:00' },
+      thu: { open: '09:00', close: '17:00' },
+      fri: { open: '09:00', close: '17:00' },
+      sat: null,
+      sun: null,
+    },
+    slotMinutes: 30,
+    isActive: true,
+    createdBy: 1,
+    createdAt: '2026-09-30T10:00:00.000Z',
+    updatedAt: '2026-09-30T10:00:00.000Z',
+  };
+
+  it('renders doctor rows from the API', async () => {
+    stub(jsonIf('/doctors', { doctors: [doctorRow] }));
+    renderPage(<DoctorsPage />, '/doctors');
+    expect(await screen.findByText('Dr Noor')).toBeInTheDocument();
+    expect(screen.getByText('General dentistry')).toBeInTheDocument();
+    expect(screen.getByText('30 min')).toBeInTheDocument();
+    expect(screen.getByText('Active')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Deactivate' })).toBeInTheDocument();
+  });
+
+  it('opens the add-doctor form with working-hours editing', async () => {
+    stub(jsonIf('/doctors', { doctors: [doctorRow] }));
+    renderPage(<DoctorsPage />, '/doctors');
+    await screen.findByText('Dr Noor');
+    fireEvent.click(screen.getByRole('button', { name: 'Add doctor' }));
+    expect(screen.getByRole('heading', { name: 'Working hours' })).toBeInTheDocument();
+    expect(screen.getByLabelText(/Name/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Monday')).toBeInTheDocument();
+    expect(screen.getByLabelText('Monday opening time')).toBeInTheDocument();
+  });
+
+  it('keeps inactive doctors visible with a reactivate action', async () => {
+    stub(jsonIf('/doctors', { doctors: [{ ...doctorRow, isActive: false }] }));
+    renderPage(<DoctorsPage />, '/doctors');
+    expect(await screen.findByText('Inactive')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reactivate' })).toBeInTheDocument();
+  });
+});
+
 describe('LeadDetailPage workflow actions', () => {
   const leadDetail = {
     lead: leadRow,
@@ -258,6 +315,7 @@ describe('LeadDetailPage workflow actions', () => {
     activity: [],
     communicationHistory: [],
     appointments: [],
+    suggestions: [],
   };
 
   it('offers Convert to patient with the lead details prefilled', async () => {

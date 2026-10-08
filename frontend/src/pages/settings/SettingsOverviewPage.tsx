@@ -21,6 +21,7 @@ const CATEGORIES: CategoryCard[] = [
   { to: '/settings/recall', title: 'Recall', description: 'Inactive-patient recall cadence' },
   { to: '/settings/reviews', title: 'Reviews', description: 'Review request timing and destination' },
   { to: '/settings/automation', title: 'Automation', description: 'Lead acknowledgement and missed-call replies' },
+  { to: '/settings/billing', title: 'Billing', description: 'Plan, pricing, and payment history' },
 ];
 
 const OPERATIONAL_SCREENS: CategoryCard[] = [

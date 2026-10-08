@@ -179,9 +179,11 @@ describe.skipIf(testHost === undefined || testHost === '')(
       expect(detail.body.communicationHistory[0].leadId).toBe(leadId);
       expect(detail.body.communicationHistory[0].body).toContain('thank you for contacting');
       expect(detail.body.appointments).toEqual([]);
-      expect(detail.body.activity).toHaveLength(1);
+      expect(detail.body.activity).toHaveLength(2);
       expect(detail.body.activity[0].action).toBe('created');
       expect(detail.body.activity[0].actorEmail).toBe(ownerAEmail);
+      expect(detail.body.activity[1].action).toBe('urgency_computed');
+      expect(detail.body.activity[1].actorEmail).toBeNull();
 
       const updated = await request(app)
         .patch(`/api/organizations/${orgAId}/leads/${leadId}`)
@@ -658,19 +660,25 @@ describe.skipIf(testHost === undefined || testHost === '')(
         actorEmail: string | null;
         createdAt: string;
       }>;
-      expect(activity).toHaveLength(3);
+      expect(activity).toHaveLength(5);
       expect(activity[0]?.action).toBe('created');
       expect(activity[0]?.actorEmail).toBe(ownerAEmail);
-      expect(activity[1]?.action).toBe('status_changed');
-      expect(activity[1]?.detail).toBe('status: NEW -> CONTACTED');
-      expect(activity[1]?.actorEmail).toBe(recvAEmail);
-      expect(activity[2]?.action).toBe('updated');
-      expect(activity[2]?.detail).toBe('fields: notes');
-      expect(activity[2]?.actorEmail).toBe(ownerAEmail);
+      expect(activity[1]?.action).toBe('urgency_computed');
+      expect(activity[1]?.actorEmail).toBeNull();
+      expect(activity[2]?.action).toBe('status_changed');
+      expect(activity[2]?.detail).toBe('status: NEW -> CONTACTED');
+      expect(activity[2]?.actorEmail).toBe(recvAEmail);
+      expect(activity[3]?.action).toBe('urgency_changed');
+      expect(activity[3]?.actorEmail).toBeNull();
+      expect(activity[4]?.action).toBe('updated');
+      expect(activity[4]?.detail).toBe('fields: notes');
+      expect(activity[4]?.actorEmail).toBe(ownerAEmail);
 
       const times = activity.map((a) => new Date(a.createdAt).getTime());
       expect(times[1]).toBeGreaterThanOrEqual(times[0] ?? 0);
       expect(times[2]).toBeGreaterThanOrEqual(times[1] ?? 0);
+      expect(times[3]).toBeGreaterThanOrEqual(times[2] ?? 0);
+      expect(times[4]).toBeGreaterThanOrEqual(times[3] ?? 0);
       expect(new Date(detail.body.lead.lastActivityAt).getTime()).toBeGreaterThanOrEqual(createdAt);
       expect(detail.body.lead.status).toBe('CONTACTED');
     }, 25_000);

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import type { Pool, RowDataPacket } from 'mysql2/promise';
 import { triggerLeadCreated } from '../automation/leadCreated';
+import { runLeadAutomation } from '../automation/leadAutomation';
 import { AppError } from '../errors';
 import { readJsonBody } from '../http/body';
 import type { Logger } from '../logger';
@@ -59,6 +60,11 @@ export function createPublicRouter(deps: PublicRouterDeps): Router {
       body,
     });
     await triggerLeadCreated(deps.db, deps.logger, { organizationId: org.id, leadId });
+    await runLeadAutomation(deps.db, deps.logger, {
+      organizationId: org.id,
+      leadId,
+      mode: 'create',
+    });
     res.status(201).json({ leadId });
   });
 

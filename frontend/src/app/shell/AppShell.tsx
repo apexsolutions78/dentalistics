@@ -9,10 +9,12 @@ const SECTION_TITLES: Record<string, string> = {
   workspace: 'Workspace',
   leads: 'Leads',
   patients: 'Patients',
+  doctors: 'Doctors',
   appointments: 'Appointments',
   communications: 'Communications',
   recall: 'Recall',
   automations: 'Automations',
+  billing: 'Billing',
   settings: 'Settings',
   unauthorized: 'Access denied',
 };

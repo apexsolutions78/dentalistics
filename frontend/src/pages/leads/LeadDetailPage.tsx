@@ -13,6 +13,7 @@ import { CommunicationTimeline } from '../../components/CommunicationTimeline';
 import { FormField } from '../../components/FormField';
 import { Flash } from '../../components/Flash';
 import { StatusBadge, ErrorState, LoadingState, EmptyState, type BadgeTone } from '../../components/states';
+import type { LeadSlotSuggestion, UrgencyLevel } from '../../lib/types';
 
 function statusTone(status: string): BadgeTone {
   if (status === 'NEW') return 'new';
@@ -20,6 +21,25 @@ function statusTone(status: string): BadgeTone {
   if (status === 'LOST' || status === 'CLOSED') return 'danger';
   if (status === 'CONTACTED') return 'warn';
   return 'default';
+}
+
+function urgencyTone(level: UrgencyLevel): BadgeTone {
+  if (level === 'HIGH') return 'danger';
+  if (level === 'MEDIUM') return 'warn';
+  return 'default';
+}
+
+const SUGGESTION_STATUS_TONES: Record<string, BadgeTone> = {
+  PENDING: 'new',
+  ACCEPTED: 'success',
+  RESCHEDULED: 'success',
+  DECLINED: 'default',
+  EXPIRED: 'default',
+};
+
+interface SuggestionDraft {
+  date: string;
+  time: string;
 }
 
 export function LeadDetailPage() {
@@ -34,6 +54,76 @@ export function LeadDetailPage() {
   const [notesDraft, setNotesDraft] = useState<string | null>(null);
   const canEditNotes = can(user, 'leads.notes.edit');
   const canCreatePatient = can(user, 'patients.create');
+  const canDecideSuggestions = can(user, 'appointments.create');
+  const [suggestionDrafts, setSuggestionDrafts] = useState<Record<number, SuggestionDraft>>({});
+
+  const suggestionDraft = (suggestion: LeadSlotSuggestion): SuggestionDraft =>
+    suggestionDrafts[suggestion.id] ?? { date: suggestion.slotDate, time: suggestion.slotTime.slice(0, 5) };
+
+  const approveSuggestion = async (suggestion: LeadSlotSuggestion): Promise<void> => {
+    if (orgId === null || leadId === undefined) return;
+    clearFeedback();
+    setFlash(null);
+    const draftForSuggestion = suggestionDraft(suggestion);
+    const changed =
+      draftForSuggestion.date !== suggestion.slotDate ||
+      draftForSuggestion.time !== suggestion.slotTime.slice(0, 5);
+    const ok = await submit(async () => {
+      await apiFetch(
+        `/api/organizations/${orgId}/leads/${leadId}/suggestions/${suggestion.id}/approve`,
+        {
+          method: 'POST',
+          body: changed
+            ? { date: draftForSuggestion.date, time: draftForSuggestion.time }
+            : {},
+        },
+      );
+      return true;
+    });
+    if (ok !== null) {
+      setFlash('Appointment booked. A confirmation message was queued for the patient.');
+      setSuggestionDrafts((prev) => {
+        const next = { ...prev };
+        delete next[suggestion.id];
+        return next;
+      });
+      reload();
+    }
+  };
+
+  const declineSuggestion = async (suggestion: LeadSlotSuggestion): Promise<void> => {
+    if (orgId === null || leadId === undefined) return;
+    clearFeedback();
+    setFlash(null);
+    const ok = await submit(async () => {
+      await apiFetch(
+        `/api/organizations/${orgId}/leads/${leadId}/suggestions/${suggestion.id}/decline`,
+        { method: 'POST', body: {} },
+      );
+      return true;
+    });
+    if (ok !== null) {
+      setFlash('Suggestion declined.');
+      reload();
+    }
+  };
+
+  const refreshSuggestions = async (): Promise<void> => {
+    if (orgId === null || leadId === undefined) return;
+    clearFeedback();
+    setFlash(null);
+    const ok = await submit(async () => {
+      await apiFetch(`/api/organizations/${orgId}/leads/${leadId}/suggestions/refresh`, {
+        method: 'POST',
+        body: {},
+      });
+      return true;
+    });
+    if (ok !== null) {
+      setFlash('Suggestions refreshed.');
+      reload();
+    }
+  };
 
   const saveStatus = async (): Promise<void> => {
     if (orgId === null || leadId === undefined || statusDraft === null || data === null) return;
@@ -105,7 +195,11 @@ export function LeadDetailPage() {
 
       <section className="card">
         <h2 className="card-title">
-          Contact information <StatusBadge label={lead.status} tone={statusTone(lead.status)} />
+          Contact information <StatusBadge label={lead.status} tone={statusTone(lead.status)} />{' '}
+          <StatusBadge
+            label={`Urgency: ${lead.urgencyLevel}`}
+            tone={urgencyTone(lead.urgencyLevel)}
+          />
         </h2>
         <div className="table-scroll" tabIndex={0} role="region" aria-label="Lead contact details">
           <table className="table">
@@ -129,6 +223,26 @@ export function LeadDetailPage() {
               <tr>
                 <th scope="row">Last activity</th>
                 <td>{formatDateTime(lead.lastActivityAt)}</td>
+              </tr>
+              <tr>
+                <th scope="row">Urgency</th>
+                <td>
+                  <StatusBadge
+                    label={lead.urgencyLevel}
+                    tone={urgencyTone(lead.urgencyLevel)}
+                  />
+                  {lead.urgencyReasons.length > 0 ? (
+                    <span
+                      style={{
+                        marginLeft: '8px',
+                        color: 'var(--color-text-secondary)',
+                        fontSize: 'var(--fs-label)',
+                      }}
+                    >
+                      {lead.urgencyReasons.join(' · ')}
+                    </span>
+                  ) : null}
+                </td>
               </tr>
             </tbody>
           </table>
@@ -195,6 +309,144 @@ export function LeadDetailPage() {
         >
           Next steps: contact the lead → Convert to patient → Book appointment (the status moves to
           Appointment booked automatically).
+        </p>
+      </section>
+
+      <section className="card">
+        <h2 className="card-title">
+          Slot suggestions
+          {lead.urgencyLevel !== 'LOW' ? (
+            <StatusBadge label={`SLA ${lead.urgencyLevel}`} tone={urgencyTone(lead.urgencyLevel)} />
+          ) : null}
+        </h2>
+        {data.suggestions.length === 0 ? (
+          <EmptyState
+            title="No suggestions yet"
+            description="Suggestions are generated automatically for active leads when doctors with free slots are configured."
+          />
+        ) : (
+          <div className="table-scroll" tabIndex={0} role="region" aria-label="Slot suggestions">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th scope="col">When</th>
+                  <th scope="col">Doctor</th>
+                  <th scope="col">Urgency</th>
+                  <th scope="col">Status</th>
+                  <th scope="col" aria-label="Actions" />
+                </tr>
+              </thead>
+              <tbody>
+                {data.suggestions.map((suggestion) => {
+                  const draft = suggestionDraft(suggestion);
+                  const isPending = suggestion.status === 'PENDING';
+                  return (
+                    <tr key={suggestion.id}>
+                      <td>
+                        {isPending && canDecideSuggestions ? (
+                          <span style={{ display: 'inline-flex', gap: '6px', alignItems: 'center' }}>
+                            <input
+                              className="input"
+                              type="date"
+                              aria-label="Suggestion date"
+                              value={draft.date}
+                              onChange={(e) =>
+                                setSuggestionDrafts((prev) => ({
+                                  ...prev,
+                                  [suggestion.id]: { ...draft, date: e.target.value },
+                                }))
+                              }
+                            />
+                            <input
+                              className="input"
+                              type="time"
+                              aria-label="Suggestion time"
+                              value={draft.time}
+                              onChange={(e) =>
+                                setSuggestionDrafts((prev) => ({
+                                  ...prev,
+                                  [suggestion.id]: { ...draft, time: e.target.value },
+                                }))
+                              }
+                            />
+                          </span>
+                        ) : (
+                          `${formatDate(suggestion.slotDate)} ${suggestion.slotTime.slice(0, 5)}`
+                        )}
+                      </td>
+                      <td>
+                        {suggestion.doctor !== null
+                          ? `${suggestion.doctor.name}${suggestion.doctor.specialty !== null && suggestion.doctor.specialty !== '' ? ` (${suggestion.doctor.specialty})` : ''}`
+                          : '—'}
+                      </td>
+                      <td>
+                        <StatusBadge
+                          label={suggestion.urgencyLevel}
+                          tone={urgencyTone(suggestion.urgencyLevel)}
+                        />
+                      </td>
+                      <td>
+                        <StatusBadge
+                          label={suggestion.status}
+                          tone={SUGGESTION_STATUS_TONES[suggestion.status] ?? 'default'}
+                        />
+                      </td>
+                      <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                        {isPending && canDecideSuggestions ? (
+                          <>
+                            <button
+                              type="button"
+                              className="btn btn-primary"
+                              disabled={saving}
+                              onClick={() => void approveSuggestion(suggestion)}
+                            >
+                              Approve
+                            </button>{' '}
+                            <button
+                              type="button"
+                              className="btn btn-secondary"
+                              disabled={saving}
+                              onClick={() => void declineSuggestion(suggestion)}
+                            >
+                              Decline
+                            </button>
+                          </>
+                        ) : suggestion.status === 'ACCEPTED' || suggestion.status === 'RESCHEDULED' ? (
+                          suggestion.appointmentId !== null ? (
+                            <Link className="btn btn-secondary" to={`/appointments/${suggestion.appointmentId}`}>
+                              Open appointment
+                            </Link>
+                          ) : null
+                        ) : null}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <div className="btn-row">
+          {canDecideSuggestions ? (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              disabled={saving}
+              onClick={() => void refreshSuggestions()}
+            >
+              Refresh suggestions
+            </button>
+          ) : null}
+        </div>
+        <p
+          style={{
+            margin: '8px 0 0',
+            color: 'var(--color-text-secondary)',
+            fontSize: 'var(--fs-label)',
+          }}
+        >
+          Approving creates the appointment, moves the lead to Appointment booked, and queues the
+          confirmation message. Adjust the date/time first to reschedule the slot.
         </p>
       </section>
 

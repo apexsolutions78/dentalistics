@@ -30,12 +30,14 @@ const MANAGER_CAPABILITIES = [
   'settings.recall.manage',
   'settings.reviews.manage',
   'settings.automation.manage',
+  'doctors.view',
+  'doctors.manage',
   'admin.webhooks.view',
   'admin.automation_failures.view',
   'admin.audit.view',
 ] as const;
 
-const PLATFORM_ADMIN_CAPABILITIES = ['admin.trials.view'] as const;
+const PLATFORM_ADMIN_CAPABILITIES = ['admin.trials.view', 'admin.payments.view'] as const;
 
 export type Capability =
   | (typeof MANAGER_CAPABILITIES)[number]
@@ -51,6 +53,8 @@ const RECEPTIONIST_CAPABILITIES: readonly Capability[] = [
   'appointments.rebook',
   'communications.view',
   'recall.view',
+  'doctors.view',
+  'doctors.manage',
 ];
 
 export const CAPABILITIES: Record<Role, readonly Capability[]> = {

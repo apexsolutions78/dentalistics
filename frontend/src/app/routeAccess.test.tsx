@@ -83,6 +83,33 @@ function routeFor(user: SessionUser | null, organization?: SessionOrganization |
     if (url.includes('/users')) {
       return jsonResponse(200, { users: [] });
     }
+    if (url.includes('/billing')) {
+      return jsonResponse(200, {
+        organization: {
+          id: 1,
+          name: 'Test Clinic',
+          plan: 'trial',
+          trialEndsAt: '2099-01-01T00:00:00.000Z',
+        },
+        price: { amountUsdCents: 2000, currency: 'USD', interval: 'month', name: 'Full Plan' },
+        gateway: { enabled: false, provider: 'assanpay', configured: false, reasons: [] },
+        payments: [],
+      });
+    }
+    if (url.includes('/api/admin/payment-gateway')) {
+      return jsonResponse(200, {
+        gateway: {
+          enabled: false,
+          provider: 'assanpay',
+          merchantId: '',
+          storeName: '',
+          baseUrl: '',
+          returnUrlBase: '',
+          state: 'red',
+          reasons: [],
+        },
+      });
+    }
     if (url.includes('/api/admin/trials')) {
       return jsonResponse(200, { trials: [] });
     }
@@ -282,6 +309,31 @@ describe('route access', () => {
 
   it('denies a receptionist the trials screen', async () => {
     await renderAt('/admin/trials', makeUser({ role: 'receptionist', email: 'desk@example.com' }));
+    expect(await screen.findByText('Access denied')).toBeInTheDocument();
+  });
+
+  it('lets an owner open the billing screen', async () => {
+    await renderAt('/settings/billing', makeUser({ role: 'owner' }));
+    expect(await screen.findByRole('heading', { name: 'Billing' })).toBeInTheDocument();
+    expect(screen.queryByText('Access denied')).not.toBeInTheDocument();
+  });
+
+  it('denies a receptionist access to billing', async () => {
+    await renderAt('/settings/billing', makeUser({ role: 'receptionist', email: 'desk@example.com' }));
+    expect(await screen.findByText('Access denied')).toBeInTheDocument();
+  });
+
+  it('lets the platform administrator open the payment gateway screen', async () => {
+    await renderAt(
+      '/admin/payments',
+      makeUser({ role: 'admin', email: 'platform@example.com', organizationId: null }),
+    );
+    expect(await screen.findByRole('heading', { name: 'Payment gateway' })).toBeInTheDocument();
+    expect(screen.queryByText('Access denied')).not.toBeInTheDocument();
+  });
+
+  it('denies a clinic owner the payment gateway screen', async () => {
+    await renderAt('/admin/payments', makeUser({ role: 'owner' }));
     expect(await screen.findByText('Access denied')).toBeInTheDocument();
   });
 

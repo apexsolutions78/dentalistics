@@ -245,6 +245,7 @@ describe.skipIf(testHost === undefined || testHost === '')(
       });
       expect(Object.keys(settings.automations as object).sort()).toEqual([
         'leadAck',
+        'leadAutomation',
         'missedCall',
         'noShow',
         'recall',
@@ -262,6 +263,7 @@ describe.skipIf(testHost === undefined || testHost === '')(
       expect(settings.providers.telephony.configured).toEqual({ signingSecret: false });
       expect(Object.keys(settings.templates as object).sort()).toEqual(
         [
+          'appointment_confirmation',
           'appointment_reminder_24h',
           'appointment_reminder_2h',
           'appointment_reminder_48h',

@@ -20,6 +20,11 @@ import {
   isAckConfig,
 } from '../automation/config';
 import {
+  LEAD_AUTOMATION_META_KEY,
+  DEFAULT_LEAD_AUTOMATION_CONFIG,
+  isLeadAutomationConfig,
+} from '../automation/leadAutomationConfig';
+import {
   MISSED_CALL_CONFIG_META_KEY,
   DEFAULT_MISSED_CALL_CONFIG,
   isMissedCallConfig,
@@ -63,7 +68,8 @@ export type AutomationSectionKey =
   | 'recall'
   | 'review'
   | 'leadAck'
-  | 'missedCall';
+  | 'missedCall'
+  | 'leadAutomation';
 
 export type ProviderSectionKey = 'telephony' | 'whatsapp';
 
@@ -74,6 +80,7 @@ export const AUTOMATION_SECTION_KEYS: readonly AutomationSectionKey[] = [
   'review',
   'leadAck',
   'missedCall',
+  'leadAutomation',
 ];
 
 export const PROVIDER_SECTION_KEYS: readonly ProviderSectionKey[] = ['telephony', 'whatsapp'];
@@ -95,6 +102,7 @@ interface TemplateSlot {
 export const TEMPLATE_SLOTS: Record<string, TemplateSlot> = {
   lead_acknowledgement: { section: 'leadAck', path: ['template'] },
   missed_call_response: { section: 'missedCall', path: ['template'] },
+  appointment_confirmation: { section: 'leadAutomation', path: ['template'] },
   appointment_reminder_48h: { section: 'reminder', path: ['templates', '48'] },
   appointment_reminder_24h: { section: 'reminder', path: ['templates', '24'] },
   appointment_reminder_2h: { section: 'reminder', path: ['templates', '2'] },
@@ -308,40 +316,57 @@ function buildDefinitions(): Record<string, unknown> {
 }
 
 export async function getSettings(db: Pool, organizationId: number): Promise<Record<string, unknown>> {
-  const [orgRows, reminder, noShow, recall, review, leadAck, missedCall, telephony, whatsapp] =
-    await Promise.all([
-      db.query<OrganizationSettingsRow[]>(
-        `SELECT name, phone, email, address, logo_url, business_hours, timezone, review_url
-         FROM organizations WHERE id = ?`,
-        [organizationId],
-      ).then(([rows]) => rows),
-      resolveJson(db, organizationId, REMINDER_CONFIG_META_KEY, isReminderConfig, DEFAULT_REMINDER_CONFIG),
-      resolveJson(db, organizationId, NO_SHOW_CONFIG_META_KEY, isNoShowConfig, DEFAULT_NO_SHOW_CONFIG),
-      resolveJson(db, organizationId, RECALL_CONFIG_META_KEY, isRecallConfig, DEFAULT_RECALL_CONFIG),
-      resolveJson(db, organizationId, REVIEW_CONFIG_META_KEY, isReviewConfig, DEFAULT_REVIEW_CONFIG),
-      resolveJson(db, organizationId, ACK_CONFIG_META_KEY, isAckConfig, DEFAULT_ACK_CONFIG),
-      resolveJson(
-        db,
-        organizationId,
-        MISSED_CALL_CONFIG_META_KEY,
-        isMissedCallConfig,
-        DEFAULT_MISSED_CALL_CONFIG,
-      ),
-      resolveJson(
-        db,
-        organizationId,
-        TELEPHONY_CONFIG_META_KEY,
-        isTelephonyConfig,
-        DEFAULT_TELEPHONY_CONFIG,
-      ),
-      resolveJson(
-        db,
-        organizationId,
-        WHATSAPP_CONFIG_META_KEY,
-        isWhatsAppConfig,
-        DEFAULT_WHATSAPP_CONFIG,
-      ),
-    ]);
+  const [
+    orgRows,
+    reminder,
+    noShow,
+    recall,
+    review,
+    leadAck,
+    missedCall,
+    leadAutomation,
+    telephony,
+    whatsapp,
+  ] = await Promise.all([
+    db.query<OrganizationSettingsRow[]>(
+      `SELECT name, phone, email, address, logo_url, business_hours, timezone, review_url
+       FROM organizations WHERE id = ?`,
+      [organizationId],
+    ).then(([rows]) => rows),
+    resolveJson(db, organizationId, REMINDER_CONFIG_META_KEY, isReminderConfig, DEFAULT_REMINDER_CONFIG),
+    resolveJson(db, organizationId, NO_SHOW_CONFIG_META_KEY, isNoShowConfig, DEFAULT_NO_SHOW_CONFIG),
+    resolveJson(db, organizationId, RECALL_CONFIG_META_KEY, isRecallConfig, DEFAULT_RECALL_CONFIG),
+    resolveJson(db, organizationId, REVIEW_CONFIG_META_KEY, isReviewConfig, DEFAULT_REVIEW_CONFIG),
+    resolveJson(db, organizationId, ACK_CONFIG_META_KEY, isAckConfig, DEFAULT_ACK_CONFIG),
+    resolveJson(
+      db,
+      organizationId,
+      MISSED_CALL_CONFIG_META_KEY,
+      isMissedCallConfig,
+      DEFAULT_MISSED_CALL_CONFIG,
+    ),
+    resolveJson(
+      db,
+      organizationId,
+      LEAD_AUTOMATION_META_KEY,
+      isLeadAutomationConfig,
+      DEFAULT_LEAD_AUTOMATION_CONFIG,
+    ),
+    resolveJson(
+      db,
+      organizationId,
+      TELEPHONY_CONFIG_META_KEY,
+      isTelephonyConfig,
+      DEFAULT_TELEPHONY_CONFIG,
+    ),
+    resolveJson(
+      db,
+      organizationId,
+      WHATSAPP_CONFIG_META_KEY,
+      isWhatsAppConfig,
+      DEFAULT_WHATSAPP_CONFIG,
+    ),
+  ]);
   const org = orgRows[0];
   if (org === undefined) {
     throw new AppError('Organization not found', 404, 'not_found', true);
@@ -369,6 +394,7 @@ export async function getSettings(db: Pool, organizationId: number): Promise<Rec
       review: { config: review.config, source: review.source },
       leadAck: { config: leadAck.config, source: leadAck.source },
       missedCall: { config: missedCall.config, source: missedCall.source },
+      leadAutomation: { config: leadAutomation.config, source: leadAutomation.source },
     },
     providers: {
       telephony: {
@@ -393,6 +419,7 @@ export async function getSettings(db: Pool, organizationId: number): Promise<Rec
     templates: {
       lead_acknowledgement: leadAck.config.template,
       missed_call_response: missedCall.config.template,
+      appointment_confirmation: leadAutomation.config.template,
       appointment_reminder_48h: reminderTemplates['48'] ?? '',
       appointment_reminder_24h: reminderTemplates['24'] ?? '',
       appointment_reminder_2h: reminderTemplates['2'] ?? '',
@@ -656,6 +683,22 @@ export async function patchAutomation(
       await upsertOrgConfig(db, organizationId, MISSED_CALL_CONFIG_META_KEY, merged);
       break;
     }
+    case 'leadAutomation': {
+      const base = await resolveJson(
+        db,
+        organizationId,
+        LEAD_AUTOMATION_META_KEY,
+        isLeadAutomationConfig,
+        DEFAULT_LEAD_AUTOMATION_CONFIG,
+      );
+      const merged = mergeSection(base.config, rawBody, {
+        nested: ['slaDays'],
+        deploymentGlobal: [],
+      });
+      assertValid(isLeadAutomationConfig(merged), key);
+      await upsertOrgConfig(db, organizationId, LEAD_AUTOMATION_META_KEY, merged);
+      break;
+    }
     default:
       invalidSection(key);
   }
@@ -818,6 +861,19 @@ async function loadSectionConfig(
         config: resolved.config as unknown as Record<string, unknown>,
       };
     }
+    case 'leadAutomation': {
+      const resolved = await resolveJson(
+        db,
+        organizationId,
+        LEAD_AUTOMATION_META_KEY,
+        isLeadAutomationConfig,
+        DEFAULT_LEAD_AUTOMATION_CONFIG,
+      );
+      return {
+        metaKey: LEAD_AUTOMATION_META_KEY,
+        config: resolved.config as unknown as Record<string, unknown>,
+      };
+    }
   }
 }
 
@@ -844,6 +900,9 @@ function assertSectionValid(
       break;
     case 'missedCall':
       valid = isMissedCallConfig(config);
+      break;
+    case 'leadAutomation':
+      valid = isLeadAutomationConfig(config);
       break;
   }
   assertValid(valid, section);

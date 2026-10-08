@@ -27,6 +27,7 @@ const SETTINGS_LINKS: Array<{ to: string; label: string; end?: boolean }> = [
   { to: '/settings/recall', label: 'Recall' },
   { to: '/settings/reviews', label: 'Reviews' },
   { to: '/settings/automation', label: 'Automation' },
+  { to: '/settings/billing', label: 'Billing' },
 ];
 
 function NavLinkItem({ link }: { link: { to: string; label: string; end?: boolean } }) {
@@ -48,6 +49,7 @@ export function Sidebar() {
   const showManagement = can(user, 'dashboard.view');
   const showSettingsSections = can(user, 'settings.view');
   const showTrials = can(user, 'admin.trials.view');
+  const showDoctors = can(user, 'doctors.view');
   const location = useLocation();
   const inSettings = location.pathname.startsWith('/settings');
 
@@ -57,6 +59,7 @@ export function Sidebar() {
         {PRIMARY_LINKS.map((link) => (
           <NavLinkItem key={link.to} link={link} />
         ))}
+        {showDoctors ? <NavLinkItem link={{ to: '/doctors', label: 'Doctors' }} /> : null}
       </ul>
       {showManagement ? (
         <ul className="nav-list" aria-label="Management" style={{ marginTop: '16px' }}>
@@ -68,6 +71,9 @@ export function Sidebar() {
       {showTrials ? (
         <ul className="nav-list" aria-label="Platform" style={{ marginTop: '16px' }}>
           <NavLinkItem link={{ to: '/admin/trials', label: 'Trials' }} />
+          {can(user, 'admin.payments.view') ? (
+            <NavLinkItem link={{ to: '/admin/payments', label: 'Payments' }} />
+          ) : null}
         </ul>
       ) : null}
       {showSettingsSections && inSettings ? (

@@ -32,3 +32,8 @@ export const MISSED_CALL_TEMPLATE_NAME = 'missed_call_response';
 
 export const DEFAULT_MISSED_CALL_TEMPLATE =
   'Hi {{first_name}}, sorry we missed your call to {{clinic_name}}. Please reply to this message or call us back to book an appointment.';
+
+export const APPOINTMENT_CONFIRMATION_TEMPLATE_NAME = 'appointment_confirmation';
+
+export const DEFAULT_APPOINTMENT_CONFIRMATION_TEMPLATE =
+  'Hi {{first_name}}, your appointment at {{clinic_name}} is confirmed for {{appointment_date}} at {{appointment_time}}. Reply to this message if you need to reschedule.';

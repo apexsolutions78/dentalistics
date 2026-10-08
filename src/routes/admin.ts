@@ -11,7 +11,15 @@ import type { Logger } from '../logger';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { listAuditLogs, listErrorEvents } from '../services/observability';
 import { createUserInOrg } from '../services/users';
-import { parsePathId, requirePassword, requireString } from '../validate';
+import {
+  gatewayReadiness,
+  loadPaymentGatewayConfig,
+  savePaymentGatewayConfig,
+} from '../payments/gatewayConfig';
+import type { PaymentGatewayConfig, PaymentGatewayProvider } from '../payments/gatewayConfig';
+import { PAYMENT_GATEWAY_PROVIDERS } from '../payments/gatewayConfig';
+import { createPaymentGateway } from '../payments/registry';
+import { parsePathId, requireChoice, requirePassword, requireString, ValidationError } from '../validate';
 export interface AdminRouterDeps {
   db: Pool;
   logger: Logger;
@@ -178,5 +186,102 @@ export function createAdminRouter(deps: AdminRouterDeps): Router {
     res.status(200).json(result);
   });
 
+  router.get('/payment-gateway', async (_req: Request, res: Response) => {
+    const config = await loadPaymentGatewayConfig(deps.db);
+    res.status(200).json({ gateway: gatewayDto(config) });
+  });
+
+  router.patch('/payment-gateway', async (req: Request, res: Response) => {
+    const body = readJsonBody(req);
+    const current = await loadPaymentGatewayConfig(deps.db);
+    const next: PaymentGatewayConfig = { ...current };
+
+    if (body.enabled !== undefined) {
+      if (typeof body.enabled !== 'boolean') {
+        throw new ValidationError('Validation failed', ['enabled must be a boolean']);
+      }
+      next.enabled = body.enabled;
+    }
+    if (body.provider !== undefined) {
+      next.provider = requireChoice(
+        body.provider,
+        PAYMENT_GATEWAY_PROVIDERS,
+        'provider',
+      ) as PaymentGatewayProvider;
+    }
+    if (body.merchantId !== undefined) {
+      next.merchantId = configString(body.merchantId, 'merchantId', 120);
+    }
+    if (body.storeName !== undefined) {
+      next.storeName = configString(body.storeName, 'storeName', 120);
+    }
+    if (body.baseUrl !== undefined) {
+      next.baseUrl = configUrl(body.baseUrl, 'baseUrl');
+    }
+    if (body.returnUrlBase !== undefined) {
+      next.returnUrlBase = configUrl(body.returnUrlBase, 'returnUrlBase');
+    }
+
+    await savePaymentGatewayConfig(deps.db, next);
+    const actor = req.user as SessionUser;
+    await recordAudit(deps.db, deps.logger, {
+      organizationId: null,
+      userId: actor.id,
+      action: 'payment_gateway_config_updated',
+      detail: `provider=${next.provider} enabled=${next.enabled} baseUrlSet=${next.baseUrl !== ''}`,
+    });
+    res.status(200).json({ gateway: gatewayDto(next) });
+  });
+
+  router.post('/payment-gateway/test', async (_req: Request, res: Response) => {
+    const config = await loadPaymentGatewayConfig(deps.db);
+    const result = await createPaymentGateway(config).testConnection();
+    res.status(200).json({ result });
+  });
+
   return router;
+}
+
+function gatewayDto(config: PaymentGatewayConfig): Record<string, unknown> {
+  const readiness = gatewayReadiness(config);
+  return {
+    enabled: config.enabled,
+    provider: config.provider,
+    merchantId: config.merchantId,
+    storeName: config.storeName,
+    baseUrl: config.baseUrl,
+    returnUrlBase: config.returnUrlBase,
+    state: readiness.configured ? 'green' : 'red',
+    reasons: readiness.reasons,
+  };
+}
+
+function configString(value: unknown, name: string, max: number): string {
+  if (typeof value !== 'string') {
+    throw new ValidationError('Validation failed', [`${name} must be a string`]);
+  }
+  const trimmed = value.trim();
+  if (trimmed.length > max) {
+    throw new ValidationError('Validation failed', [`${name} must be at most ${max} characters`]);
+  }
+  return trimmed;
+}
+
+function configUrl(value: unknown, name: string): string {
+  const text = configString(value, name, 512);
+  if (text === '') {
+    return '';
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(text);
+  } catch {
+    throw new ValidationError('Validation failed', [
+      `${name} must be an absolute URL (e.g. https://example.com)`,
+    ]);
+  }
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+    throw new ValidationError('Validation failed', [`${name} must use http or https`]);
+  }
+  return text;
 }

@@ -55,6 +55,12 @@ export function clinicLocalTime(instant: Date, timeZone: string): string {
   return `${pad(p.hour)}:${pad(p.minute)}`;
 }
 
+export function clinicLocalDate(instant: Date, timeZone: string): string {
+  const p = tzPartsIn(instant, timeZone);
+  const pad = (n: number): string => String(n).padStart(2, '0');
+  return `${p.year}-${pad(p.month)}-${pad(p.day)}`;
+}
+
 export function isWithinQuietHours(
   localTime: string,
   start: string,

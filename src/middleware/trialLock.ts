@@ -6,6 +6,8 @@ const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 const EXEMPT_PREFIXES = ['/api/auth', '/api/public', '/api/webhooks'];
 
+const BILLING_PATH = /^\/api\/organizations\/\d+\/billing(\/|$)/;
+
 export function createTrialLock(db: Pool): RequestHandler {
   return (req: Request, _res: Response, next: NextFunction) => {
     if (SAFE_METHODS.has(req.method)) {
@@ -18,6 +20,10 @@ export function createTrialLock(db: Pool): RequestHandler {
       return;
     }
     if (EXEMPT_PREFIXES.some((prefix) => req.path.startsWith(prefix))) {
+      next();
+      return;
+    }
+    if (BILLING_PATH.test(req.path)) {
       next();
       return;
     }

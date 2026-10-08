@@ -121,6 +121,21 @@ export function makeSettings(overrides: Partial<Settings> = {}): Settings {
         config: { enabled: true, channel: 'SMS', provider: 'mock', template: 'mc' },
         source: 'default',
       },
+      leadAutomation: {
+        config: {
+          enabled: true,
+          highKeywords: ['emergency', 'pain', 'broken', 'bleeding'],
+          highSources: ['MISSED_CALL'],
+          staleHours: 24,
+          slotsCount: 3,
+          lookaheadDays: 7,
+          slaDays: { high: 2, medium: 5, low: 7 },
+          channel: 'SMS',
+          provider: 'mock',
+          template: 'appt',
+        },
+        source: 'default',
+      },
     },
     providers: {
       telephony: { enabled: false, configured: { signingSecret: false }, source: 'default' },
@@ -134,6 +149,7 @@ export function makeSettings(overrides: Partial<Settings> = {}): Settings {
     templates: {
       lead_acknowledgement: 'ack',
       missed_call_response: 'mc',
+      appointment_confirmation: 'appt',
       appointment_reminder_48h: 'r48',
       appointment_reminder_24h: 'r24',
       appointment_reminder_2h: 'r2',
@@ -144,12 +160,13 @@ export function makeSettings(overrides: Partial<Settings> = {}): Settings {
       review_request: 'rv1',
     },
     definitions: {
-      automationKeys: ['reminder', 'noShow', 'recall', 'review', 'leadAck', 'missedCall'],
+      automationKeys: ['reminder', 'noShow', 'recall', 'review', 'leadAck', 'missedCall', 'leadAutomation'],
       providerKeys: ['telephony', 'whatsapp'],
       deploymentGlobal: { automations: ['maxAttempts'], note: 'attempt cap is deployment-wide' },
       templateNames: [
         'lead_acknowledgement',
         'missed_call_response',
+        'appointment_confirmation',
         'appointment_reminder_48h',
         'appointment_reminder_24h',
         'appointment_reminder_2h',

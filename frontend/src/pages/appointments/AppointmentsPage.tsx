@@ -4,7 +4,7 @@ import { useAuth } from '../../lib/auth';
 import { useApi } from '../../lib/useApi';
 import { apiFetch } from '../../lib/api';
 import { useSubmit } from '../../lib/useAsync';
-import type { Appointment, Paged, Patient } from '../../lib/types';
+import type { Appointment, Doctor, Paged, Patient } from '../../lib/types';
 import { APPOINTMENT_STATUSES, options } from '../../lib/constants';
 import { formatDate, formatTime, fullName } from '../../lib/format';
 import { PageHeader } from '../../components/PageHeader';
@@ -28,9 +28,10 @@ interface AppointmentFilters {
   from: string;
   to: string;
   patientId: string;
+  doctorId: string;
 }
 
-const EMPTY: AppointmentFilters = { status: '', from: '', to: '', patientId: '' };
+const EMPTY: AppointmentFilters = { status: '', from: '', to: '', patientId: '', doctorId: '' };
 
 export function AppointmentsPage() {
   const { user } = useAuth();
@@ -42,6 +43,7 @@ export function AppointmentsPage() {
     from: '',
     to: '',
     patientId: searchParams.get('patientId') ?? '',
+    doctorId: searchParams.get('doctorId') ?? '',
   });
   const [applied, setApplied] = useState<AppointmentFilters>(draft);
   const [offset, setOffset] = useState(0);
@@ -55,11 +57,19 @@ export function AppointmentsPage() {
     if (applied.from !== '') parts.push(`from=${applied.from}`);
     if (applied.to !== '') parts.push(`to=${applied.to}`);
     if (applied.patientId !== '') parts.push(`patientId=${applied.patientId}`);
+    if (applied.doctorId !== '') parts.push(`doctorId=${applied.doctorId}`);
     return parts.join('&');
   }, [applied, offset]);
 
   const path = orgId === null ? null : `/api/organizations/${orgId}/appointments?${query}`;
   const { status, data, error, reload } = useApi<Paged & { appointments: Appointment[] }>(path);
+
+  const doctorsPath = orgId === null ? null : `/api/organizations/${orgId}/doctors`;
+  const doctorsResult = useApi<{ doctors: Doctor[] }>(doctorsPath);
+  const activeDoctors = useMemo(
+    () => (doctorsResult.data?.doctors ?? []).filter((doctor) => doctor.isActive),
+    [doctorsResult.data],
+  );
 
   const { submit, saving, error: formError, clearFeedback, setError } = useSubmit();
   const [flash, setFlash] = useState<string | null>(null);
@@ -67,7 +77,15 @@ export function AppointmentsPage() {
   const [pickerQuery, setPickerQuery] = useState(prefillPhone);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [pickerSearch, setPickerSearch] = useState(prefillPhone);
-  const [form, setForm] = useState({ date: '', time: '', service: '', provider: '' });
+  const [form, setForm] = useState({ date: '', time: '', service: '', provider: '', doctorId: '' });
+
+  const availabilityPath =
+    orgId === null || !showForm || form.doctorId === '' || form.date === ''
+      ? null
+      : `/api/organizations/${orgId}/doctors/${form.doctorId}/availability?date=${form.date}`;
+  const availability = useApi<{ date: string; slotMinutes: number; slots: string[]; withinHours: boolean }>(
+    availabilityPath,
+  );
 
   const paramsKey = searchParams.toString();
   const [syncedKey, setSyncedKey] = useState(paramsKey);
@@ -78,6 +96,7 @@ export function AppointmentsPage() {
       from: '',
       to: '',
       patientId: searchParams.get('patientId') ?? '',
+      doctorId: searchParams.get('doctorId') ?? '',
     };
     setDraft(next);
     setApplied(next);
@@ -118,13 +137,14 @@ export function AppointmentsPage() {
       };
       if (form.service.trim() !== '') body.service = form.service.trim();
       if (form.provider.trim() !== '') body.provider = form.provider.trim();
+      if (form.doctorId !== '') body.doctorId = Number(form.doctorId);
       if (prefillLeadId !== '') body.leadId = Number(prefillLeadId);
       await apiFetch(`/api/organizations/${orgId}/appointments`, { method: 'POST', body });
       return true;
     });
     if (ok !== null) {
       setFlash('Appointment booked.');
-      setForm({ date: '', time: '', service: '', provider: '' });
+      setForm({ date: '', time: '', service: '', provider: '', doctorId: '' });
       setSelectedPatient(null);
       setAppliedPrefillId('');
       setPickerQuery('');
@@ -139,7 +159,12 @@ export function AppointmentsPage() {
   };
 
   const patients = data?.appointments ?? [];
-  const filtered = applied.status !== '' || applied.from !== '' || applied.to !== '' || applied.patientId !== '';
+  const filtered =
+    applied.status !== '' ||
+    applied.from !== '' ||
+    applied.to !== '' ||
+    applied.patientId !== '' ||
+    applied.doctorId !== '';
   const pickerLoading =
     pickerPath !== null && picker.status === 'loading' && picker.data === null;
   const prefillLoading =
@@ -247,16 +272,67 @@ export function AppointmentsPage() {
                 className="input"
                 type="date"
                 value={form.date}
-                onChange={(e) => setForm({ ...form, date: e.target.value })}
+                onChange={(e) => setForm({ ...form, date: e.target.value, time: '' })}
               />
             </FormField>
-            <FormField label="Time" required>
-              <input
-                className="input"
-                type="time"
-                value={form.time}
-                onChange={(e) => setForm({ ...form, time: e.target.value })}
-              />
+            <FormField
+              label="Doctor"
+              hint="Leave empty for a doctorless slot (blocks every doctor's calendar)."
+            >
+              <select
+                className="select"
+                value={form.doctorId}
+                onChange={(e) => setForm({ ...form, doctorId: e.target.value, time: '' })}
+              >
+                <option value="">No doctor</option>
+                {activeDoctors.map((doctor) => (
+                  <option key={doctor.id} value={doctor.id}>
+                    {doctor.name}
+                    {doctor.specialty !== null && doctor.specialty !== '' ? ` (${doctor.specialty})` : ''}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+            <FormField
+              label="Time"
+              required
+              hint={form.doctorId !== '' ? 'Only free slots within working hours are listed.' : undefined}
+            >
+              {form.doctorId !== '' ? (
+                availability.status === 'loading' ? (
+                  <LoadingState label="Loading slots…" />
+                ) : availability.data !== null && availability.data.withinHours ? (
+                  availability.data.slots.length > 0 ? (
+                    <select
+                      className="select"
+                      value={form.time}
+                      onChange={(e) => setForm({ ...form, time: e.target.value })}
+                    >
+                      <option value="">Choose a slot…</option>
+                      {availability.data.slots.map((slot) => (
+                        <option key={slot} value={slot}>
+                          {slot}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <span style={{ fontSize: 'var(--fs-label)', color: 'var(--color-text-secondary)' }}>
+                      No free slots on this day for the selected doctor.
+                    </span>
+                  )
+                ) : (
+                  <span style={{ fontSize: 'var(--fs-label)', color: 'var(--color-text-secondary)' }}>
+                    {availability.error ?? 'The doctor does not work on that day.'}
+                  </span>
+                )
+              ) : (
+                <input
+                  className="input"
+                  type="time"
+                  value={form.time}
+                  onChange={(e) => setForm({ ...form, time: e.target.value })}
+                />
+              )}
             </FormField>
             <FormField label="Service">
               <input
@@ -337,6 +413,22 @@ export function AppointmentsPage() {
                 onChange={(e) => setDraft({ ...draft, to: e.target.value })}
               />
             </FormField>
+            <FormField label="Doctor">
+              <select
+                className="select"
+                value={draft.doctorId}
+                onChange={(e) => setDraft({ ...draft, doctorId: e.target.value })}
+              >
+                <option value="">Any doctor</option>
+                <option value="none">No doctor</option>
+                {(doctorsResult.data?.doctors ?? []).map((doctor) => (
+                  <option key={doctor.id} value={doctor.id}>
+                    {doctor.name}
+                    {doctor.isActive ? '' : ' (inactive)'}
+                  </option>
+                ))}
+              </select>
+            </FormField>
           </div>
           <div className="btn-row">
             <button type="submit" className="btn btn-primary">
@@ -352,6 +444,7 @@ export function AppointmentsPage() {
                 const next = new URLSearchParams(searchParams);
                 next.delete('status');
                 next.delete('patientId');
+                next.delete('doctorId');
                 setSearchParams(next, { replace: true });
               }}
             >
@@ -388,6 +481,7 @@ export function AppointmentsPage() {
                   <th scope="col">Time</th>
                   <th scope="col">Patient</th>
                   <th scope="col">Service</th>
+                  <th scope="col">Doctor</th>
                   <th scope="col">Status</th>
                   <th scope="col">Provider</th>
                   <th scope="col" aria-label="Actions" />
@@ -404,6 +498,7 @@ export function AppointmentsPage() {
                       </Link>
                     </td>
                     <td>{appt.service ?? '—'}</td>
+                    <td>{appt.doctor?.name ?? '—'}</td>
                     <td>
                       <StatusBadge label={appt.status} tone={statusTone(appt.status)} />
                     </td>

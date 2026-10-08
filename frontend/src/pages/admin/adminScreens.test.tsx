@@ -7,6 +7,7 @@ import { WebhooksPage } from './WebhooksPage';
 import { AutomationFailuresPage } from './AutomationFailuresPage';
 import { AuditLogPage } from './AuditLogPage';
 import { TrialsPage } from './TrialsPage';
+import { PaymentGatewayPage } from './PaymentGatewayPage';
 import { makeUser, makeMembers, jsonResponse } from '../../test/fixtures';
 
 afterEach(() => {
@@ -308,5 +309,115 @@ describe('TrialsPage', () => {
     stub((url) => (url.includes('/api/admin/trials') ? jsonResponse(200, { trials: [] }) : null));
     renderPage(<TrialsPage />);
     expect(await screen.findByText('No trial clinics')).toBeInTheDocument();
+  });
+});
+
+const gatewayRed = {
+  gateway: {
+    enabled: false,
+    provider: 'assanpay',
+    merchantId: '',
+    storeName: '',
+    baseUrl: '',
+    returnUrlBase: '',
+    state: 'red',
+    reasons: [
+      'API base URL is not set',
+      'Merchant ID is not set',
+      'Return URL base is not set',
+      'Gateway is switched off',
+    ],
+  },
+};
+
+const gatewayGreen = {
+  gateway: {
+    enabled: true,
+    provider: 'mock',
+    merchantId: '',
+    storeName: 'Pay Test Store',
+    baseUrl: '',
+    returnUrlBase: '',
+    state: 'green',
+    reasons: [],
+  },
+};
+
+describe('PaymentGatewayPage', () => {
+  it('shows the red readiness state with configuration reasons', async () => {
+    stub((url) =>
+      url.includes('/api/admin/payment-gateway') ? jsonResponse(200, gatewayRed) : null,
+    );
+    renderPage(<PaymentGatewayPage />);
+    expect(await screen.findByText('NOT READY')).toBeInTheDocument();
+    expect(screen.getByText('Disabled')).toBeInTheDocument();
+    expect(screen.getByText('AssanPay provider')).toBeInTheDocument();
+    expect(screen.getByText('API base URL is not set')).toBeInTheDocument();
+    expect(screen.getByText('Gateway is switched off')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save settings' })).toBeDisabled();
+  });
+
+  it('saves the gateway settings after an edit', async () => {
+    const fn = stub((url, init) => {
+      if (url.includes('/api/admin/payment-gateway') && init?.method === 'PATCH') {
+        return jsonResponse(200, gatewayGreen);
+      }
+      if (url.includes('/api/admin/payment-gateway')) {
+        return jsonResponse(200, gatewayRed);
+      }
+      return null;
+    });
+    renderPage(<PaymentGatewayPage />);
+    const storeName = await screen.findByLabelText('Store name');
+    expect(screen.getByRole('button', { name: 'Save settings' })).toBeDisabled();
+
+    fireEvent.change(storeName, { target: { value: 'Pay Test Store' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save settings' }));
+
+    expect(await screen.findByText('Gateway settings saved.')).toBeInTheDocument();
+    const patch = fn.mock.calls.find(
+      ([input, init]) =>
+        String(input).includes('/api/admin/payment-gateway') && init?.method === 'PATCH',
+    );
+    expect(patch).toBeDefined();
+    const body = JSON.parse(String(patch?.[1]?.body ?? '{}')) as Record<string, unknown>;
+    expect(body).toMatchObject({ storeName: 'Pay Test Store', enabled: false });
+  });
+
+  it('runs a connection test and shows the result', async () => {
+    stub((url, init) => {
+      if (url.includes('/payment-gateway/test') && init?.method === 'POST') {
+        return jsonResponse(200, { result: { ok: true, detail: 'mock gateway reachable' } });
+      }
+      if (url.includes('/api/admin/payment-gateway')) {
+        return jsonResponse(200, gatewayGreen);
+      }
+      return null;
+    });
+    renderPage(<PaymentGatewayPage />);
+    expect(await screen.findByText('READY')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Test connection' }));
+    expect(await screen.findByText('Connection test: mock gateway reachable')).toBeInTheDocument();
+  });
+
+  it('shows an API error when the gateway configuration is rejected', async () => {
+    stub((url, init) => {
+      if (url.includes('/api/admin/payment-gateway') && init?.method === 'PATCH') {
+        return jsonResponse(400, {
+          error: { code: 'validation_error', message: 'baseUrl must use http or https' },
+        });
+      }
+      if (url.includes('/api/admin/payment-gateway')) {
+        return jsonResponse(200, gatewayRed);
+      }
+      return null;
+    });
+    renderPage(<PaymentGatewayPage />);
+    fireEvent.change(await screen.findByLabelText('API base URL'), {
+      target: { value: 'ftp://nope' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save settings' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('baseUrl must use http or https');
   });
 });

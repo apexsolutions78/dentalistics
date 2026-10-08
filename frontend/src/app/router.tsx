@@ -21,6 +21,7 @@ import { LeadsPage } from '../pages/leads/LeadsPage';
 import { LeadDetailPage } from '../pages/leads/LeadDetailPage';
 import { PatientsPage } from '../pages/patients/PatientsPage';
 import { PatientProfilePage } from '../pages/patients/PatientProfilePage';
+import { DoctorsPage } from '../pages/doctors/DoctorsPage';
 import { AppointmentsPage } from '../pages/appointments/AppointmentsPage';
 import { AppointmentCalendarPage } from '../pages/appointments/AppointmentCalendarPage';
 import { AppointmentDetailPage } from '../pages/appointments/AppointmentDetailPage';
@@ -32,6 +33,9 @@ import { WebhooksPage } from '../pages/admin/WebhooksPage';
 import { AutomationFailuresPage } from '../pages/admin/AutomationFailuresPage';
 import { AuditLogPage } from '../pages/admin/AuditLogPage';
 import { TrialsPage } from '../pages/admin/TrialsPage';
+import { PaymentGatewayPage } from '../pages/admin/PaymentGatewayPage';
+import { BillingPage } from '../pages/settings/BillingPage';
+import { MockCheckoutPage } from '../pages/billing/MockCheckoutPage';
 import { SettingsOverviewPage } from '../pages/settings/SettingsOverviewPage';
 import { ClinicSettingsPage } from '../pages/settings/ClinicSettingsPage';
 import { UsersRolesPage } from '../pages/settings/UsersRolesPage';
@@ -68,6 +72,9 @@ export function AppRouter() {
                 <Route path="leads/:leadId" element={<LeadDetailPage />} />
                 <Route path="patients" element={<PatientsPage />} />
                 <Route path="patients/:patientId" element={<PatientProfilePage />} />
+                <Route path="doctors" element={<RequireCapability capability="doctors.view" />}>
+                  <Route index element={<DoctorsPage />} />
+                </Route>
                 <Route path="appointments">
                   <Route index element={<AppointmentsPage />} />
                   <Route path="calendar" element={<AppointmentCalendarPage />} />
@@ -106,12 +113,17 @@ export function AppRouter() {
                   <Route path="recall" element={<RecallSettingsPage />} />
                   <Route path="reviews" element={<ReviewSettingsPage />} />
                   <Route path="automation" element={<AutomationSettingsPage />} />
+                  <Route path="billing" element={<BillingPage />} />
+                </Route>
+                <Route path="billing/mock/:orderId" element={<RequireCapability capability="settings.view" />}>
+                  <Route index element={<MockCheckoutPage />} />
                 </Route>
                 <Route path="*" element={<NotFoundPage />} />
               </Route>
             </Route>
             <Route element={<RequirePlatformAdmin />}>
               <Route path="admin/trials" element={<TrialsPage />} />
+              <Route path="admin/payments" element={<PaymentGatewayPage />} />
               <Route path="*" element={<NotFoundPage />} />
             </Route>
           </Route>
