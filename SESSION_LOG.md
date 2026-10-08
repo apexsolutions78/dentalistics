@@ -5377,3 +5377,208 @@ idempotent migrate: pplied=0, skipped=18 (0017 + 0018 present,
 never pasted), authenticated browser walkthrough on production
 (credentials not used without instruction). Deployment state recorded
 as PROJECT_STATE rev 72.
+
+**[Update 2026-10-07 - Phase A: lead automation + Doctors Panel]:**
+owner instruction "Phase A to C approved" (three features; Q1-Q6
+design answers recorded in-session - panel managed by master admin
+AND receptionist, urgency rubric approved as drafted, approve ->
+confirmation + lead moves to APPOINTMENT_BOOKED, AssanPay is the real
+gateway with merchant account pending, FastPay deferred, $20/mo, "$5
+Pakistan discount" + currency/FX left AMBIGUOUS for Phase B).
+Phase A implemented end-to-end: migration 0019 (doctors,
+appointments.doctor_id, leads urgency columns, lead_slot_suggestions),
+urgency + slot + suggestion services, leadAutomation pipeline with
+activities urgency_computed/suggestions_generated/urgency_changed
+(no last_activity_at bump), doctors router + availability endpoint,
+suggestion endpoints (refresh/approve/decline) with
+appointment_confirmation idempotency, settings leadAutomation section,
+public.ts + callEvents.ts triggers, doctors.view/doctors.manage
+capabilities (receptionist too, total 34), DoctorsPage, lead-detail
+urgency badges + suggestions card, appointments doctor filter/select,
+AutomationSettingsPage card. Tests: +20 new (urgency 11 unit,
+leadAutomation 9 live-DB integration), +3 DoctorsPage frontend tests.
+Rule-8 fallout fixes: m3 activity timeline now expects the two new
+automation entries (1->2, 3->5), m16 settings keys gain leadAutomation
++ appointment_confirmation, makeSettings fixture gains leadAutomation
+(TS2741). Gates executed (all exit 0): backend verify
+lint+typecheck+**386/386 (37 files)**+build; frontend verify
+eslint+**125/125 (22 files)**+tsc+build. Status: CODE_WRITTEN,
+TEST_PASSED, INTEGRATION_VERIFIED. NOT VERIFIED: no Playwright E2E for
+approve->appointment, no live-server walkthrough. NOT committed, NOT
+deployed (Rule 11). Recorded as PROJECT_STATE rev 73. Next phase
+(Phase B - AssanPay checkout + master-admin gateway settings) awaits
+owner instruction + the open pricing/currency answers (Rule 1).
+
+---
+
+## Session 40 - 2026-10-08 - Phase B: AssanPay payment gateway complete (checkout, billing UI, admin settings); all gates green
+
+**Owner instructions this session:** "read last session log and resume
+what is remaining on To do list" -> Session 39 recap + to-do review
+delivered, the two open decisions (resume what? price USD or PKR with
+the $5 discount?) put to the owner through the question tool; owner
+answered: **resume Phase B**, pricing **"USD only, delete discount"**.
+"Continue if you have next steps" -> executed to completion.
+
+**Starting state:** Phase A complete but uncommitted (rev 73); Phase B
+was the next to-do item. Pricing/currency had been left AMBIGUOUS at
+the end of Session 39 - resolved by the owner answer above (recorded
+as **D12**, PROJECT_STATE rev 74). Docker engine was DOWN at session
+start (docker API pipe missing) - Docker Desktop launched and the
+existing `dentalistics-mysql` container started (healthy, 0.0.0.0:3306,
+root password from `.env` verified authenticating) before any DB test.
+
+### Work executed (Phase B, end to end)
+
+1. **Schema** - `migrations/0020_payments.sql`: `payments` table
+   (organization FK, `amount_usd_cents`, `currency` CHAR(3) fixed
+   'USD', status ENUM PENDING/PAID/FAILED/EXPIRED/CANCELLED, provider,
+   UNIQUE `order_id` + status indexes, checkout_url,
+   provider_transaction_id, last_error, paid_at). Applied by the test
+   harness through the existing `runMigrations` path.
+2. **Gateway layer** `src/payments/` (adapter behind an interface):
+   - `types.ts` - `PaymentGateway` interface: `createPayment(input)`,
+     `queryStatus(orderId)`, `testConnection()`.
+   - `gatewayConfig.ts` - app_meta key `payment_gateway_config`,
+     defaults `{enabled:false, provider:'assanpay', baseUrl:'',
+     merchantId:'', storeName:'', returnUrlBase:''}`, shape-guarded
+     load, upsert save, `gatewayReadiness()` -> `{configured, reasons}`
+     driving green/red.
+   - `mockGateway.ts` - local checkout URL `/billing/mock/<orderId>`,
+     `testConnection` always ok.
+   - `assanpayGateway.ts` - built from the OFFICIAL docs.assanpay.com
+     pages fetched this session (primary source): POST
+     `/payment-request/{merchantId}` body `{amount, order_id, store_name,
+     link}` where order_id must be <=20 chars alphanumeric and unique,
+     response `data.completeLink`; GET
+     `/payment/all-inquiry/{merchantId}?transactionId=` response
+     `data.transactionStaus` (their spelling) mapping paid/failed/
+     pending, HTTP 404 -> 'unknown'. `fetch` + `AbortSignal.timeout
+     (15000)`. API base URL, auth header and settlement currency are
+     NOT in the public docs - recorded as config fields + readiness
+     reasons, never invented (UNKNOWN).
+   - `registry.ts` - `createPaymentGateway(config)`.
+3. **Service** `src/services/payments.ts` - `BILLING_PRICE` 2000 USD
+   cents (single price source), `getBillingSummary`, `createCheckout`
+   (supersedes prior PENDING rows -> CANCELLED), `checkPaymentStatus`,
+   `markPaidAndActivate` (plan='full', trial_ends_at=NULL, audits
+   payment_checkout_created / payment_completed / trial_activated),
+   `recordMockResult`.
+4. **Endpoints** - new `src/routes/billing.ts` mounted in `app.ts`:
+   `GET /:orgId/billing`, `POST .../checkout` (409 gateway_disabled /
+   already_active), `GET .../payments/:orderId/status`,
+   `POST .../payments/:orderId/mock-complete` (409 mock_disabled when
+   the active provider is not mock); owner/admin via the existing
+   member guard (receptionist 403, foreign org 404, unauth 401).
+   `src/routes/admin.ts` gains `GET/PATCH /api/admin/payment-gateway`
+   + `POST .../test` (boolean/choice/string/URL validation -> 400,
+   audit payment_gateway_config_updated).
+5. **Trial-lock exemption** - `src/middleware/trialLock.ts` exempts
+   `/^\/api\/organizations\/\d+\/billing(\/|$)/` so a day-9 clinic can
+   still pay; every other non-GET stays 403 trial_expired (proved by
+   test).
+6. **Frontend** - `settings/BillingPage.tsx` (plan card, "Full Plan -
+   $20.00 USD per month", Upgrade disabled until the gateway is
+   enabled + shows readiness reasons, internal `navigate` for local
+   checkout URLs / `window.location.assign` otherwise, 3s x5 status
+   poll when `?orderId=` present, payment history table with Check
+   status), `billing/MockCheckoutPage.tsx` (Simulate successful/
+   failed payment + Back to billing), `admin/PaymentGatewayPage.tsx`
+   (READY/NOT READY StatusBadge + reasons list, form, Save settings /
+   Test connection, `useUnsavedChanges`), routing (`settings/billing`
+   under settings.view, `billing/mock/:orderId`, `admin/payments`
+   under RequirePlatformAdmin), Sidebar "Billing" + "Payments" links,
+   SettingsOverview billing card, AppShell `billing` section title,
+   `lib/types.ts` payment/billing/gateway types.
+7. **Tests written** - backend `tests/payments.integration.test.ts`
+   (12 tests, m16 harness pattern, first run green); frontend
+   `BillingPage.test.tsx` (5), `adminScreens.test.tsx` +PaymentGateway
+   describe (4), `MockCheckoutPage.test.tsx` (4), `routeAccess.test.
+   tsx` +4 (owner/receptionist x billing, admin/owner x payments).
+
+### Defects found and fixed (execution, not inspection)
+
+| # | Defect | Fix | Re-verification |
+|---|---|---|---|
+| B1 | BillingPage rendered its cards when `useApi` data was `null` (`summary !== undefined` guard) - `useApi` starts at `null`, so the page would throw `Cannot read properties of null (reading 'gateway')` on EVERY mount in production | Guard changed to `summary !== null` | Full frontend suite 142/142, no unhandled errors |
+| B2 | Checkout responds `201 {payment:{...}}` (billing route line 63) but BillingPage read a top-level `checkoutUrl` - the Upgrade click would throw `Cannot read properties of undefined (reading 'startsWith')` in production | `apiFetch<{payment: CheckoutPayment}>` + `result.payment.checkoutUrl` | New BillingPage checkout test passes; frontend 142/142 |
+| B3 | TS error TS2345 - hoisted `run()` closure in the polling effect could not keep the `orderIdParam !== null` narrowing | Local `const orderId = orderIdParam` after the guard | `tsc -b` exit 0 |
+| B4 | Backend tsc TS2532 x5 in the new test (`rows[0]` possibly undefined under noUncheckedIndexedAccess) | `rows[0] as mysql.RowDataPacket` narrowing (existing repo pattern) | `tsc -p tsconfig.json` exit 0 |
+| B5 | eslint `no-unused-vars` on `mockGateway.queryStatus(_orderId)` (single unused param; repo has no ignore pattern) | Param removed (TS allows implementing an interface method with fewer params) | `eslint .` exit 0 |
+
+### Gates actually executed (all exit 0)
+
+- Backend `npm run verify`: eslint 0 + `tsc -p tsconfig.json` 0 +
+  **vitest 398/398 (38 files, 0 failed)** + `tsc -p
+  tsconfig.build.json` 0. Includes the new live-DB payments suite
+  **12/12** (runs against the restarted Docker MySQL).
+- Frontend `npm run verify:frontend`: eslint 0 + **vitest 142/142
+  (24 files)** + `tsc -b` 0 + `vite build` OK (`index-6EdNMCa7.css`
+  reused; JS `index-CBlDgnzZ.js` 470.61 kB / 127.42 kB gzip).
+- Earlier isolated runs: `npx vitest run
+  tests/payments.integration.test.ts` = 12/12 first run; frontend
+  suite 142/142 after each fix.
+
+Status: CODE_WRITTEN, TEST_PASSED, INTEGRATION_VERIFIED.
+NOT VERIFIED: live AssanPay end-to-end call (merchant account pending,
+UNKNOWN base URL/auth), Playwright E2E for the checkout flow.
+NOT committed, NOT deployed (Rule 11 - 50 files now pending: Phase A +
+Phase B). Recorded as PROJECT_STATE rev 74 (D12 added).
+
+**Open questions for the owner:** (1) accept Phase B as reported (and
+then commit?), or adjust? (2) when the AssanPay merchant credentials
+arrive, supply API base URL + merchant ID + return URL base through
+the new /admin/payments screen (they are config, not code - no rebuild
+needed); mock provider is there for demos meanwhile. Carried-over:
+Phase A acceptance (rev 73); D11 conformance audit PROPOSED (Rule 1);
+deploy of everything since 3de9534 pending explicit instruction
+(Rule 11).
+
+**What is left (durable, for the next session):**
+
+1. Phase A acceptance + Phase B acceptance - owner decisions, gates
+   green on both (Rule 10 reports delivered).
+2. Commit/push of the 50 pending files - only on explicit owner
+   instruction (never committed this session or last).
+3. Phase C definition - UNKNOWN, never recorded; needs owner
+   instruction + a definition before any work (Rule 1).
+4. AssanPay merchant credentials -> configure gateway live; re-gate
+   with a real test payment (UNKNOWN until then).
+5. D11 conformance audit - PROPOSED, not started (Rule 1).
+6. Deployment of Phase A + B - not done (Rule 11).
+
+**[Update 2026-10-08 - Phase A + Phase B ACCEPTED; session log saved, work committed and pushed]:**
+owner verbatim: "Phase A and Phase B accepted. Save Session Log and
+proceed". Recorded as PROJECT_STATE rev 75 - this closes the
+"awaiting owner acceptance" status of rev 73 (Phase A) and rev 74
+(Phase B) and supersedes items 1 and 2 of the "What is left" list
+above (acceptance: DONE; commit: DONE as below). Execution:
+
+- **Code commit `5ccac30`** - "Phase A: lead automation + Doctors
+  Panel; Phase B: AssanPay billing and gateway settings" - all 52
+  pending files (migrations 0019 + 0020, `src/payments/`,
+  urgency/slots/suggestions/doctors/leadAutomation services + routers,
+  billing router, admin gateway endpoints, trialLock billing
+  exemption, BillingPage / MockCheckoutPage / PaymentGatewayPage +
+  routing/nav/capability wiring + the new test suites). Staged with
+  explicit excludes: `AGENTS.md` (owner decision pending since
+  Session 39) and the two docs files (committed separately below);
+  `.env` is git-ignored and was never staged. Gates at acceptance
+  unchanged from rev 74, executed earlier this session, all exit 0:
+  backend verify lint + typecheck + 398/398 (38 files) + build;
+  frontend verify:frontend eslint + 142/142 (24 files) + tsc + build.
+- **Docs commit = this entry + PROJECT_STATE rev 75**, pushed to
+  origin/master together with `5ccac30`; verification result
+  (git ls-remote MATCH check) reported to the owner in the final
+  report of this session.
+- OPEN after "proceed": **Phase C is still undefined** - a
+  repository-wide search found no definition anywhere (the only
+  mentions are the ones recording the gap). Rule 3 forbids inventing
+  it and Rule 1 forbids starting an undefined phase, so instead of
+  guessing the proceed target was put to the owner as a single
+  question (Phase C definition / D11 audit / E2E gap closure /
+  deploy / stop).
+- Other open items unchanged: AssanPay merchant credentials (gateway
+  ships disabled; live enable + real test payment re-gate after
+  credentials arrive); D11 conformance audit (PROPOSED); deployment
+  of `5ccac30` and everything since `3de9534` (Rule 11).
