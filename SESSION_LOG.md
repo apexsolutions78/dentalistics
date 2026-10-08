@@ -5582,3 +5582,154 @@ above (acceptance: DONE; commit: DONE as below). Execution:
   ships disabled; live enable + real test payment re-gate after
   credentials arrive); D11 conformance audit (PROPOSED); deployment
   of `5ccac30` and everything since `3de9534` (Rule 11).
+
+---
+
+## Session 41 - 2026-10-08 - D11 conformance audit (read-only): 6 gaps found, no code changes
+
+**Authorization / scope.** After Phase A + B acceptance
+(Session 40), the "proceed" target was undefined (Phase C has no
+definition anywhere in the repo - Rule 3/Rule 1), so one question was
+put to the owner; the owner selected **"D11 conformance audit
+(Recommended)"**. Scope: walk every automation against D11
+(PROJECT_STATE §6: automation-first, manual fallback, automation
+resumes unattended; acceptance test = "after the manual action, does
+the automated process continue unattended?"), report gaps, **no code
+changes without approval**.
+
+**Method.** Three explore agents gathered evidence in parallel
+(1: reminders/no-show/recall/review; 2: messaging/retries;
+3: lead automation/suggestions/trial lock). Every high-severity agent
+claim was then re-verified through an independent path: direct file
+reads + repo greps from the main session. file:line citations below
+come from those reads unless marked (a). Test evidence = test names
+observed by grep in `tests/*.test.ts`.
+
+**Verdict summary (Rule 4 labels).** 6 gaps: G1 HIGH, G2-G4 MEDIUM,
+G5-G6 LOW - all CONFIRMED behavior, with the D11 relevance of G5
+ASSUMED pending owner interpretation. 3 by-design stops verified
+D11-conformant. No code changed; no tests executed this session
+(read-only audit - last executed gates remain rev 75's green
+398/398 + 142/142). Full findings recorded as PROJECT_STATE **K7** and
+**rev 76**.
+
+**G1 (HIGH) - suggestion-approve appointments never receive
+48/24/2h reminders (CONFIRMED).** `approveSuggestion` inserts the
+appointment directly (`src/services/suggestions.ts:420-436`) and only
+sends the confirmation (`:468`); the sole production insert of
+reminder rows is inside `scheduleRemindersForAppointment`
+(`src/automation/reminders.ts:99`, which early-returns when the org
+has reminders disabled `:79`), and its only production caller is the
+manual create route (`src/routes/appointments.ts:91` - grep confirmed
+single caller). No lazy backfill exists (the tick selects existing
+PENDING/FAILED rows only). Test `leadAutomation.integration.test.ts:309`
+asserts appointment + lead status + confirmation, but no reminder
+rows. **D11 FAIL: after the manual approve, reminder automation does
+not continue.**
+
+**G2 (MEDIUM) - automation disabled at the trigger event creates no
+job rows; re-enabling never backfills (CONFIRMED).** Creation-time
+`!cfg.enabled` early-returns in reminders (`reminders.ts:79`),
+no-show (`noShow.ts:123-124`), recall (`recall.ts:143-144`) and
+review (`reviewRequests.ts:157-158`). Ticks re-read config every run,
+so re-enabling resumes the send side (m16:398) - but appointments
+booked, no-shows marked and visits completed while the automation was
+off are permanently un-automated with no recovery path. The disabled
+behavior itself is test-covered (m9:641, m10:660, m11:501, m16:398);
+the no-backfill consequence is not in rev 68's known-exceptions list.
+ASSUMED owner intent: re-enable should catch up - needs a decision
+(fix vs document).
+
+**G3 (MEDIUM) - quiet hours drop reminders instead of deferring
+(CONFIRMED).** A due reminder inside quiet hours is finalized as
+terminal `SUPPRESSED / quiet_hours` (`reminders.ts:252-269`) and is
+never re-attempted when the window ends - the message is silently
+lost and no manual path exists to notice. Quiet hours apply only to
+reminders (grep: `isWithinQuietHours` used solely at
+`reminders.ts:254`; D4 deliberately scoped them there). May be
+intended policy - **PROPOSED owner decision: defer-to-window-end vs
+document the drop.**
+
+**G4 (MEDIUM, documented rationale) - webhook-created missed-call
+leads never invoke lead acknowledgement (CONFIRMED).**
+`callEvents.ts:140` runs only `runLeadAutomation`; `triggerLeadCreated`
+exists only at `leads.ts:50` (staff create) and `public.ts:62`
+(website) - grep. The exclusion matches rev 67's recorded decision
+(MISSED_CALL kept out of default ack sources because `missedCall.ts`
+already sends its own response - double-text avoidance) => **the
+default behavior is a DOCUMENTED-EXCEPTION**. Discrepancy found:
+rev 67's side-claim "clinics can still add it in Settings -> Automation"
+is only true for staff-created leads (the webhook path never calls
+the trigger, so the Settings sources filter cannot fire there) - doc
+correction **PROPOSED**.
+
+**G5 (LOW) - inbound patient reply never updates lead state
+(CONFIRMED behavior; D11 relevance ASSUMED).**
+`handleInboundMessage` (`messages.ts:267-298`) links the reply to the
+most recent active lead and stores it as RECEIVED; there is no
+`UPDATE leads` anywhere in messages.ts (grep). Lead status changes
+only through staff actions/bookings. Whether a reply should
+auto-advance lead status is an owner requirement question -
+**PROPOSED observation, not a confirmed defect.**
+
+**G6 (LOW) - interrupted PENDING lead-ack rows are unreachable by any
+endpoint (CONFIRMED).** `retryLeadAcknowledgement`
+(`leadCreated.ts:130`, accepts PENDING + FAILED since the Session 19
+fix) has zero non-test callers (grep: m6 tests only), while the
+generic retry requires `status='FAILED'`
+(`observability.ts:165` / `:201`) - a crash between message INSERT
+and dispatch leaves a PENDING ack that no UI/API path can resend.
+Sub-constraint **NOT VERIFIED**: `kind=message` retry also requires a
+non-empty `provider_key` (`observability.ts:168-170`) - whether ack
+rows always carry one was not checked.
+
+**CONFIRMED D11-conformant chains (direct reads).** Appointment state
+handlers feed automation (`src/routes/appointments.ts`: cancel `:313`,
+complete `:327-330` = cancel reminders + close recall + create next
+recall + create review request, no-show `:344-345`, reschedule
+`:361-362` = cancel + reschedule, rebook `:378-385` = schedule +
+close recall + close no-show case, staff closes `:389-440`), with
+test coverage m8:354/383/411, m9:312/434/474, m10/m11 disabled
+gates, m20 scenarios A-D. Per-org config re-read every tick (grep
+`cfg.enabled` across all automations) - toggles resume without a
+restart (m16:398). Trial lock = fresh DB check per mutating request
+(`trialLock.ts:30-44`) with a tested activation lift
+(`trialLock.integration.test.ts:234`). maxAttempts exhaustion is
+D11-shaped: documented anti-spam stop, manual retry requeues
+FAILED -> PENDING (`observability.ts:192-214`, m19:773). smsOptOut =
+terminal suppression with opt-in resume for unclaimed rows
+(`reminders.ts:240-250`, m11:454).
+
+**Side findings (non-D11).** S1: suggestion approve/decline routes
+carry no backend capability or role check (`routes/leads.ts:104-141`,
+only `assertOrgExists`); every role holds `appointments.create`
+(`capabilities.ts:13/52/61-63`) so the net effect matches the
+capability model today, but rev 73's "approve gated on
+`appointments.create`" is frontend-only and vacuous, and the
+F-40 "capability <-> backend 403" convention
+(`FrontEnd_Planning.md` §implemented F-40) is not enforced on these
+two routes. S2 = rev 67 wording (under G4). S3 = rev 68's "manual
+retry endpoints exist for lead acknowledgement" holds only for FAILED
+rows via failed-jobs/message (G6 caveat).
+
+**Tests actually executed this session: none** (read-only audit; no
+code changed, so no gates were re-run - Rule 7, reported honestly).
+Last executed gates stand from rev 75: backend `npm run verify`
+398/398 (38 files), frontend `npm run verify:frontend` 142/142
+(24 files), all exit 0.
+
+**Files created/modified:** none in code; `PROJECT_STATE.md`
+(revision 76 + new K7) and this entry.
+
+**Unresolved:** G1-G6 await owner decisions (fix vs accept vs
+document); rev 67 wording correction; S1 backend gate question.
+
+**Assumptions:** no new ones - G2 backfill intent and G5 D11
+relevance are explicitly ASSUMED and flagged for confirmation.
+
+**Recommended next phase (PROPOSED, Rule 1):** (1) fix G1 - route
+approve-created appointments through the shared reminder scheduling
++ regression test (smallest high-value fix); (2) owner decisions on
+G2/G3/G5; (3) G4 doc correction + G6 endpoint gap decision;
+(4) commit this session's docs updates (not yet committed - commit
+awaits explicit owner instruction).
