@@ -23,6 +23,7 @@ import {
   getMessage,
   handleInboundMessage,
 } from '../src/services/messages';
+import { ingestCallEvent } from '../src/services/callEvents';
 
 const testHost = process.env.TEST_DB_HOST;
 
@@ -403,6 +404,70 @@ describe.skipIf(testHost === undefined || testHost === '')(
       expect(rows[0]?.body).toContain('Staff');
       expect(rows[0]?.body).toContain('M6 Clinic A');
     });
+
+    it('retries an interrupted acknowledgement through the API endpoint (G6)', async () => {
+      const created = await postLead(keyA, {
+        firstName: 'Pend',
+        lastName: 'Ing',
+        phone: '15550202011',
+      });
+      expect(created.status).toBe(201);
+      const leadId = created.body.leadId as number;
+      expect((await ackRows(leadId)).length).toBeGreaterThan(0);
+
+      await pool.query(
+        `UPDATE communication_messages SET status = 'PENDING'
+         WHERE organization_id = ? AND lead_id = ? AND message_type = 'lead_acknowledgement'`,
+        [orgAId, leadId],
+      );
+
+      const res = await request(app)
+        .post(`/api/organizations/${orgAId}/leads/${leadId}/acknowledgement/retry`)
+        .set('Cookie', ownerCookie);
+      expect(res.status).toBe(200);
+      expect(res.body.retry.action).toBe('ack_sent');
+      const rows = await ackRows(leadId);
+      expect(rows[0]?.status).toBe('SENT');
+
+      const missing = await request(app)
+        .post(`/api/organizations/${orgAId}/leads/${leadId + 900_000}/acknowledgement/retry`)
+        .set('Cookie', ownerCookie);
+      expect(missing.status).toBe(404);
+    });
+
+    it('acknowledges webhook-created missed-call leads only when MISSED_CALL is opted in (G4)', async () => {
+      try {
+        await pool.query('INSERT INTO app_meta (meta_key, meta_value) VALUES (?, ?)', [
+          ACK_CONFIG_META_KEY,
+          JSON.stringify({
+            ...DEFAULT_ACK_CONFIG,
+            sources: ['WEBSITE', 'MANUAL', 'OTHER', 'MISSED_CALL'],
+          }),
+        ]);
+        const result = await ingestCallEvent(pool, logger, {
+          organizationId: orgAId,
+          providerKey: 'mock',
+          event: {
+            eventId: `m6-g4-${Date.now()}`,
+            providerStatus: 'completed',
+            outcome: 'MISSED',
+            from: '+15550202012',
+            to: '15550001111',
+            occurredAt: new Date(),
+          },
+          rawPayload: '{}',
+        });
+        expect(result.leadId).not.toBeNull();
+        const rows = (await ackRows(result.leadId as number)).filter(
+          (row) => row.message_type === 'lead_acknowledgement',
+        );
+        expect(rows).toHaveLength(1);
+        expect(rows[0]?.status).toBe('SENT');
+      } finally {
+        await pool.query('DELETE FROM app_meta WHERE meta_key = ?', [ACK_CONFIG_META_KEY]);
+      }
+    });
+
 
     it('handles the patient response and links it to the lead', async () => {
       const inbound = await handleInboundMessage(pool, logger, {

@@ -113,6 +113,53 @@ export async function scheduleRemindersForAppointment(
   return { scheduled, skipped };
 }
 
+export const CATCH_UP_DAYS = 7;
+const CATCH_UP_LIMIT = 100;
+
+export interface CatchUpResult {
+  candidates: number;
+  created: number;
+}
+
+export async function catchUpReminders(
+  db: Pool,
+  logger: Logger,
+  options: { limit?: number } = {},
+): Promise<CatchUpResult> {
+  const limit = options.limit ?? CATCH_UP_LIMIT;
+  const cfg = await loadReminderConfig(db);
+  const filter = await loadOrgEnabledFilter(
+    db,
+    REMINDER_CONFIG_META_KEY,
+    cfg.enabled,
+    'a.organization_id',
+  );
+  if (!filter.eligible) {
+    return { candidates: 0, created: 0 };
+  }
+  const [rows] = await db.query<RowDataPacket[]>(
+    `SELECT a.id
+     FROM appointments a
+     WHERE a.status IN ('SCHEDULED', 'CONFIRMED')
+       AND a.appointment_date >= CURDATE()
+       AND NOT EXISTS (
+         SELECT 1 FROM appointment_reminders r WHERE r.appointment_id = a.id
+       )${filter.clause}
+     ORDER BY a.appointment_date ASC, a.id ASC
+     LIMIT ?`,
+    [...filter.params, limit],
+  );
+  let created = 0;
+  for (const row of rows) {
+    const scheduled = await scheduleRemindersForAppointment(db, logger, Number(row.id));
+    created += scheduled.scheduled;
+  }
+  if (rows.length > 0) {
+    logger.info('reminder catch-up finished', { candidates: rows.length, created });
+  }
+  return { candidates: rows.length, created };
+}
+
 export async function cancelRemindersForAppointment(
   db: Pool,
   logger: Logger,
@@ -419,6 +466,8 @@ export async function runReminderTick(
   if (!filter.eligible) {
     return result;
   }
+
+  await catchUpReminders(db, logger, { limit: batchSize });
 
   await db.query(
     `UPDATE appointment_reminders

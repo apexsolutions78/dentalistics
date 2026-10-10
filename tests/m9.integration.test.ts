@@ -27,6 +27,10 @@ import { generateSiteKey } from '../src/security/siteKey';
 const testHost = process.env.TEST_DB_HOST;
 const HOUR = 3_600_000;
 
+function dateDaysAhead(days: number): string {
+  return new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
+}
+
 function testDbConfig(): DbConfig {
   const database = process.env.TEST_DB_NAME ?? 'dentalistics_test';
   if (!/^[A-Za-z0-9_]+$/.test(database)) {
@@ -311,8 +315,9 @@ describe.skipIf(testHost === undefined || testHost === '')(
 
     it('starts recovery on no-show: case, immediate message, scheduled follow-up', async () => {
       const patientId = await freshPatient('Alice');
+      const apptDate = dateDaysAhead(3);
       const created = await createAppt(patientId, {
-        date: '2026-10-10',
+        date: apptDate,
         time: '10:00',
         service: 'Check-up',
       });
@@ -353,7 +358,7 @@ describe.skipIf(testHost === undefined || testHost === '')(
       expect(msg?.message_type).toBe('no_show_message');
       expect(msg?.template).toBe('no_show_message');
       expect(msg?.body).toContain('Alice');
-      expect(msg?.body).toContain('2026-10-10');
+      expect(msg?.body).toContain(apptDate);
       expect(msg?.body).not.toContain('{{');
       expect(await commCountForCase(caseId)).toBe(1);
 
@@ -656,6 +661,29 @@ describe.skipIf(testHost === undefined || testHost === '')(
           cancelled: 0,
           rebooked: 0,
         });
+      } finally {
+        await resetNoShowConfig();
+      }
+    });
+
+    it('starts recovery via catch-up after the config is re-enabled (G2)', async () => {
+      const patientId = await freshPatient('Lena');
+      const created = await createAppt(patientId, { date: dateDaysAhead(-1), time: '12:30' });
+      const apptId = created.body.appointment.id as number;
+      try {
+        await setNoShowConfig({ enabled: false });
+        expect((await markNoShow(apptId)).status).toBe(200);
+        expect(await caseRows(apptId)).toHaveLength(0);
+
+        await resetNoShowConfig();
+        await runNoShowTick(pool, logger);
+
+        const cases = await caseRows(apptId);
+        expect(cases).toHaveLength(1);
+        const messages = await noShowMessageRows(cases[0]?.id ?? 0);
+        expect(messages.map((r) => r.phase)).toEqual(['INITIAL', 'FOLLOW_UP']);
+        const initial = messages.find((r) => r.phase === 'INITIAL');
+        expect(initial?.status).toBe('SENT');
       } finally {
         await resetNoShowConfig();
       }

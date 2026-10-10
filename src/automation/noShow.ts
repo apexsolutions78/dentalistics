@@ -518,6 +518,56 @@ async function processNoShowMessage(
   }
 }
 
+export const NO_SHOW_CATCH_UP_DAYS = 7;
+const NO_SHOW_CATCH_UP_LIMIT = 100;
+
+export interface NoShowCatchUpResult {
+  candidates: number;
+  created: number;
+}
+
+export async function catchUpNoShowCases(
+  db: Pool,
+  logger: Logger,
+  options: { now?: Date; limit?: number } = {},
+): Promise<NoShowCatchUpResult> {
+  const now = options.now ?? new Date();
+  const limit = options.limit ?? NO_SHOW_CATCH_UP_LIMIT;
+  const cfg = await loadNoShowConfig(db);
+  const filter = await loadOrgEnabledFilter(
+    db,
+    NO_SHOW_CONFIG_META_KEY,
+    cfg.enabled,
+    'a.organization_id',
+  );
+  if (!filter.eligible) {
+    return { candidates: 0, created: 0 };
+  }
+  const [rows] = await db.query<RowDataPacket[]>(
+    `SELECT a.id
+     FROM appointments a
+     WHERE a.status = 'NO_SHOW'
+       AND a.appointment_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
+       AND NOT EXISTS (
+         SELECT 1 FROM no_show_cases c WHERE c.appointment_id = a.id
+       )${filter.clause}
+     ORDER BY a.appointment_date DESC, a.id ASC
+     LIMIT ?`,
+    [NO_SHOW_CATCH_UP_DAYS, ...filter.params, limit],
+  );
+  let created = 0;
+  for (const row of rows) {
+    const started = await startNoShowRecovery(db, logger, { appointmentId: Number(row.id), now });
+    if (started.started) {
+      created += 1;
+    }
+  }
+  if (rows.length > 0) {
+    logger.info('no-show catch-up finished', { candidates: rows.length, created });
+  }
+  return { candidates: rows.length, created };
+}
+
 export interface NoShowTickOptions {
   now?: Date;
   batchSize?: number;
@@ -542,6 +592,8 @@ export async function runNoShowTick(
   if (!filter.eligible) {
     return result;
   }
+
+  await catchUpNoShowCases(db, logger, { now, limit: batchSize });
 
   await db.query(
     `UPDATE no_show_messages

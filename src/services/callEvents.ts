@@ -1,6 +1,7 @@
 import type { Pool, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { sendMissedCallResponse } from '../automation/missedCall';
 import { runLeadAutomation } from '../automation/leadAutomation';
+import { triggerLeadCreated } from '../automation/leadCreated';
 import type { Logger } from '../logger';
 import type { InboundCallEvent } from '../telephony/types';
 import { RECOVERY_OUTCOMES } from '../telephony/types';
@@ -137,6 +138,7 @@ async function recover(
     leadId = await createMissedCallLead(db, logger, organizationId, phone, event);
     firstName = 'Unknown';
     disposition = 'lead_created';
+    await triggerLeadCreated(db, logger, { organizationId, leadId });
     await runLeadAutomation(db, logger, { organizationId, leadId, mode: 'create' });
   }
 

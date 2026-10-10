@@ -339,6 +339,37 @@ describe.skipIf(testHost === undefined || testHost === '')(
       expect(decided?.appointmentId).toBe(res.body.appointment.id);
     });
 
+    it('schedules 48/24/2h reminders for a suggestion-approved appointment (G1)', async () => {
+      const leadId = await createLead('Root canal');
+      const pending = (await suggestionsFor(leadId)).filter((item) => item.status === 'PENDING');
+      expect(pending.length).toBeGreaterThan(0);
+      const suggestion = pending[0] as { id: number };
+
+      const slotDay = dateAdd(today, 3);
+      const free = await availability(doctorId, slotDay);
+      expect(free.status).toBe(200);
+      const slots = free.body.slots as string[];
+      expect(slots.length).toBeGreaterThan(0);
+      const slot = String(slots[0]);
+
+      const res = await request(app)
+        .post(`/api/organizations/${orgId}/leads/${leadId}/suggestions/${suggestion.id}/approve`)
+        .set('Cookie', ownerCookie)
+        .send({ date: slotDay, time: slot });
+      expect(res.status).toBe(201);
+      const appointmentId = Number(res.body.appointment.id);
+
+      const [rows] = await pool.query<mysql.RowDataPacket[]>(
+        `SELECT offset_hours, status
+         FROM appointment_reminders
+         WHERE appointment_id = ?
+         ORDER BY offset_hours DESC`,
+        [appointmentId],
+      );
+      expect(rows.map((row) => Number(row.offset_hours))).toEqual([48, 24, 2]);
+      expect(rows.every((row) => row.status === 'PENDING')).toBe(true);
+    });
+
     it('supports approving a suggestion into a different free slot (reschedule)', async () => {
       const leadId = await createLead('Check-up');
       const pending = (await suggestionsFor(leadId)).filter((item) => item.status === 'PENDING');

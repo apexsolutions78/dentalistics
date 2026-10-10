@@ -637,6 +637,57 @@ async function processRecallMessage(
   }
 }
 
+export const RECALL_CATCH_UP_DAYS = 7;
+const RECALL_CATCH_UP_LIMIT = 100;
+
+export interface RecallCatchUpResult {
+  candidates: number;
+  created: number;
+}
+
+export async function catchUpRecalls(
+  db: Pool,
+  logger: Logger,
+  options: { limit?: number } = {},
+): Promise<RecallCatchUpResult> {
+  const limit = options.limit ?? RECALL_CATCH_UP_LIMIT;
+  const cfg = await loadRecallConfig(db);
+  const filter = await loadOrgEnabledFilter(
+    db,
+    RECALL_CONFIG_META_KEY,
+    cfg.enabled,
+    'a.organization_id',
+  );
+  if (!filter.eligible) {
+    return { candidates: 0, created: 0 };
+  }
+  const [rows] = await db.query<RowDataPacket[]>(
+    `SELECT a.id
+     FROM appointments a
+     WHERE a.status = 'COMPLETED'
+       AND a.appointment_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
+       AND NOT EXISTS (
+         SELECT 1 FROM recalls r WHERE r.anchor_appointment_id = a.id
+       )${filter.clause}
+     ORDER BY a.appointment_date DESC, a.id ASC
+     LIMIT ?`,
+    [RECALL_CATCH_UP_DAYS, ...filter.params, limit],
+  );
+  let created = 0;
+  for (const row of rows) {
+    const recall = await createRecallForCompletedAppointment(db, logger, {
+      appointmentId: Number(row.id),
+    });
+    if (recall.created) {
+      created += 1;
+    }
+  }
+  if (rows.length > 0) {
+    logger.info('recall catch-up finished', { candidates: rows.length, created });
+  }
+  return { candidates: rows.length, created };
+}
+
 export interface RecallTickOptions {
   now?: Date;
   batchSize?: number;
@@ -661,6 +712,8 @@ export async function runRecallTick(
   if (!filter.eligible) {
     return result;
   }
+
+  await catchUpRecalls(db, logger, { limit: batchSize });
 
   await db.query(
     `UPDATE recall_messages

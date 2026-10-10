@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import type { Pool } from 'mysql2/promise';
-import { triggerLeadCreated } from '../automation/leadCreated';
+import { triggerLeadCreated, retryLeadAcknowledgement } from '../automation/leadCreated';
 import { refreshLeadAutomation, runLeadAutomation } from '../automation/leadAutomation';
 import type { SessionUser } from '../auth/sessions';
 import { AppError } from '../errors';
@@ -137,6 +137,27 @@ export function createLeadsRouter(deps: LeadsRouterDeps): Router {
         actor.id,
       );
       res.status(200).json({ suggestion });
+    },
+  );
+
+  router.post(
+    '/:orgId/leads/:leadId/acknowledgement/retry',
+    async (req: Request, res: Response) => {
+      const organizationId = parsePathId(req.params.orgId);
+      const actor = req.user as SessionUser;
+      assertCanManageMembers(actor, organizationId);
+      const leadId = parsePathId(req.params.leadId);
+      const result = await retryLeadAcknowledgement(deps.db, deps.logger, {
+        organizationId,
+        leadId,
+      });
+      if (result.action === 'skipped_missing_lead') {
+        throw new AppError('Lead acknowledgement not found', 404, 'not_found', true);
+      }
+      if (result.action === 'error') {
+        throw new AppError('Lead acknowledgement retry failed', 500, 'retry_failed', false);
+      }
+      res.status(200).json({ retry: { action: result.action, messageId: result.messageId ?? null } });
     },
   );
 

@@ -16,7 +16,7 @@ export async function loadOrgSetting(
 export interface OrgEnabledFilter {
   eligible: boolean;
   clause: string;
-  params: number[];
+  params: Array<number[]>;
 }
 
 export async function loadOrgEnabledFilter(
@@ -58,11 +58,11 @@ export async function loadOrgEnabledFilter(
     return {
       eligible: true,
       clause: ` AND ${columnRef} NOT IN (?)`,
-      params: explicitlyDisabled,
+      params: [explicitlyDisabled],
     };
   }
   if (explicitlyEnabled.length === 0) {
     return { eligible: false, clause: '', params: [] };
   }
-  return { eligible: true, clause: ` AND ${columnRef} IN (?)`, params: explicitlyEnabled };
+  return { eligible: true, clause: ` AND ${columnRef} IN (?)`, params: [explicitlyEnabled] };
 }

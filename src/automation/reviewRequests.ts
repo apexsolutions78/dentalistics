@@ -487,6 +487,57 @@ async function processReviewRequest(
   }
 }
 
+export const REVIEW_CATCH_UP_DAYS = 7;
+const REVIEW_CATCH_UP_LIMIT = 100;
+
+export interface ReviewCatchUpResult {
+  candidates: number;
+  created: number;
+}
+
+export async function catchUpReviewRequests(
+  db: Pool,
+  logger: Logger,
+  options: { limit?: number } = {},
+): Promise<ReviewCatchUpResult> {
+  const limit = options.limit ?? REVIEW_CATCH_UP_LIMIT;
+  const cfg = await loadReviewConfig(db);
+  const filter = await loadOrgEnabledFilter(
+    db,
+    REVIEW_CONFIG_META_KEY,
+    cfg.enabled,
+    'a.organization_id',
+  );
+  if (!filter.eligible) {
+    return { candidates: 0, created: 0 };
+  }
+  const [rows] = await db.query<RowDataPacket[]>(
+    `SELECT a.id
+     FROM appointments a
+     WHERE a.status = 'COMPLETED'
+       AND a.appointment_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
+       AND NOT EXISTS (
+         SELECT 1 FROM review_requests rr WHERE rr.appointment_id = a.id
+       )${filter.clause}
+     ORDER BY a.appointment_date DESC, a.id ASC
+     LIMIT ?`,
+    [REVIEW_CATCH_UP_DAYS, ...filter.params, limit],
+  );
+  let created = 0;
+  for (const row of rows) {
+    const review = await createReviewRequestForCompletedAppointment(db, logger, {
+      appointmentId: Number(row.id),
+    });
+    if (review.created) {
+      created += 1;
+    }
+  }
+  if (rows.length > 0) {
+    logger.info('review request catch-up finished', { candidates: rows.length, created });
+  }
+  return { candidates: rows.length, created };
+}
+
 export interface ReviewTickOptions {
   now?: Date;
   batchSize?: number;
@@ -511,6 +562,8 @@ export async function runReviewRequestTick(
   if (!filter.eligible) {
     return result;
   }
+
+  await catchUpReviewRequests(db, logger, { limit: batchSize });
 
   await db.query(
     `UPDATE review_requests

@@ -351,6 +351,41 @@ describe.skipIf(testHost === undefined || testHost === '')(
       expect(rows.filter((r) => r.status === 'PENDING')).toHaveLength(0);
     });
 
+    it('catches up reminders for appointments booked while the org had reminders off (G2)', async () => {
+      const orgConfig = JSON.stringify({ ...DEFAULT_REMINDER_CONFIG, enabled: false });
+      await pool.query(
+        `INSERT INTO organization_settings (organization_id, meta_key, meta_value)
+         VALUES (?, ?, ?)
+         ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)`,
+        [orgAId, REMINDER_CONFIG_META_KEY, orgConfig],
+      );
+      try {
+        const created = await createAppt(ownerACookie, orgAId, {
+          patientId: patientAId,
+          date: '2026-11-19',
+          time: '10:00',
+        });
+        expect(created.status).toBe(201);
+        const apptId = created.body.appointment.id as number;
+        expect(await reminderRows(apptId)).toHaveLength(0);
+
+        await pool.query(
+          'DELETE FROM organization_settings WHERE organization_id = ? AND meta_key = ?',
+          [orgAId, REMINDER_CONFIG_META_KEY],
+        );
+        await runReminderTick(pool, logger);
+
+        const rows = await reminderRows(apptId);
+        expect(rows.map((r) => r.offset_hours)).toEqual([48, 24, 2]);
+        expect(rows.every((r) => r.status === 'PENDING')).toBe(true);
+      } finally {
+        await pool.query(
+          'DELETE FROM organization_settings WHERE organization_id = ? AND meta_key = ?',
+          [orgAId, REMINDER_CONFIG_META_KEY],
+        );
+      }
+    });
+
     it('eagerly cancels reminders on cancel, complete and no-show', async () => {
       const cases: Array<[string, string]> = [
         ['cancel', 'appointment_cancelled'],

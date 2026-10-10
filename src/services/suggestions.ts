@@ -2,6 +2,7 @@ import type { Pool, RowDataPacket } from 'mysql2/promise';
 import { clinicLocalDate, clinicLocalTime } from '../automation/time';
 import type { LeadAutomationConfig } from '../automation/leadAutomationConfig';
 import { loadLeadAutomationConfig } from '../automation/leadAutomationConfig';
+import { scheduleRemindersForAppointment } from '../automation/reminders';
 import { APPOINTMENT_CONFIRMATION_TEMPLATE_NAME } from '../communications/template';
 import { getProvider } from '../communications/registry';
 import { AppError, ValidationError } from '../errors';
@@ -463,6 +464,15 @@ export async function approveSuggestion(
     rescheduled ? 'suggestion_rescheduled' : 'suggestion_accepted',
     `${date} ${time.slice(0, 5)} with ${doctorLabel}`,
   );
+
+  try {
+    await scheduleRemindersForAppointment(db, logger, appointmentId);
+  } catch (err) {
+    logger.error('reminder scheduling failed', {
+      appointmentId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
 
   try {
     await sendAppointmentConfirmation(db, logger, lead, appointmentId, date, time);

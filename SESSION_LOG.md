@@ -5733,3 +5733,275 @@ approve-created appointments through the shared reminder scheduling
 G2/G3/G5; (3) G4 doc correction + G6 endpoint gap decision;
 (4) commit this session's docs updates (not yet committed - commit
 awaits explicit owner instruction).
+
+## Session 42 - 2026-10-10 - G1 fixed (suggestion-approve reminders) + regression test; all gates green
+
+**Authorization / scope.** Owner instruction "proceed" after this
+session presented Session 41's recommended next phase, i.e. item (1)
+only: fix G1 (route suggestion-approved appointments through the
+shared reminder scheduling) + regression test. G2/G3/G5 owner
+decisions, G4 wording correction and G6 endpoint decision were NOT
+part of the instruction, so nothing in those areas was changed
+(Rule 1 / Rule 5).
+
+**Change (smallest appropriate).** `src/services/suggestions.ts`
+- added `import { scheduleRemindersForAppointment } from
+  '../automation/reminders';`
+- `approveSuggestion` now calls
+  `scheduleRemindersForAppointment(db, logger, appointmentId)` in a
+  try/catch immediately before the confirmation send (next to the
+  appointment INSERT at `:420-436`); on failure it logs `reminder
+  scheduling failed` and never fails the approval - the same
+  never-throw shape as `safeScheduleReminders`
+  (`routes/appointments.ts:82-98`). Placement rationale (CONFIRMED by
+  grep): `approveSuggestion` has a single production caller
+  (`routes/leads.ts:112`), the confirmation side effect already lives
+  in this service, and `src/services/callEvents.ts` sets the
+  precedent of a service orchestrating automation; `reminders.ts`
+  imports nothing that loops back to `suggestions.ts` (its service
+  imports are `services/messages` only), so no import cycle.
+
+**Regression test (new).** `tests/leadAutomation.integration.test.ts`
+- "schedules 48/24/2h reminders for a suggestion-approved appointment
+  (G1)": creates a lead, takes the first PENDING suggestion, queries
+  availability 3 days out and approves into that slot, then asserts
+  `appointment_reminders.offset_hours == [48, 24, 2]` and all rows
+  `PENDING`. The 3-day lead is deliberate: with org timezone default
+  `UTC` (migration `0007`) all three offsets are strictly in the
+  future at any time of day, so the assertion cannot flake by time
+  of day (in contrast to the m9 defect below).
+
+**Environment incident (CONFIRMED, resolved).** First `npm run verify`
+failed with `ECONNREFUSED 127.0.0.1:3306` in 27 integration files -
+Docker Desktop was not running at session start (same incident as
+Session 40, SESSION_LOG:5148). Started `Docker Desktop.exe`, waited
+for engine 29.6.1, `docker start dentalistics-mysql`, polled until
+`healthy` + TCP 3306 listening, then re-ran. No code involved.
+
+**Pre-existing test defect found while gating (Rule 8 - root-caused,
+not weakened).** The re-run failed 1 test: `tests/m9.integration.test.ts`
+"starts recovery on no-show: case, immediate message, scheduled
+follow-up" expected 3 reminder rows, got 1 (`offset_hours: 2`).
+INDEPENDENT VERIFICATION: this session's two changed files were
+`git stash`ed and the same test re-run on the clean tree - it failed
+identically, so the failure is pre-existing and not caused by the G1
+fix. ROOT CAUSE: the test hardcoded `date: '2026-10-10'` (that same
+day) with `time: '10:00'`; by run time the 48h and 24h offsets were
+already in the past, so `scheduleRemindersForAppointment` correctly
+skipped them (only the 2h offset remained) while the assertion still
+demanded 3. The date expired between rev 75's run (2026-10-08, when
+the appointment was still >48h out) and today. FIX (expectations
+unchanged): added helper `dateDaysAhead(days)` and used
+`dateDaysAhead(3)` for the appointment date, with the message-body
+assertion `toContain(apptDate)` derived from it - still exactly 3
+reminders, still all `CANCELLED` / `appointment_no_show`. Nothing
+deleted or relaxed. Note (ASSUMED risk, not verified): `m8` uses
+fixed dates in Nov/Dec 2026 for the same kind of 3-reminder
+assertions and will hit the same expiry when those dates fall within
+48h - recorded as a watch item, not changed (out of scope).
+
+**New observation N1 (PROPOSED, not fixed).** While implementing G1,
+the same D11 pattern was noticed one step further: `approveSuggestion`
+also never calls `closeRecallsForPatientOnBooking`, while manual
+create (`routes/appointments.ts:256`) and rebook (`:379`) both do via
+`safeCloseRecallOnBooking` (`:177`, definition `automation/recall.ts:309`,
+which closes the patient's OPEN recall with reason `booked`).
+CONFIRMED by grep: the only production caller of
+`closeRecallsForPatientOnBooking` is `routes/appointments.ts:186`.
+Effect: an existing patient with an open recall who books through a
+suggestion keeps the recall open (a recall request can still be sent
+for a visit that is already booked). NOT changed - outside the
+approved G1 scope; awaiting owner decision (fix as G1-style
+follow-up vs accept).
+
+**Tests actually executed this session.** Environment first: Docker
+Desktop + `dentalistics-mysql` started and health-verified (see
+above). Then, in order: (a) `npm run verify` with DB down -> 27
+files failed `ECONNREFUSED` (environment, not code); (b) `npx vitest
+run tests/m9.integration.test.ts` on the stashed/clean tree -> 1
+failed, 13 passed (proves pre-existing); (c) `npx vitest run
+tests/m9.integration.test.ts tests/leadAutomation.integration.test.ts`
+after the m9 date fix -> 24/24 passed; (d) full `npm run verify` ->
+exit 0: eslint, tsc, **399/399 tests (38 files)**, build. (e)
+`npm run verify:frontend` -> exit 0: eslint, **142/142 tests (24
+files)**, tsc build, vite build (frontend untouched - run for
+completeness only). Test count check: rev 75's 398 + 1 new G1 test =
+399. STATUS: CODE_WRITTEN + CODE_EXECUTED + TEST_PASSED.
+
+**Files created/modified:** code - `src/services/suggestions.ts`
+(+10), `tests/leadAutomation.integration.test.ts` (+31), `tests/m9.integration.test.ts`
+(date fix + helper); docs - `PROJECT_STATE.md` (revision 77 + K7
+updated: G1 FIXED, N1 recorded) and this entry. Nothing else touched
+(`AGENTS.md` still untracked, owner decision pending).
+
+**Unresolved:** G2-G6 fix/accept/document decisions; **N1** (recall
+not closed on suggestion booking); rev 67 wording correction (G4);
+S1 backend capability gate question; AssanPay credentials; production
+deployment (Rule 11); m8's fixed Nov/Dec dates as a future test-date
+expiry watch item; commit of this session's changes (awaits explicit
+owner instruction).
+
+**Assumptions:** none new. N1's behavior is CONFIRMED by inspection;
+whether it should be fixed is PROPOSED. The m8 date-expiry note is
+ASSUMED (not executed).
+
+**Recommended next phase (PROPOSED, Rule 1):** (1) owner decisions on
+G2/G3/G5 + N1 (fix vs document); (2) G4 doc correction + G6 endpoint
+decision; (3) commit this session's work (explicit instruction
+required).
+
+## Session 43 - 2026-10-10 - G2/G4/G6 fixed, N1 superseded (already met), S4 latent defect fixed; all gates green
+
+**Authorization / scope.** Owner answered the four pending decisions
+in one message: **G2 "Re-enable"** (catch-up on enable); **G6
+"expose an endpoint and then fix it"**; **N1 "Nothing is fixed. An
+automated booking should always have a check to be approved by the
+Master Admin or Receptionist. Once it is approved, then it moves
+forward"**; **G4 "Fix what is possible at the moment according to
+the workflow"**; plus **AGENTS.md "TRACK"**. G3 (quiet hours) and G5
+(inbound reply -> lead state) were NOT answered, so both remain
+untouched (Rule 1). Everything below is inside the stated decisions.
+
+**AGENTS.md (TRACK).** Committed on its own before any code work, so
+the instruction file is under version control independent of this
+phase: `e77f710 chore: track AGENTS.md (owner instruction)`. No other
+file in that commit.
+
+**G2 - catch-up on enable (the largest item).** Approach: each of the
+four automations gets its own catch-up helper, and each helper is
+invoked **from that automation's own tick** - so recovery is
+unattended (D11) and needs no separate "enable" hook or migration.
+All four are bounded (a lookback window + `LIMIT 100` default) and
+idempotent: candidates are selected with `NOT EXISTS` against the
+target job table, and every creation function re-checks its own
+per-org `cfg.enabled` before writing, so a double run cannot
+duplicate. `catchUpReminders` (`reminders.ts`) selects
+`SCHEDULED/CONFIRMED` appointments with **no** reminder rows whose
+date is still in the future and calls the existing
+`scheduleRemindersForAppointment` (which itself skips offsets already
+in the past); `catchUpNoShowCases` (`noShow.ts`) opens a recovery
+case for `NO_SHOW` appointments within `NO_SHOW_CATCH_UP_DAYS = 7`
+that have no case; `catchUpRecalls` (`recall.ts`) creates the recall
+for `COMPLETED` appointments within `RECALL_CATCH_UP_DAYS = 7` with
+no `anchor_appointment_id` row; `catchUpReviewRequests`
+(`reviewRequests.ts`) does the equivalent within
+`REVIEW_CATCH_UP_DAYS = 7`. Org scoping reuses the existing
+`loadOrgEnabledFilter`, so an org explicitly disabled is never caught
+up even when the global default is on. Lookbacks use the appointment
+date (`CURDATE()`), not wall-clock creation time, because these tables
+have no reliable "event time" column; 7 days matches the no-show /
+recall / review event horizon and the reminder window is future-only.
+**Tests (4, all named "(G2)"):** in `m8` an org-disabled reminder
+window + re-enable + `runReminderTick` yields the full `[48,24,2]`
+PENDING set for a booking made while off; in `m9`/`m10`/`m11` the
+same disable -> event -> re-enable -> tick pattern yields a no-show
+case (INITIAL `SENT`), a recall anchored to the appointment, and a
+review request respectively.
+
+**S4 - latent `loadOrgEnabledFilter` binding defect (NEW, CONFIRMED,
+found while building G2, fixed).** The helper returned the org-id
+list as a **flat** `params: number[]`, but all **6** of its call
+sites spread it (`...filter.params`) into a query where
+`filter.clause` (`... IN (?)`) appears **before** a trailing `LIMIT ?`.
+With a non-empty list the ids bound to the `IN (?)` and the
+batch-size placeholder shifted onto `LIMIT` - a mis-binding that
+stays invisible only because each tick re-checks per-org
+`cfg.enabled` before sending, so wrong rows are skipped rather than
+mis-sent. Root-cause fix at the source, not at the call sites:
+`params` is now `Array<number[]>` with the id list wrapped, so one
+`?` expands to the whole list and `LIMIT` keeps its own binding
+(`src/db/orgMeta.ts`). Empty-list behaviour (the common case, global
+default with no overrides) is unchanged. No dedicated unit test
+existed for this helper; it is exercised end-to-end by the new G2
+tests, which run with an org-level override.
+
+**G4 - Settings opt-in now honoured on the webhook path (minimal fix
+inside the existing workflow).** Owner's instruction was to fix what
+the current workflow allows, which is the rev 67 double-text decision
+itself, not its wording: `callEvents.ts` `recover()` now calls
+`triggerLeadCreated` for the lead it creates, so the lead-ack source
+filter is consulted for webhook-created missed-call leads exactly as
+it already was for staff-created and public-website leads. Default
+behaviour is byte-for-byte unchanged (MISSED_CALL stays out of
+`DEFAULT_ACK_CONFIG.sources`, and the pre-existing m6 source-filter
+test still passes unmodified); a clinic that explicitly adds
+MISSED_CALL in Settings now actually receives the ack it asked for.
+Test added in `m6` ("...only when MISSED_CALL is opted in (G4)"),
+asserting exactly one `lead_acknowledgement` row for a webhook-created
+lead. Note (CONFIRMED by that test): opting in yields **both** the
+ack and `missed_call_response` - that is the documented double-text
+the clinic is explicitly requesting, so it is intended, not a defect.
+
+**G6 - endpoint exposed and wired.** New
+`POST /:orgId/leads/:leadId/acknowledgement/retry`
+(`routes/leads.ts`, gated `assertCanManageMembers`) calls
+`retryLeadAcknowledgement`, which has accepted PENDING+FAILED rows
+since the Session 19 fix but had zero non-test callers. Returns 200
+`{retry:{action,messageId}}` for ack_sent / ack_failed /
+ack_duplicate, **404** when the lead has no ack row at all, 500 on an
+unexpected error. The generic failed-jobs `kind=message` retry is
+deliberately untouched (remains FAILED-only and provider_key-gated);
+this endpoint is the purpose-built path for the interrupted-PENDING
+case G6 described. Test in `m6` ("...through the API endpoint (G6)"):
+flips a real ack row back to `PENDING`, retries via the endpoint,
+asserts `ack_sent` + `SENT`, then asserts 404 for a lead with no ack
+row.
+
+**N1 - superseded by owner clarification; NO code change.** The
+owner's sentence is a requirement statement, and inspection confirms
+the requirement is **already met on every booking path**: the public
+site (`public.ts`) creates a **lead only**, never an appointment, and
+every path that creates an appointment (manual `POST /appointments`,
+rebook, suggestion approve) sits behind `requireAuth` and is
+therefore Master Admin / Receptionist-only. Suggestion "automation"
+only ever proposes slots (PENDING suggestions); a human approval is
+what turns one into an appointment, and after that approval the rest
+of the automation (reminders via G1, catch-up via G2) proceeds
+unattended - i.e. "once it is approved, then it moves forward". The
+recall-closing reading of N1 I recorded in Session 42 is therefore
+**withdrawn as superseded**, not implemented. Recorded in K7 as
+SUPERSEDED so it cannot be mistaken for an open defect.
+
+**Tests actually executed this session.** Docker was already up
+(started in Session 42). Sequence: `npm run lint` 0, `npm run
+typecheck` 0; targeted `vitest run` of m6+m8+m9+m10+m11 -> 69/70,
+the single failure being **my own** new G4 assertion (it counted the
+missed-call response as a second ack; fixed to filter
+`message_type='lead_acknowledgement'`), then m6 alone 13/13; targeted
+m16+m20 (the toggle/scenario suites that exercise `loadOrgEnabledFilter`
+and tick results most directly) -> 14/14, confirming the S4 binding
+fix and the in-tick catch-up calls did not shift any existing tick
+result; full `npm run verify` -> exit 0 (eslint, tsc, **405/405
+tests / 38 files** = 399 + 6 new, build); `npm run verify:frontend`
+-> exit 0 (142/142, 24 files, frontend untouched). STATUS:
+CODE_WRITTEN + CODE_EXECUTED + TEST_PASSED.
+
+**Files created/modified.** Code: `src/db/orgMeta.ts` (S4 binding
+fix), `src/automation/{reminders,noShow,recall,reviewRequests}.ts`
+(4 catch-up helpers + 4 tick hooks), `src/services/callEvents.ts`
+(+1 call, G4), `src/routes/leads.ts` (+retry endpoint, G6);
+tests: `tests/m{6,8,9,10,11}.integration.test.ts` (+6 tests) plus the
+2 Session-42 files still uncommitted from that phase
+(`src/services/suggestions.ts`, `tests/leadAutomation.integration.test.ts`,
+`tests/m9.integration.test.ts` date fix). Docs: `PROJECT_STATE.md`
+(revision 78 + K7 updated: G2/G4/G6 FIXED, N1 SUPERSEDED, S4 recorded)
+and this entry. `AGENTS.md` committed as `e77f710`.
+
+**Unresolved:** G3 (quiet hours drop vs defer) and G5 (inbound reply
+-> lead state) still await owner decisions (Rule 1 - not touched);
+S1 backend capability gate on suggestion approve/decline routes;
+rev 67 wording correction (now a docs-only item, the behaviour it
+mis-described is fixed); AssanPay credentials; production deployment
+(Rule 11); m8's fixed Nov/Dec test dates as a future expiry watch
+item; **commit of this session's + Session 42's work (explicit
+instruction required)**.
+
+**Assumptions.** None load-bearing. The 7-day catch-up lookbacks are
+a PROPOSED constant I chose (exported as `*_CATCH_UP_DAYS` for easy
+owner adjustment), not an owner-specified number; the reminder
+catch-up is future-only and therefore unbounded in horizon by design.
+
+**Recommended next phase (PROPOSED, Rule 1):** (1) commit both
+sessions' work; (2) owner decisions on G3/G5 + S1; (3) G4 docs-only
+wording correction; (4) AssanPay credentials / deployment when the
+owner is ready (Rule 11).

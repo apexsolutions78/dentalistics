@@ -524,6 +524,30 @@ describe.skipIf(testHost === undefined || testHost === '')(
       }
     });
 
+    it('creates the review request via catch-up after the config is re-enabled (G2)', async () => {
+      const patientId = await freshPatient('Ivy');
+      try {
+        await setReviewConfig({ enabled: false });
+        const created = await createAppt(patientId, {
+          date: utcDay(-1),
+          time: '09:15',
+          service: 'Check-up',
+        });
+        const apptId = created.body.appointment.id as number;
+        expect((await completeApp(apptId)).status).toBe(200);
+        expect(await reviewRowsForPatient(patientId)).toHaveLength(0);
+
+        await resetReviewConfig();
+        await runReviewRequestTick(pool, logger);
+
+        const rows = await reviewRowsForPatient(patientId);
+        expect(rows).toHaveLength(1);
+        expect(rows[0]?.appointment_id).toBe(apptId);
+      } finally {
+        await resetReviewConfig();
+      }
+    });
+
     it('falls back to defaults on corrupt config', async () => {
       try {
         await pool.query(

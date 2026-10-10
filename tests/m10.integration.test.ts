@@ -684,6 +684,30 @@ describe.skipIf(testHost === undefined || testHost === '')(
       }
     });
 
+    it('creates the recall via catch-up after the config is re-enabled (G2)', async () => {
+      const patientId = await freshPatient('Ina');
+      try {
+        await setRecallConfig({ enabled: false });
+        const created = await createAppt(patientId, {
+          date: utcDay(-1),
+          time: '14:00',
+          service: 'Cleaning',
+        });
+        const apptId = created.body.appointment.id as number;
+        expect((await completeApp(apptId)).status).toBe(200);
+        expect(await recallsForPatient(patientId)).toHaveLength(0);
+
+        await resetRecallConfig();
+        await runRecallTick(pool, logger);
+
+        const recalls = await recallsForPatient(patientId);
+        expect(recalls).toHaveLength(1);
+        expect(recalls[0]?.anchor_appointment_id).toBe(apptId);
+      } finally {
+        await resetRecallConfig();
+      }
+    });
+
     it('falls back to defaults on corrupt config', async () => {
       try {
         await pool.query(
