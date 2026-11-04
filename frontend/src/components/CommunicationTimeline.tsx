@@ -1,5 +1,7 @@
 import type { Message } from '../lib/types';
 import { dayKey, formatDay, formatDateTime, formatTime } from '../lib/format';
+import { EmptyState } from './states';
+import { SampleLine } from './SampleLine';
 
 function describe(message: Message): { who: string; label: string } {
   if (message.direction === 'INBOUND') {
@@ -14,9 +16,11 @@ function describe(message: Message): { who: string; label: string } {
 export function CommunicationTimeline({ messages }: { messages: Message[] }) {
   if (messages.length === 0) {
     return (
-      <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--fs-label)' }}>
-        No messages yet.
-      </p>
+      <EmptyState
+        title="No messages yet"
+        description="Messages to and from this patient appear here."
+        preview={<SampleLine>a WhatsApp reminder to Layla.</SampleLine>}
+      />
     );
   }
 

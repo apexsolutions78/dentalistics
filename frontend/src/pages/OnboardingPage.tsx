@@ -6,6 +6,7 @@ import { useDocumentTitle } from '../lib/useDocumentTitle';
 import { FormField } from '../components/FormField';
 import { Flash } from '../components/Flash';
 import type { BusinessHours, Settings } from '../lib/types';
+import { PatientImportStep } from './PatientImportStep';
 
 const EMAIL_PATTERN = /^\S+@\S+\.\S+$/;
 
@@ -19,7 +20,7 @@ const DAYS: Array<{ key: string; label: string }> = [
   { key: 'sun', label: 'Sunday' },
 ];
 
-const STEP_LABELS = ['Clinic profile', 'Business hours', 'Review and finish'] as const;
+const STEP_LABELS = ['Clinic profile', 'Business hours', 'Import your patients', 'Review and finish'] as const;
 
 interface HourRow {
   enabled: boolean;
@@ -69,6 +70,7 @@ export function OnboardingPage() {
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string | null>>({});
   const [finished, setFinished] = useState(false);
+  const [importedCount, setImportedCount] = useState(0);
   useDocumentTitle('Set up your clinic');
 
   const orgId = organization?.id ?? null;
@@ -190,6 +192,10 @@ export function OnboardingPage() {
       }
       return;
     }
+    if (step === 3) {
+      setStep(4);
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -211,7 +217,7 @@ export function OnboardingPage() {
       <div className="login-card onboarding-card">
         <h1>Set up your clinic</h1>
         <div className="sub">
-          Step {step} of 3 - {STEP_LABELS[step - 1]}
+          Step {step} of 4 - {STEP_LABELS[step - 1]}
         </div>
         {error ? <Flash kind="error" message={error} onDismiss={() => setError(null)} /> : null}
 
@@ -343,7 +349,25 @@ export function OnboardingPage() {
           </form>
         ) : null}
 
-        {step === 3 ? (
+        {step === 3 && orgId !== null ? (
+          <div>
+            <PatientImportStep
+              orgId={orgId}
+              busy={busy}
+              onImported={(count) => setImportedCount((current) => current + count)}
+            />
+            <div className="btn-row" style={{ marginTop: 'var(--space-4)' }}>
+              <button type="button" className="btn btn-secondary" onClick={() => setStep(2)} disabled={busy}>
+                Back
+              </button>
+              <button type="button" className="btn btn-primary" onClick={() => setStep(4)} disabled={busy}>
+                Skip for now
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {step === 4 ? (
           <div>
             <p className="sub">Review your clinic details. You can change everything later in Settings.</p>
             <dl className="onboarding-review">
@@ -361,13 +385,15 @@ export function OnboardingPage() {
                   ? `${enabledDays.length} days per week`
                   : 'Closed all week'}
               </dd>
+              <dt>Patients imported</dt>
+              <dd>{importedCount}</dd>
             </dl>
             {error ? <Flash kind="error" message={error} onDismiss={() => setError(null)} /> : null}
             <div className="btn-row" style={{ marginTop: 'var(--space-4)' }}>
               <button
                 type="button"
                 className="btn btn-secondary"
-                onClick={() => setStep(2)}
+                onClick={() => setStep(3)}
                 disabled={busy}
               >
                 Back

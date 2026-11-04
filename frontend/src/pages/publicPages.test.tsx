@@ -31,10 +31,8 @@ describe('MarketingPage', () => {
     );
     expect(await screen.findByText('Free Plan')).toBeInTheDocument();
     expect(screen.getByText('$0')).toBeInTheDocument();
-    expect(screen.getByText('8-day free trial with every feature')).toBeInTheDocument();
-    expect(
-      screen.getByText('Full access to every feature, $20 per month'),
-    ).toBeInTheDocument();
+    expect(screen.getByText('14-day free trial with every feature')).toBeInTheDocument();
+    expect(screen.getByText('Full access to every feature, billed monthly')).toBeInTheDocument();
     expect(await screen.findByText('Full Plan')).toBeInTheDocument();
     expect(screen.getByText('$20')).toBeInTheDocument();
     expect(screen.getByText('/month')).toBeInTheDocument();
@@ -44,6 +42,40 @@ describe('MarketingPage', () => {
       expect(link).toHaveAttribute('href', '/login');
     }
     expect(screen.getAllByRole('link', { name: /Start free trial/i }).length).toBeGreaterThan(0);
+  });
+
+  it('prices the full plan from the browser locale without a network lookup', async () => {
+    const original = window.navigator.languages;
+    Object.defineProperty(window.navigator, 'languages', { configurable: true, value: ['ur-PK'] });
+    window.localStorage.removeItem('dentalistics.pricingRegion');
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      expect(url).not.toMatch(/geo|ipinfo|ip-api|geolocation/i);
+      if (url.includes('/api/public/plans')) {
+        return Promise.resolve(
+          jsonResponse(200, {
+            plans: makePlans(),
+            regions: [
+              { code: 'us', label: 'United States', currency: 'USD', amountMinor: 2000, placeholder: false },
+              { code: 'pk', label: 'Pakistan', currency: 'PKR', amountMinor: 600000, placeholder: true },
+            ],
+          }),
+        );
+      }
+      return Promise.resolve(jsonResponse(404, { error: { code: 'not_found', message: 'Not found' } }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    render(
+      <MemoryRouter>
+        <MarketingPage />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByLabelText('Price region')).toHaveValue('pk');
+    expect(screen.getByText(/6,000/)).toBeInTheDocument();
+    expect(screen.getByText(/Placeholder amount/)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'What sets Dentalistics apart' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Leads page in Dentalistics showing sample enquiries' })).toBeInTheDocument();
+    Object.defineProperty(window.navigator, 'languages', { configurable: true, value: original });
   });
 
   it('lists the planned product features', async () => {

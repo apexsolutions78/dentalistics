@@ -8,6 +8,7 @@ import { PageHeader } from '../../components/PageHeader';
 import { Pager } from '../../components/Pager';
 import { FormField } from '../../components/FormField';
 import { ErrorState, LoadingState, EmptyState } from '../../components/states';
+import { SampleLine } from '../../components/SampleLine';
 
 const PAGE_SIZE = 25;
 
@@ -131,6 +132,9 @@ export function AuditLogPage() {
               applied !== ''
                 ? 'No audit records match the current filter. Try resetting it.'
                 : 'Sign-ins, settings changes, and user management actions appear here as they happen.'
+            }
+            preview={
+              applied !== '' ? undefined : <SampleLine>a sign-in by the clinic owner.</SampleLine>
             }
           />
         ) : null}

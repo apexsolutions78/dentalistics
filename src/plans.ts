@@ -1,4 +1,5 @@
-export const TRIAL_DAYS = 8;
+/** New signups only. Existing organizations.trial_ends_at values are not rewritten. */
+export const TRIAL_DAYS = 14;
 
 export interface PublicPlan {
   id: 'trial' | 'full';
@@ -13,7 +14,7 @@ export const PLANS: readonly PublicPlan[] = [
   {
     id: 'trial',
     name: 'Free Plan',
-    headline: '8-day free trial with every feature',
+    headline: '14-day free trial with every feature',
     priceUsdCents: 0,
     interval: 'trial',
     trialDays: TRIAL_DAYS,
@@ -21,7 +22,7 @@ export const PLANS: readonly PublicPlan[] = [
   {
     id: 'full',
     name: 'Full Plan',
-    headline: 'Full access to every feature, $20 per month',
+    headline: 'Full access to every feature, billed monthly',
     priceUsdCents: 2000,
     interval: 'month',
     trialDays: null,

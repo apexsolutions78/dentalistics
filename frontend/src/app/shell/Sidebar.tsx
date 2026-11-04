@@ -182,6 +182,15 @@ export function Sidebar() {
             {can(user, 'admin.payments.view') ? (
               <NavLinkItem link={{ to: '/admin/payments', label: 'Payments' }} />
             ) : null}
+            {can(user, 'admin.payments.view') ? (
+              <NavLinkItem link={{ to: '/admin/pricing', label: 'Pricing' }} />
+            ) : null}
+            {can(user, 'admin.payments.view') ? (
+              <NavLinkItem link={{ to: '/admin/manual-payments', label: 'Manual payments' }} />
+            ) : null}
+            {can(user, 'admin.payments.view') ? (
+              <NavLinkItem link={{ to: '/admin/setup-help', label: 'Setup help' }} />
+            ) : null}
           </ul>
         </div>
       ) : null}

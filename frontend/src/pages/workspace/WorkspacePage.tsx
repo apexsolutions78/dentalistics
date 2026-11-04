@@ -9,6 +9,7 @@ import type { ReceptionistWorkspace } from '../../lib/types';
 import { formatDate, formatDateTime, formatTime, fullName } from '../../lib/format';
 import { PageHeader } from '../../components/PageHeader';
 import { StatusBadge, ErrorState, LoadingState, EmptyState, type BadgeTone } from '../../components/states';
+import { SampleLine } from '../../components/SampleLine';
 import { Flash } from '../../components/Flash';
 
 function statusTone(status: string): BadgeTone {
@@ -23,12 +24,14 @@ function QueueCard({
   count,
   emptyTitle,
   emptyDescription,
+  preview,
   children,
 }: {
   title: string;
   count: number;
   emptyTitle: string;
   emptyDescription: string;
+  preview?: ReactNode;
   children?: ReactNode;
 }) {
   return (
@@ -37,7 +40,7 @@ function QueueCard({
         {title} <span className="badge">{count}</span>
       </h2>
       {count === 0 ? (
-        <EmptyState title={emptyTitle} description={emptyDescription} />
+        <EmptyState title={emptyTitle} description={emptyDescription} preview={preview} />
       ) : (
         children
       )}
@@ -107,6 +110,7 @@ export function WorkspacePage() {
         count={q.tasks.count}
         emptyTitle="Nothing needs attention"
         emptyDescription="New leads, missed calls, replies, confirmations, no-shows and due recalls appear here."
+        preview={<SampleLine>call back Sara Halim about a cleaning enquiry.</SampleLine>}
       >
         <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: '6px' }}>
           {q.tasks.items.map((task) => (
@@ -125,6 +129,7 @@ export function WorkspacePage() {
         count={q.newLeads.count}
         emptyTitle="No new leads"
         emptyDescription="New website enquiries and manually added leads appear here."
+        preview={<SampleLine>Sara Halim, website, cleaning.</SampleLine>}
       >
         <div className="table-scroll" tabIndex={0} role="region" aria-label="New leads table">
           <table className="table">
@@ -161,6 +166,7 @@ export function WorkspacePage() {
         count={q.missedCalls.count}
         emptyTitle="No missed calls"
         emptyDescription="Missed, rejected and busy calls from the last 30 days appear here."
+        preview={<SampleLine>a missed call from a mobile number, turned into a lead.</SampleLine>}
       >
         <div className="table-scroll" tabIndex={0} role="region" aria-label="Missed calls table">
           <table className="table">
@@ -203,6 +209,7 @@ export function WorkspacePage() {
         count={q.patientReplies.count}
         emptyTitle="No recent replies"
         emptyDescription="Inbound patient messages from the last 30 days appear here."
+        preview={<SampleLine>Layla replied that Thursday works.</SampleLine>}
       >
         <div className="table-scroll" tabIndex={0} role="region" aria-label="Patient replies table">
           <table className="table">
@@ -243,6 +250,7 @@ export function WorkspacePage() {
         count={q.upcomingAppointments.count}
         emptyTitle="No upcoming appointments"
         emptyDescription="Scheduled and confirmed appointments from today onward appear here."
+        preview={<SampleLine>Omar Nasser, Thursday 10:30, cleaning, scheduled.</SampleLine>}
       >
         <div className="table-scroll" tabIndex={0} role="region" aria-label="Upcoming appointments table">
           <table className="table">
@@ -293,6 +301,7 @@ export function WorkspacePage() {
         count={q.noShows.count}
         emptyTitle="No recent no-shows"
         emptyDescription="No-show appointments from the last 30 days appear here."
+        preview={<SampleLine>a missed cleaning with a rebook link.</SampleLine>}
       >
         <div className="table-scroll" tabIndex={0} role="region" aria-label="No-shows table">
           <table className="table">
@@ -327,6 +336,7 @@ export function WorkspacePage() {
         count={q.recallOpportunities.count}
         emptyTitle="No recall opportunities"
         emptyDescription="Patients due for a recall appear here."
+        preview={<SampleLine>Omar Nasser, hygiene recall due 12 May.</SampleLine>}
       >
         <div className="table-scroll" tabIndex={0} role="region" aria-label="Recall opportunities table">
           <table className="table">

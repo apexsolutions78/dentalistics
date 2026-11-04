@@ -1154,6 +1154,91 @@ button:focus-visible,
   margin-bottom: var(--space-4);
 }
 
+.marketing-diff {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 var(--space-4) var(--space-6);
+  width: 100%;
+}
+
+.marketing-diff h2,
+.marketing-diff > .sub {
+  text-align: center;
+}
+
+.marketing-diff > .sub {
+  color: var(--color-text-secondary);
+  margin: 0 auto var(--space-4);
+  max-width: 640px;
+}
+
+.marketing-diff-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-3);
+}
+
+.marketing-diff-card {
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.marketing-diff-card img {
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+
+.marketing-diff-card h3 {
+  margin: 0;
+}
+
+.marketing-diff-card p {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+.region-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+  color: var(--color-text-secondary);
+}
+
+.placeholder-note {
+  color: var(--color-text-secondary);
+  font-size: var(--fs-label);
+  margin: 0;
+}
+
+.instructions-box {
+  white-space: pre-wrap;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: var(--space-3);
+  margin: var(--space-3) 0;
+}
+
+.import-preview {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-label);
+}
+
+.import-preview th,
+.import-preview td {
+  text-align: left;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: top;
+}
+
 .marketing-pricing {
   max-width: 760px;
   margin: 0 auto;

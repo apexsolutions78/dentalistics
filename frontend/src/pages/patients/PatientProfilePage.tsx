@@ -7,6 +7,7 @@ import { formatDate, formatTime, fullName } from '../../lib/format';
 import { PageHeader } from '../../components/PageHeader';
 import { CommunicationTimeline } from '../../components/CommunicationTimeline';
 import { StatusBadge, ErrorState, LoadingState, EmptyState, type BadgeTone } from '../../components/states';
+import { SampleLine } from '../../components/SampleLine';
 
 function appointmentTone(status: string): BadgeTone {
   if (status === 'CONFIRMED' || status === 'COMPLETED') return 'success';
@@ -111,6 +112,10 @@ export function PatientProfilePage() {
                 <td>{patient.email ?? '—'}</td>
               </tr>
               <tr>
+                <th scope="row">Date of birth</th>
+                <td>{patient.dateOfBirth ?? '—'}</td>
+              </tr>
+              <tr>
                 <th scope="row">SMS</th>
                 <td>
                   <StatusBadge
@@ -155,6 +160,7 @@ export function PatientProfilePage() {
           <EmptyState
             title="No current appointment"
             description="Scheduled and confirmed appointments show up here."
+            preview={<SampleLine>Thursday 10:30 cleaning, scheduled.</SampleLine>}
           />
         ) : (
           <div>
@@ -180,7 +186,11 @@ export function PatientProfilePage() {
             onRetry={appointmentsQuery.reload}
           />
         ) : appointments.length === 0 ? (
-          <EmptyState title="No appointments" description="This patient has no appointment history yet." />
+          <EmptyState
+            title="No appointments"
+            description="This patient has no appointment history yet."
+            preview={<SampleLine>a completed check-up.</SampleLine>}
+          />
         ) : (
           <div className="table-scroll" tabIndex={0} role="region" aria-label="Appointment history table">
             <table className="table">
@@ -235,7 +245,11 @@ export function PatientProfilePage() {
             onRetry={leadsQuery.reload}
           />
         ) : leads.length === 0 ? (
-          <EmptyState title="No leads" description="No leads match this patient's phone number." />
+          <EmptyState
+            title="No leads"
+            description="No leads match this patient's phone number."
+            preview={<SampleLine>a website enquiry for cleaning.</SampleLine>}
+          />
         ) : (
           <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: '6px' }}>
             {leads.map((lead) => (
@@ -264,6 +278,7 @@ export function PatientProfilePage() {
           <EmptyState
             title="No recall"
             description="A recall opens automatically after a completed visit when recall automation is enabled."
+            preview={<SampleLine>hygiene recall due 12 May.</SampleLine>}
           />
         ) : (
           <div className="table-scroll" tabIndex={0} role="region" aria-label="Recall status table">

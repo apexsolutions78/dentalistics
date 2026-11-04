@@ -34,6 +34,9 @@ import { AutomationFailuresPage } from '../pages/admin/AutomationFailuresPage';
 import { AuditLogPage } from '../pages/admin/AuditLogPage';
 import { TrialsPage } from '../pages/admin/TrialsPage';
 import { PaymentGatewayPage } from '../pages/admin/PaymentGatewayPage';
+import { RegionalPricingPage } from '../pages/admin/RegionalPricingPage';
+import { ManualPaymentsAdminPage } from '../pages/admin/ManualPaymentsAdminPage';
+import { SetupHelpPage } from '../pages/admin/SetupHelpPage';
 import { BillingPage } from '../pages/settings/BillingPage';
 import { PatientBillingPage } from '../pages/billing/PatientBillingPage';
 import { InvoicePage } from '../pages/billing/InvoicePage';
@@ -138,6 +141,9 @@ export function AppRouter() {
             <Route element={<RequirePlatformAdmin />}>
               <Route path="admin/trials" element={<TrialsPage />} />
               <Route path="admin/payments" element={<PaymentGatewayPage />} />
+              <Route path="admin/pricing" element={<RegionalPricingPage />} />
+              <Route path="admin/manual-payments" element={<ManualPaymentsAdminPage />} />
+              <Route path="admin/setup-help" element={<SetupHelpPage />} />
               <Route path="*" element={<NotFoundPage />} />
             </Route>
           </Route>

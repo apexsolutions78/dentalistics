@@ -125,6 +125,13 @@ was already writing UTC. Details are in `src/db/localTimestamps.ts`.
 
 Subscription grace defaults to 3 days (`BILLING_GRACE_DAYS`). Renewal
 notices start 7 days before `paid_until` (`BILLING_RENEWAL_NOTICE_DAYS`).
+New signups get a 14-day trial (`TRIAL_DAYS`). Clinics that already have
+a trial end date keep it. The Full Plan price shown on the public page
+comes from the regional price table (Platform → Pricing). USD $20 is the
+seeded default. Other currencies are placeholders until an admin saves
+them. Bank-transfer instructions are also admin-written (Platform →
+Manual payments). AssanPay checkout stays off until the payment gateway
+switch is turned on.
 
 ## Notes
 

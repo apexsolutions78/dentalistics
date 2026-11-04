@@ -13,6 +13,7 @@ import {
   EmptyState,
   type BadgeTone,
 } from '../../components/states';
+import { SampleLine } from '../../components/SampleLine';
 
 const PAGE_SIZE = 25;
 
@@ -148,6 +149,7 @@ export function WebhooksPage() {
           <EmptyState
             title="No webhook events"
             description="Telephony and WhatsApp deliveries appear here once the providers are configured and traffic arrives."
+            preview={<SampleLine>a delivered WhatsApp status callback.</SampleLine>}
           />
         ) : null}
         {data !== null && events.length > 0 ? (
