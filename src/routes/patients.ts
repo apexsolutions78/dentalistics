@@ -7,6 +7,8 @@ import { readJsonBody } from '../http/body';
 import type { Logger } from '../logger';
 import { requireAuth } from '../middleware/auth';
 import { assertCanManageMembers, assertOrgExists } from '../middleware/tenant';
+import { PATIENT_IMPORT_TEMPLATE } from '../services/patientImport';
+import { commitPatientImport, previewPatientImport } from '../services/patientImportCommit';
 import { createPatient, deletePatient, getPatient, listPatients, updatePatient } from '../services/patients';
 import { parsePathId } from '../validate';
 
@@ -27,6 +29,33 @@ export function createPatientsRouter(deps: PatientsRouterDeps): Router {
       query: req.query as unknown as Record<string, unknown>,
     });
     res.status(200).json(result);
+  });
+
+  router.get('/:orgId/patients/import-template', (req: Request, res: Response) => {
+    const organizationId = parsePathId(req.params.orgId);
+    assertCanManageMembers(req.user as SessionUser, organizationId);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="patients-template.csv"');
+    res.status(200).send(PATIENT_IMPORT_TEMPLATE);
+  });
+
+  router.post('/:orgId/patients/import/preview', async (req: Request, res: Response) => {
+    const organizationId = parsePathId(req.params.orgId);
+    assertCanManageMembers(req.user as SessionUser, organizationId);
+    const preview = await previewPatientImport(deps.db, organizationId, readJsonBody(req));
+    res.status(200).json({ preview });
+  });
+
+  router.post('/:orgId/patients/import', async (req: Request, res: Response) => {
+    const organizationId = parsePathId(req.params.orgId);
+    const actor = req.user as SessionUser;
+    assertCanManageMembers(actor, organizationId);
+    const result = await commitPatientImport(deps.db, deps.logger, {
+      organizationId,
+      actorId: actor.id,
+      body: readJsonBody(req),
+    });
+    res.status(201).json(result);
   });
 
   router.post('/:orgId/patients', async (req: Request, res: Response) => {

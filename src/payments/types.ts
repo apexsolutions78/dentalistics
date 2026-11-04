@@ -22,6 +22,11 @@ export interface GatewayConnectionResult {
   detail: string;
 }
 
+/**
+ * Online checkout. AssanPay implements this. A future card gateway implements
+ * the same three methods and is chosen by payment_gateway_config.provider.
+ * Manual bank transfer is reviewed by the super admin and is not a gateway.
+ */
 export interface PaymentGateway {
   readonly key: string;
   createPayment(input: CreatePaymentInput): Promise<CreatedPayment>;

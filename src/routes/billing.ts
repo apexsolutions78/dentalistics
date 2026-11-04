@@ -9,9 +9,12 @@ import { requireAuth } from '../middleware/auth';
 import { assertCanManageMembers } from '../middleware/tenant';
 import { gatewayReadiness, loadPaymentGatewayConfig } from '../payments/gatewayConfig';
 import { createPaymentGateway } from '../payments/registry';
+import { listPayableMethods, submitManualPayment } from '../services/manualPayments';
+import { listRegionalPrices } from '../services/regionalPrices';
 import {
   checkPaymentStatus,
   createCheckout,
+  createOrderId,
   getBillingSummary,
   recordMockResult,
 } from '../services/payments';
@@ -46,7 +49,22 @@ export function createBillingRouter(deps: BillingRouterDeps): Router {
       config,
       gatewayReadiness(config),
     );
-    res.status(200).json(summary);
+    const regions = await listRegionalPrices(deps.db);
+    const manualMethods = await listPayableMethods(deps.db);
+    res.status(200).json({ ...summary, regions, manualMethods });
+  });
+
+  router.post('/:orgId/billing/manual', async (req: Request, res: Response) => {
+    const organizationId = parsePathId(req.params.orgId);
+    const actor = req.user as SessionUser;
+    assertCanManageMembers(actor, organizationId);
+    const payment = await submitManualPayment(deps.db, deps.logger, {
+      organizationId,
+      actorId: actor.id,
+      body: readJsonBody(req),
+      orderId: createOrderId(),
+    });
+    res.status(201).json({ payment });
   });
 
   router.post('/:orgId/billing/checkout', async (req: Request, res: Response) => {

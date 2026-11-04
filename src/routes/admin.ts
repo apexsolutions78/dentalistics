@@ -19,6 +19,7 @@ import {
 import type { PaymentGatewayConfig, PaymentGatewayProvider } from '../payments/gatewayConfig';
 import { PAYMENT_GATEWAY_PROVIDERS } from '../payments/gatewayConfig';
 import { createPaymentGateway } from '../payments/registry';
+import { createPlatformAdminRouter } from './platformAdmin';
 import { parsePathId, requireChoice, requirePassword, requireString, ValidationError } from '../validate';
 export interface AdminRouterDeps {
   db: Pool;
@@ -246,6 +247,8 @@ export function createAdminRouter(deps: AdminRouterDeps): Router {
     const result = await createPaymentGateway(config).testConnection();
     res.status(200).json({ result });
   });
+
+  router.use(createPlatformAdminRouter(deps));
 
   return router;
 }

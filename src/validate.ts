@@ -114,6 +114,20 @@ export function optionalUserId(value: unknown, name: string): number | null {
   return value;
 }
 
+export function optionalDateOfBirth(value: unknown): string | null {
+  if (value === undefined || value === null || value === '') {
+    return null;
+  }
+  const date = parseDateOnly(value, 'dateOfBirth');
+  const today = new Date().toISOString().slice(0, 10);
+  if (date < '1900-01-01' || date > today) {
+    throw new ValidationError('Invalid input', [
+      'dateOfBirth must be from 1900-01-01 through today',
+    ]);
+  }
+  return date;
+}
+
 export function parseDateOnly(value: unknown, name: string): string {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     throw new ValidationError('Invalid input', [`${name} must be a date in YYYY-MM-DD format`]);

@@ -44,6 +44,24 @@ export interface PublicPlan {
   trialDays: number | null;
 }
 
+export interface RegionalPrice {
+  code: string;
+  label: string;
+  currency: string;
+  amountMinor: number;
+  placeholder: boolean;
+  sortOrder?: number;
+}
+
+export interface ManualPaymentMethod {
+  key: string;
+  label: string;
+  instructions: string;
+  enabled?: boolean;
+  regionCodes: string[];
+  sortOrder?: number;
+}
+
 export type ConfigSource = 'org' | 'deployment' | 'default';
 
 export interface TrialRow {
@@ -297,6 +315,7 @@ export interface Patient {
   lastName: string;
   phone: string;
   email: string | null;
+  dateOfBirth?: string | null;
   notes: string | null;
   smsOptOut: boolean;
   createdAt: string;
@@ -462,12 +481,18 @@ export interface ReceptionistWorkspace {
 
 export interface PaymentRow {
   orderId: string;
-  status: 'pending' | 'paid' | 'failed' | 'expired' | 'cancelled';
+  status: 'pending' | 'paid' | 'failed' | 'expired' | 'cancelled' | 'rejected';
   amountUsdCents: number;
+  amountMinor?: number | null;
   currency: string;
+  regionCode?: string | null;
   provider: string;
+  methodKey?: string | null;
   checkoutUrl: string | null;
+  reference?: string | null;
+  hasReceipt?: boolean;
   lastError: string | null;
+  rejectionReason?: string | null;
   createdAt: string;
   paidAt: string | null;
 }
@@ -493,6 +518,8 @@ export interface BillingSummary {
     configured: boolean;
     reasons: string[];
   };
+  regions?: RegionalPrice[];
+  manualMethods?: ManualPaymentMethod[];
   payments: PaymentRow[];
 }
 
@@ -507,7 +534,7 @@ export interface CheckoutPayment {
 
 export interface PaymentStatusResult {
   orderId: string;
-  status: 'pending' | 'paid' | 'failed' | 'expired' | 'cancelled';
+  status: 'pending' | 'paid' | 'failed' | 'expired' | 'cancelled' | 'rejected';
   plan: 'trial' | 'full';
   payment: PaymentRow;
 }

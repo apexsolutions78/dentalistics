@@ -9,7 +9,9 @@ import { PageHeader } from '../../components/PageHeader';
 import { Flash } from '../../components/Flash';
 import { EmptyState, ErrorState, LoadingState, StatusBadge } from '../../components/states';
 import { formatDateTime } from '../../lib/format';
-import type { BillingPhase, BillingState } from '../../lib/types';
+import { formatMinor } from '../../lib/money';
+import { browserLanguages, pickRegion, readStoredRegion, storeRegion } from '../../lib/region';
+import type { BillingPhase, BillingState, ManualPaymentMethod, RegionalPrice } from '../../lib/types';
 
 const POLL_INTERVAL_MS = 3000;
 const POLL_ATTEMPTS = 5;
@@ -36,6 +38,10 @@ export function BillingPage() {
   const [searchParams] = useSearchParams();
   const orderIdParam = searchParams.get('orderId');
   const [banner, setBanner] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
+  const [chosenRegion, setChosenRegion] = useState<string | null>(() => readStoredRegion());
+  const [methodKey, setMethodKey] = useState('');
+  const [reference, setReference] = useState('');
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
 
   const checkStatus = useCallback(
     async (orderId: string): Promise<'paid' | 'failed' | 'pending' | 'error'> => {
@@ -97,6 +103,57 @@ export function BillingPage() {
     };
   }, [orderIdParam, orgId, checkStatus]);
 
+  async function submitManual(): Promise<void> {
+    if (orgId === null || selectedRegion === null || selectedMethod === null) return;
+    if (reference.trim().length < 3) {
+      setBanner({ kind: 'error', text: 'Enter the payment reference from your transfer.' });
+      return;
+    }
+    let receipt: { contentType: string; dataBase64: string } | null = null;
+    if (receiptFile !== null) {
+      if (receiptFile.size > 1_500_000) {
+        setBanner({ kind: 'error', text: 'The receipt must be 1.5 MB or smaller.' });
+        return;
+      }
+      if (
+        receiptFile.type !== 'image/jpeg' &&
+        receiptFile.type !== 'image/png' &&
+        receiptFile.type !== 'application/pdf'
+      ) {
+        setBanner({ kind: 'error', text: 'The receipt must be a JPEG, PNG, or PDF.' });
+        return;
+      }
+      const dataUrl = await receiptFile.arrayBuffer();
+      const bytes = new Uint8Array(dataUrl);
+      let binary = '';
+      bytes.forEach((byte) => {
+        binary += String.fromCharCode(byte);
+      });
+      receipt = { contentType: receiptFile.type, dataBase64: btoa(binary) };
+    }
+    setBanner(null);
+    const result = await submit(() =>
+      apiFetch<{ payment: { orderId: string } }>(`/api/organizations/${orgId}/billing/manual`, {
+        method: 'POST',
+        body: {
+          regionCode: selectedRegion.code,
+          methodKey: selectedMethod.key,
+          reference: reference.trim(),
+          receipt,
+        },
+      }),
+    );
+    if (result !== null) {
+      setReference('');
+      setReceiptFile(null);
+      setBanner({
+        kind: 'success',
+        text: `Payment ${result.payment.orderId} was sent for review. The paid period extends when it is confirmed.`,
+      });
+      reload();
+    }
+  }
+
   async function startCheckout(): Promise<void> {
     if (orgId === null) return;
     setBanner(null);
@@ -115,6 +172,20 @@ export function BillingPage() {
   }
 
   const summary = data;
+  const regionList: RegionalPrice[] = summary?.regions ?? [];
+  const regionCode =
+    regionList.length === 0
+      ? (chosenRegion ?? 'us')
+      : pickRegion(
+          regionList.map((region) => region.code),
+          browserLanguages(),
+          chosenRegion,
+        );
+  const selectedRegion = regionList.find((region) => region.code === regionCode) ?? null;
+  const methods: ManualPaymentMethod[] = (summary?.manualMethods ?? []).filter((method) =>
+    selectedRegion === null ? false : method.regionCodes.includes(selectedRegion.code),
+  );
+  const selectedMethod = methods.find((method) => method.key === methodKey) ?? methods[0] ?? null;
   const plan = summary?.organization.plan ?? null;
   const trialEnded =
     plan === 'trial' &&
@@ -227,10 +298,103 @@ export function BillingPage() {
               </div>
             ) : null}
             {!summary.gateway.enabled && (showUpgrade || showRenew) ? (
-              <p className="text-muted" style={{ marginTop: 'var(--space-2)' }}>
-                {summary.gateway.reasons.join(' · ') || 'Payment gateway is not enabled.'}
+              <>
+                <p className="text-muted" style={{ marginTop: 'var(--space-2)' }}>
+                  {summary.gateway.reasons.join(' · ') || 'Payment gateway is not enabled.'}
+                </p>
+                <p className="text-muted">
+                  Online card checkout stays off until the operator turns the gateway on. Bank transfer is below.
+                </p>
+              </>
+            ) : null}
+          </section>
+
+          <section className="card" style={{ marginTop: 'var(--space-4)' }}>
+            <h2 className="card-title">Pay by bank transfer</h2>
+            <p className="text-muted">
+              Choose your region, follow the instructions, then send the reference from your transfer.
+              A receipt image or PDF is optional.
+            </p>
+            {regionList.length > 0 ? (
+              <label className="region-picker">
+                Region
+                <select
+                  aria-label="Payment region"
+                  value={selectedRegion?.code ?? ''}
+                  onChange={(event) => {
+                    setChosenRegion(event.target.value);
+                    storeRegion(event.target.value);
+                    setMethodKey('');
+                  }}
+                >
+                  {regionList.map((region) => (
+                    <option key={region.code} value={region.code}>
+                      {region.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+            {selectedRegion !== null ? (
+              <p>
+                <strong>
+                  {formatMinor(selectedRegion.amountMinor, selectedRegion.currency)} per month
+                </strong>
+                {selectedRegion.placeholder ? ' (placeholder amount until the operator sets it)' : ''}
               </p>
             ) : null}
+            {methods.length === 0 ? (
+              <p>Payment instructions for this region have not been published yet.</p>
+            ) : (
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void submitManual();
+                }}
+              >
+                <label>
+                  Payment method
+                  <select
+                    aria-label="Payment method"
+                    value={selectedMethod?.key ?? ''}
+                    onChange={(event) => setMethodKey(event.target.value)}
+                  >
+                    {methods.map((method) => (
+                      <option key={method.key} value={method.key}>
+                        {method.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {selectedMethod !== null ? (
+                  <pre className="instructions-box">{selectedMethod.instructions}</pre>
+                ) : null}
+                <label>
+                  Payment reference
+                  <input
+                    className="input"
+                    aria-label="Payment reference"
+                    value={reference}
+                    onChange={(event) => setReference(event.target.value)}
+                    required
+                  />
+                </label>
+                <label>
+                  Receipt (optional)
+                  <input
+                    aria-label="Receipt file"
+                    type="file"
+                    accept="image/jpeg,image/png,application/pdf"
+                    onChange={(event) => setReceiptFile(event.target.files?.[0] ?? null)}
+                  />
+                </label>
+                <div className="btn-row">
+                  <button type="submit" className="btn btn-primary" disabled={saving}>
+                    {saving ? 'Sending…' : 'Submit payment for review'}
+                  </button>
+                </div>
+              </form>
+            )}
           </section>
 
           <section className="card" style={{ marginTop: 'var(--space-4)' }}>
@@ -266,7 +430,9 @@ export function BillingPage() {
                         <td>{payment.orderId}</td>
                         <td>{new Date(payment.createdAt).toLocaleString()}</td>
                         <td>
-                          {formatUsd(payment.amountUsdCents)} {payment.currency}
+                          {payment.amountMinor != null
+                            ? formatMinor(payment.amountMinor, payment.currency)
+                            : `${formatUsd(payment.amountUsdCents)} ${payment.currency}`}
                         </td>
                         <td>
                           <StatusBadge
@@ -275,7 +441,7 @@ export function BillingPage() {
                           />
                         </td>
                         <td>
-                          {payment.status === 'pending' ? (
+                          {payment.status === 'pending' && payment.provider !== 'manual' ? (
                             <button
                               type="button"
                               className="btn btn-secondary"

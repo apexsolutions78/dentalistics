@@ -13,6 +13,7 @@ import {
   LoadingState,
   EmptyState,
 } from '../../components/states';
+import { SampleLine } from '../../components/SampleLine';
 
 const PAGE_SIZE = 25;
 
@@ -116,6 +117,7 @@ export function AutomationFailuresPage() {
           <EmptyState
             title="No failed jobs"
             description="Automation failures appear here with a retry action. Nothing has failed recently."
+            preview={<SampleLine>a reminder that failed to send, with a retry.</SampleLine>}
           />
         ) : null}
         {data !== null && jobs.length > 0 ? (

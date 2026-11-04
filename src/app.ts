@@ -98,14 +98,17 @@ export function createApp(deps: AppDeps = {}): Express {
     );
     next();
   });
-  app.use(
-    express.json({
-      limit: '100kb',
-      verify: (req, _res, buf) => {
-        (req as Request & { rawBody?: Buffer }).rawBody = buf;
+  app.use((req, res, next) => {
+    const largeBody =
+      req.method === 'POST' &&
+      (/\/billing\/manual$/.test(req.path) || /\/patients\/import/.test(req.path));
+    return express.json({
+      limit: largeBody ? '4mb' : '100kb',
+      verify: (innerReq, _res, buf) => {
+        (innerReq as Request & { rawBody?: Buffer }).rawBody = buf;
       },
-    }),
-  );
+    })(req, res, next);
+  });
   app.use(express.urlencoded({ extended: false, limit: '100kb' }));
 
   app.use((req: Request, res: Response, next) => {
