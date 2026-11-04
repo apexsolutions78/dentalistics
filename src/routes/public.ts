@@ -7,6 +7,7 @@ import { AppError } from '../errors';
 import { readJsonBody } from '../http/body';
 import type { Logger } from '../logger';
 import { PLANS } from '../plans';
+import { listRegionalPrices } from '../services/regionalPrices';
 import type { RateLimiter } from '../security/rateLimit';
 import { createPublicLead } from '../services/leads';
 import { createDbPublicActivityReader } from '../services/publicActivity';
@@ -37,8 +38,18 @@ export function createPublicRouter(deps: PublicRouterDeps): Router {
     });
   const activityLimiter = deps.activityLimiter ?? deps.ipLimiter;
 
-  router.get('/plans', (_req: Request, res: Response) => {
-    res.status(200).json({ plans: PLANS });
+  router.get('/plans', async (_req: Request, res: Response) => {
+    const regions = await listRegionalPrices(deps.db);
+    res.status(200).json({
+      plans: PLANS,
+      regions: regions.map((region) => ({
+        code: region.code,
+        label: region.label,
+        currency: region.currency,
+        amountMinor: region.amountMinor,
+        placeholder: region.placeholder,
+      })),
+    });
   });
 
   router.get('/activity', async (req: Request, res: Response) => {

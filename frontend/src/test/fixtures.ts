@@ -29,15 +29,15 @@ export function makePlans(): PublicPlan[] {
     {
       id: 'trial',
       name: 'Free Plan',
-      headline: '8-day free trial with every feature',
+      headline: '14-day free trial with every feature',
       priceUsdCents: 0,
       interval: 'trial',
-      trialDays: 8,
+      trialDays: 14,
     },
     {
       id: 'full',
       name: 'Full Plan',
-      headline: 'Full access to every feature, $20 per month',
+      headline: 'Full access to every feature, billed monthly',
       priceUsdCents: 2000,
       interval: 'month',
       trialDays: null,

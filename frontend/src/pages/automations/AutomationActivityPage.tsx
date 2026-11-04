@@ -15,6 +15,7 @@ import {
   EmptyState,
   type BadgeTone,
 } from '../../components/states';
+import { SampleLine } from '../../components/SampleLine';
 
 const PAGE_SIZE = 25;
 
@@ -165,6 +166,11 @@ export function AutomationActivityPage() {
               isFiltered
                 ? 'No automation jobs match the current filters. Try resetting them.'
                 : 'Reminder, no-show, recall and review jobs appear here once automations run.'
+            }
+            preview={
+              isFiltered ? undefined : (
+                <SampleLine>a review request sent after a completed visit.</SampleLine>
+              )
             }
           />
         ) : null}

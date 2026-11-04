@@ -2,6 +2,7 @@ import type { Pool, RowDataPacket } from 'mysql2/promise';
 
 export const PAYMENT_GATEWAY_META_KEY = 'payment_gateway_config';
 
+/** Online providers only. Manual transfer is not a provider. Add a card gateway to this union. */
 export type PaymentGatewayProvider = 'mock' | 'assanpay';
 
 export const PAYMENT_GATEWAY_PROVIDERS: readonly PaymentGatewayProvider[] = ['mock', 'assanpay'];

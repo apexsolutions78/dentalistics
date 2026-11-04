@@ -6230,3 +6230,60 @@ subscription clock. Admin activation grants one billing period.
 run the timestamp correction once with `--offset-minutes 300` and
 `--before` set to the UTC restart instant. K8 (outbound renewal
 reminder) remains a follow-up.
+
+## Session 46 - 2026-11-04 - Regional prices, manual payments, 14-day trial
+
+**Authorization.** Owner instruction to add regional pricing, a manual
+payment flow (no card gateway), a 14-day trial for new clinics, CSV
+patient import, setup-help requests, sample peeks on remaining empty
+lists, and a marketing section with real screenshots. One PR against
+master. Do not deploy.
+
+**What shipped.** Migration `0023` adds the price table, payment-method
+instructions, setup-help requests, patient date of birth, and manual
+payment columns. It does not write `trial_ends_at`. `TRIAL_DAYS` is 14
+and signup still binds that constant, so existing trials keep their
+end date. USD $20 is the seeded default. Other currencies are
+placeholders (`is_placeholder = 1`) for the owner to replace. Method
+rows start disabled with empty instructions. Confirming a manual
+payment extends `paid_until` by one month. Rejecting does not. AssanPay
+stays behind the existing gateway enabled flag. The public region
+selector uses the browser locale and localStorage. No IP lookup.
+
+**Gates.** `npm run verify` exit 0: eslint, tsc, 447/447 tests in 45
+files, 0 skipped, build. `npm run verify:frontend` exit 0: eslint,
+189/189 tests in 32 files, vite build. Local MySQL 8.0.46. Not deployed.
+
+**Assumptions.** Placeholder amounts are coarse stand-ins, not exchange
+rates. A single-word CSV name is rejected so the import does not invent
+a last name. Receipts are JPEG, PNG, or PDF up to 1.5 MB.
+
+## Session 47 - 2026-11-04 - Clinic patient billing
+
+**Authorization / scope.** Owner instruction to add clinic-side patient
+billing (invoices, payments, expenses, reports) for the named markets,
+distinct from Apex subscription billing. One PR against master. No
+deploy (Rule 11).
+
+**Executed.** Migration `0024_patient_billing.sql` (renumbered from
+0023 after PR #5 merged `0023_regional_pricing_and_manual_payments.sql`
+on master). Services and routes under
+`/api/organizations/:orgId/patient-billing`. Frontend screens at
+`/patient-billing`, invoice detail with letterhead and print CSS,
+expenses, and reports with CSV. Capabilities `patientBilling.view`,
+`patientBilling.manage`, and `patientBilling.reports`. Audit actions
+listed in PROJECT_STATE revision 84. Patient delete refuses when an
+invoice exists.
+
+**Gates before the renumber.** `npm run verify` exit 0 (eslint, tsc,
+450/450 tests in 45 files, 0 skipped, build) against MariaDB 10.11.14.
+`npm run verify:frontend` exit 0 (eslint, 192/192 tests in 31 files,
+vite build). Fresh database migrate at that point: applied 23, skipped
+0; second run applied 0, skipped 23. Browser walkthrough: empty-list
+sample, INV-0001 issued for Marina Dental, cash payment, report totals
+AED 157.50 revenue / AED 100.00 collected / AED 57.50 outstanding.
+
+**Not deployed.** Defaults AED and VAT, discount as a line amount, and
+owner/admin-only writes are recorded as assumptions in revision 84.
+
+---

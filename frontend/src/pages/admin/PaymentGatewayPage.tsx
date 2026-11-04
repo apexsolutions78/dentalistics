@@ -85,7 +85,7 @@ export function PaymentGatewayPage() {
     <div>
       <PageHeader
         title="Payment gateway"
-        subtitle="AssanPay checkout settings for clinic upgrades to the Full Plan"
+        subtitle="AssanPay stays off until this switch is on. Manual bank payments are a separate page and do not use this gateway."
         actions={
           <button type="button" className="btn btn-secondary" onClick={reload}>
             Refresh

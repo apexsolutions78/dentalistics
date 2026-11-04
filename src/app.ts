@@ -24,6 +24,7 @@ import { createDoctorsRouter } from './routes/doctors';
 import { createLeadsRouter } from './routes/leads';
 import { createOrganizationsRouter } from './routes/organizations';
 import { createObservabilityRouter } from './routes/observability';
+import { createPatientBillingRouter } from './routes/patientBilling';
 import { createPatientsRouter } from './routes/patients';
 import { createPublicRouter } from './routes/public';
 import { createRecallsRouter } from './routes/recalls';
@@ -99,14 +100,17 @@ export function createApp(deps: AppDeps = {}): Express {
     );
     next();
   });
-  app.use(
-    express.json({
-      limit: '100kb',
-      verify: (req, _res, buf) => {
-        (req as Request & { rawBody?: Buffer }).rawBody = buf;
+  app.use((req, res, next) => {
+    const largeBody =
+      req.method === 'POST' &&
+      (/\/billing\/manual$/.test(req.path) || /\/patients\/import/.test(req.path));
+    return express.json({
+      limit: largeBody ? '4mb' : '100kb',
+      verify: (innerReq, _res, buf) => {
+        (innerReq as Request & { rawBody?: Buffer }).rawBody = buf;
       },
-    }),
-  );
+    })(req, res, next);
+  });
   app.use(express.urlencoded({ extended: false, limit: '100kb' }));
 
   app.use((req: Request, res: Response, next) => {
@@ -191,6 +195,7 @@ export function createApp(deps: AppDeps = {}): Express {
     app.use('/api/organizations', createDoctorsRouter({ db, logger }));
     app.use('/api/organizations', createPatientsRouter({ db, logger }));
     app.use('/api/organizations', createChartRouter({ db, logger }));
+    app.use('/api/organizations', createPatientBillingRouter({ db, logger }));
     app.use('/api/organizations', createAppointmentsRouter({ db, logger }));
     app.use('/api/organizations', createDashboardRouter({ db, logger }));
     app.use('/api/organizations', createWorkspaceRouter({ db, logger }));

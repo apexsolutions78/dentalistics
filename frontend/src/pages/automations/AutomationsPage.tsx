@@ -9,6 +9,7 @@ import { PageHeader } from '../../components/PageHeader';
 import { Pager } from '../../components/Pager';
 import { FormField } from '../../components/FormField';
 import { StatusBadge, ErrorState, LoadingState, EmptyState, type BadgeTone } from '../../components/states';
+import { SampleLine } from '../../components/SampleLine';
 
 const PAGE_SIZE = 25;
 
@@ -226,7 +227,16 @@ export function AutomationsPage() {
           ) : logsQuery.data !== null && logs.length === 0 ? (
             <EmptyState
               title="No activity found"
-              description="No automation jobs match the current filters."
+              description={
+                applied.status === '' && applied.kind === ''
+                  ? 'Reminder, no-show, recall and review jobs appear here once automations run.'
+                  : 'No automation jobs match the current filters.'
+              }
+              preview={
+                applied.status === '' && applied.kind === '' ? (
+                  <SampleLine>a review request sent after a completed visit.</SampleLine>
+                ) : undefined
+              }
             />
           ) : logsQuery.data !== null ? (
             <>

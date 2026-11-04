@@ -56,6 +56,9 @@ export function requireRole(...roles: Array<SessionUser['role']>): RequestHandle
 
 const CAPABILITY_ROLES: Record<string, readonly SessionUser['role'][]> = {
   'appointments.create': ['owner', 'admin', 'receptionist'],
+  'patientBilling.view': ['owner', 'admin', 'receptionist'],
+  'patientBilling.manage': ['owner', 'admin'],
+  'patientBilling.reports': ['owner', 'admin'],
 };
 
 export function requireCapability(capability: string): RequestHandler {

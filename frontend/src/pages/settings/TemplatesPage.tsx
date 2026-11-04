@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { useSettings } from '../../lib/settings';
 import { PageHeader } from '../../components/PageHeader';
 import { EmptyState } from '../../components/states';
+import { SampleLine } from '../../components/SampleLine';
 import { SettingsBody } from './SettingsBody';
 
 const LABELS: Record<string, string> = {
@@ -30,7 +31,13 @@ export function TemplatesPage() {
         {(settings) => {
           const names = settings.definitions.templateNames;
           if (names.length === 0) {
-            return <EmptyState title="No templates" description="This deployment defines no template slots." />;
+            return (
+              <EmptyState
+                title="No templates"
+                description="This deployment defines no template slots."
+                preview={<SampleLine>an appointment reminder template.</SampleLine>}
+              />
+            );
           }
           return (
             <div className="card">

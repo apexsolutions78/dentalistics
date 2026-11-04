@@ -35,6 +35,18 @@ describe('requireCapability', () => {
     expect((err as AppError).code).toBe('authentication_required');
   });
 
+  it('lets the front desk view patient billing and keeps the books with the owner', () => {
+    expect(run(sessionUser('receptionist'), 'patientBilling.view')).toBeUndefined();
+    expect(run(sessionUser('owner'), 'patientBilling.manage')).toBeUndefined();
+    expect(run(sessionUser('admin'), 'patientBilling.reports')).toBeUndefined();
+    const manage = run(sessionUser('receptionist'), 'patientBilling.manage');
+    expect(manage).toBeInstanceOf(AppError);
+    expect((manage as AppError).statusCode).toBe(403);
+    const reports = run(sessionUser('receptionist'), 'patientBilling.reports');
+    expect(reports).toBeInstanceOf(AppError);
+    expect((reports as AppError).statusCode).toBe(403);
+  });
+
   it('fails closed for capabilities the backend map does not know', () => {
     const err = run(sessionUser('owner'), 'not.a.real.capability');
     expect(err).toBeInstanceOf(AppError);

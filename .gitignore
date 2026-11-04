@@ -20,6 +20,9 @@ npm-debug.log*
 .DS_Store
 Thumbs.db
 
+# Payment receipts uploaded by clinics. Never commit these.
+data/
+
 # Test artifacts
 *.tsbuildinfo
 

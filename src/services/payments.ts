@@ -22,20 +22,26 @@ export const BILLING_PRICE = {
   name: FULL_PLAN.name,
 };
 
-export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'expired' | 'cancelled';
+export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'expired' | 'cancelled' | 'rejected';
 
 interface PaymentRow extends RowDataPacket {
   id: number;
   organization_id: number;
   plan: 'trial' | 'full';
   amount_usd_cents: number;
+  amount_minor: number | null;
   currency: string;
-  status: 'PENDING' | 'PAID' | 'FAILED' | 'EXPIRED' | 'CANCELLED';
+  region_code: string | null;
+  status: 'PENDING' | 'PAID' | 'FAILED' | 'EXPIRED' | 'CANCELLED' | 'REJECTED';
   provider: string;
+  method_key: string | null;
   order_id: string;
   provider_transaction_id: string | null;
   checkout_url: string | null;
+  payer_reference: string | null;
+  receipt_stored_name: string | null;
   last_error: string | null;
+  rejection_reason: string | null;
   paid_at: Date | null;
   created_at: Date;
 }
@@ -48,7 +54,7 @@ interface OrganizationRow extends RowDataPacket {
   paid_until: Date | null;
 }
 
-function generateOrderId(): string {
+export function createOrderId(): string {
   return `D${Date.now().toString(36)}${crypto.randomBytes(3).toString('hex')}`;
 }
 
@@ -61,10 +67,16 @@ function paymentDto(row: PaymentRow): Record<string, unknown> {
     orderId: row.order_id,
     status: lowerStatus(row.status),
     amountUsdCents: row.amount_usd_cents,
+    amountMinor: row.amount_minor,
     currency: row.currency,
+    regionCode: row.region_code,
     provider: row.provider,
+    methodKey: row.method_key,
     checkoutUrl: row.checkout_url,
+    reference: row.payer_reference,
+    hasReceipt: row.receipt_stored_name !== null,
     lastError: row.last_error,
+    rejectionReason: row.rejection_reason,
     createdAt: row.created_at,
     paidAt: row.paid_at,
   };
@@ -171,11 +183,11 @@ export async function createCheckout(
 
   await db.query(
     `UPDATE payments SET status = 'CANCELLED', last_error = 'superseded by a new checkout'
-     WHERE organization_id = ? AND status = 'PENDING'`,
+     WHERE organization_id = ? AND status = 'PENDING' AND provider <> 'manual'`,
     [input.organizationId],
   );
 
-  const orderId = generateOrderId();
+  const orderId = createOrderId();
   const [inserted] = await db.query<ResultSetHeader>(
     `INSERT INTO payments (organization_id, plan, amount_usd_cents, currency, status, provider, order_id)
      VALUES (?, 'full', ?, 'USD', 'PENDING', ?, ?)`,
@@ -334,7 +346,7 @@ export async function checkPaymentStatus(
 ): Promise<StatusResult> {
   let payment = await loadPayment(db, input.organizationId, input.orderId);
 
-  if (payment.status === 'PENDING' && input.config.enabled) {
+  if (payment.status === 'PENDING' && payment.provider !== 'manual' && input.config.enabled) {
     const providerResult = await input.gateway.queryStatus(payment.order_id);
     if (providerResult.status === 'paid') {
       await markPaidAndActivate(db, logger, payment, input.actorId);
@@ -368,6 +380,14 @@ export async function recordMockResult(
   },
 ): Promise<StatusResult> {
   const payment = await loadPayment(db, input.organizationId, input.orderId);
+  if (payment.provider === 'manual') {
+    throw new AppError(
+      'Manual payments are reviewed by the platform admin.',
+      409,
+      'manual_review',
+      true,
+    );
+  }
   if (payment.status === 'PENDING') {
     if (input.result === 'paid') {
       await markPaidAndActivate(db, logger, payment, input.actorId);
@@ -386,4 +406,54 @@ export async function recordMockResult(
     plan: org.plan,
     payment: paymentDto(fresh),
   };
+}
+
+async function loadPaymentById(db: Pool, paymentId: number): Promise<PaymentRow> {
+  const [rows] = await db.query<PaymentRow[]>(
+    "SELECT * FROM payments WHERE id = ? AND provider = 'manual'",
+    [paymentId],
+  );
+  const row = rows[0];
+  if (row === undefined) {
+    throw new AppError('Manual payment not found', 404, 'not_found', true);
+  }
+  return row;
+}
+
+export async function confirmManualPayment(
+  db: Pool,
+  logger: Logger,
+  paymentId: number,
+  actorId: number,
+): Promise<Record<string, unknown>> {
+  const payment = await loadPaymentById(db, paymentId);
+  if (payment.status !== 'PENDING') {
+    throw new AppError('Only a pending payment can be confirmed', 409, 'payment_not_pending', true);
+  }
+  await markPaidAndActivate(db, logger, payment, actorId);
+  return paymentDto(await loadPaymentById(db, paymentId));
+}
+
+export async function rejectManualPayment(
+  db: Pool,
+  logger: Logger,
+  paymentId: number,
+  actorId: number,
+  reason: string,
+): Promise<Record<string, unknown>> {
+  const payment = await loadPaymentById(db, paymentId);
+  if (payment.status !== 'PENDING') {
+    throw new AppError('Only a pending payment can be rejected', 409, 'payment_not_pending', true);
+  }
+  await db.query(
+    `UPDATE payments SET status = 'REJECTED', rejection_reason = ? WHERE id = ? AND status = 'PENDING'`,
+    [reason, payment.id],
+  );
+  await recordAudit(db, logger, {
+    organizationId: payment.organization_id,
+    userId: actorId,
+    action: 'manual_payment_rejected',
+    detail: `orderId=${payment.order_id}`,
+  });
+  return paymentDto(await loadPaymentById(db, paymentId));
 }

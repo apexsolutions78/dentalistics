@@ -6,6 +6,7 @@ const PRIMARY_LINKS: Array<{ to: string; label: string; end?: boolean }> = [
   { to: '/workspace', label: 'Workspace', end: true },
   { to: '/leads', label: 'Leads' },
   { to: '/patients', label: 'Patients' },
+  { to: '/patient-billing', label: 'Patient billing' },
   { to: '/appointments', label: 'Appointments' },
   { to: '/communications', label: 'Communications' },
   { to: '/recall', label: 'Recall' },
@@ -112,6 +113,7 @@ function GlyphShape({ label }: { label: string }) {
     case 'Reviews':
       return <path d="m12 4 2 4.2 4.6.6-3.4 3.2.8 4.6L12 14.4 7.9 16.6l.8-4.6L5.4 8.8 10 8.2z" />;
     case 'Billing':
+    case 'Patient billing':
     case 'Payments':
       return (
         <>
@@ -147,6 +149,7 @@ export function Sidebar() {
   const showSettingsSections = can(user, 'settings.view');
   const showTrials = can(user, 'admin.trials.view');
   const showDoctors = can(user, 'doctors.view');
+  const showPatientBilling = can(user, 'patientBilling.view');
   const location = useLocation();
   const inSettings = location.pathname.startsWith('/settings');
 
@@ -155,7 +158,7 @@ export function Sidebar() {
       <div className="nav-group">
         <p className="nav-label">Today</p>
         <ul className="nav-list" aria-label="Clinic">
-          {PRIMARY_LINKS.map((link) => (
+          {PRIMARY_LINKS.filter((link) => link.to !== '/patient-billing' || showPatientBilling).map((link) => (
             <NavLinkItem key={link.to} link={link} />
           ))}
           {showDoctors ? <NavLinkItem link={{ to: '/doctors', label: 'Doctors' }} /> : null}
@@ -178,6 +181,15 @@ export function Sidebar() {
             <NavLinkItem link={{ to: '/admin/trials', label: 'Trials' }} />
             {can(user, 'admin.payments.view') ? (
               <NavLinkItem link={{ to: '/admin/payments', label: 'Payments' }} />
+            ) : null}
+            {can(user, 'admin.payments.view') ? (
+              <NavLinkItem link={{ to: '/admin/pricing', label: 'Pricing' }} />
+            ) : null}
+            {can(user, 'admin.payments.view') ? (
+              <NavLinkItem link={{ to: '/admin/manual-payments', label: 'Manual payments' }} />
+            ) : null}
+            {can(user, 'admin.payments.view') ? (
+              <NavLinkItem link={{ to: '/admin/setup-help', label: 'Setup help' }} />
             ) : null}
           </ul>
         </div>

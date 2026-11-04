@@ -14,6 +14,7 @@ import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { FormField } from '../../components/FormField';
 import { Flash } from '../../components/Flash';
 import { StatusBadge, ErrorState, LoadingState, EmptyState } from '../../components/states';
+import { SampleLine } from '../../components/SampleLine';
 import { WhatsAppSendButton } from '../../components/WhatsAppSendButton';
 import { statusTone } from './AppointmentsPage';
 
@@ -421,6 +422,7 @@ export function AppointmentDetailPage() {
           <EmptyState
             title="No automation activity"
             description="No scheduled jobs were found for this appointment yet."
+            preview={<SampleLine>a 24-hour reminder marked sent.</SampleLine>}
           />
         ) : (
           <div className="table-scroll" tabIndex={0} role="region" aria-label="Automation activity table">
