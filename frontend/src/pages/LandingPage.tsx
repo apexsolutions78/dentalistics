@@ -16,6 +16,9 @@ export function LandingPage() {
   if (status === 'anonymous') {
     return <MarketingPage />;
   }
+  if (user !== null && user.role === 'admin' && user.organizationId === null) {
+    return <Navigate to="/admin/trials" replace />;
+  }
   if (can(user, 'dashboard.view')) {
     return <Navigate to="/dashboard" replace />;
   }

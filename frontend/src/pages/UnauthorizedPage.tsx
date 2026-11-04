@@ -9,7 +9,7 @@ export function UnauthorizedPage() {
       <EmptyState
         heading
         title="Access denied"
-        description="Your role does not have permission to view settings. Contact your clinic owner if you believe this is a mistake."
+        description="Your role does not have permission to open this screen. Contact your clinic owner if you believe this is a mistake."
       />
       <p style={{ marginTop: 'var(--space-4)' }}>
         <Link to="/">Back to start</Link>

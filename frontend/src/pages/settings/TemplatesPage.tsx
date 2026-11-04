@@ -8,6 +8,7 @@ import { SettingsBody } from './SettingsBody';
 const LABELS: Record<string, string> = {
   lead_acknowledgement: 'Lead acknowledgement',
   missed_call_response: 'Missed-call response',
+  appointment_confirmation: 'Appointment confirmation',
   appointment_reminder_48h: 'Reminder — 48 hours before',
   appointment_reminder_24h: 'Reminder — 24 hours before',
   appointment_reminder_2h: 'Reminder — 2 hours before',

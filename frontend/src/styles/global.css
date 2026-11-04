@@ -51,13 +51,14 @@ a {
 
 .app-shell {
   display: grid;
-  grid-template-columns: 236px 1fr;
+  grid-template-columns: 236px minmax(0, 1fr);
   grid-template-rows: 56px auto 1fr;
   grid-template-areas:
     'brand header'
     'banner banner'
     'sidebar main';
   min-height: 100%;
+  max-width: 100%;
 }
 
 .app-trial-banner {
@@ -126,6 +127,8 @@ a {
   display: flex;
   align-items: center;
   gap: var(--space-3);
+  min-width: 0;
+  max-width: 100%;
   padding: var(--space-1) var(--space-2) var(--space-1) var(--space-4);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -135,9 +138,26 @@ a {
   transition: box-shadow var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
 }
 
+.account-email {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .account-menu:hover {
   border-color: var(--color-border-control);
   box-shadow: var(--shadow-raised);
+}
+
+.app-brand,
+.app-header,
+.app-sidebar,
+.app-main,
+.page-stage,
+.app-trial-banner {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .app-sidebar {
@@ -156,6 +176,7 @@ a {
   padding: var(--space-5) var(--space-6);
   max-width: 1180px;
   width: 100%;
+  overflow-x: auto;
 }
 
 .nav-list {
@@ -213,8 +234,9 @@ a {
 
 .page-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: var(--space-3);
   margin-bottom: var(--space-5);
   animation: fade-rise var(--dur-2) var(--ease) both;
@@ -285,7 +307,7 @@ a {
 
 .card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr));
   gap: var(--space-3);
 }
 
@@ -331,6 +353,7 @@ a {
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
+  min-height: 40px;
   padding: 9px 18px;
   border-radius: var(--radius-pill);
   border: 1px solid transparent;
@@ -402,6 +425,7 @@ a {
 
 .btn-row {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2);
   align-items: center;
   margin-top: var(--space-4);
@@ -436,6 +460,7 @@ a {
 .select,
 .textarea {
   font: inherit;
+  min-height: 40px;
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--color-border-control);
   border-radius: 10px;
@@ -494,18 +519,20 @@ button:focus-visible,
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  min-height: 40px;
   margin-bottom: var(--space-2);
   font-size: var(--fs-label);
 }
 
 .checkbox-row input {
-  width: 16px;
-  height: 16px;
+  width: 22px;
+  height: 22px;
+  flex: none;
 }
 
 .form-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
   gap: 0 var(--space-4);
 }
 
@@ -513,6 +540,8 @@ button:focus-visible,
 
 .table-scroll {
   overflow-x: auto;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .table-scroll:focus-visible {
@@ -540,6 +569,7 @@ button:focus-visible,
   padding: var(--space-3);
   border-bottom: 1px solid var(--color-border);
   vertical-align: middle;
+  overflow-wrap: anywhere;
 }
 
 .table tbody tr {
@@ -719,8 +749,10 @@ button:focus-visible,
   background: rgba(10, 10, 12, 0.55);
   backdrop-filter: blur(3px);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
+  overflow: auto;
+  padding: var(--space-4);
   z-index: 40;
   animation: fade-in 160ms ease both;
 }
@@ -729,7 +761,10 @@ button:focus-visible,
   background: var(--color-surface);
   border-radius: var(--radius-card);
   padding: var(--space-5);
-  width: min(420px, 92vw);
+  width: min(420px, 100%);
+  max-height: calc(100vh - 32px);
+  margin: auto;
+  overflow: auto;
   box-shadow: var(--shadow-dialog);
   animation: pop-in 240ms var(--ease) both;
 }
@@ -835,7 +870,8 @@ button:focus-visible,
   color: var(--badge-new-text);
   border: 1px solid transparent;
   border-radius: var(--radius);
-  padding: 2px var(--space-2);
+  min-height: 40px;
+  padding: 8px var(--space-2);
   cursor: pointer;
 }
 
@@ -866,8 +902,11 @@ button:focus-visible,
 
 .template-link {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
+  min-width: 0;
   padding: var(--space-3) 0;
   border-bottom: 1px solid var(--color-border);
   text-decoration: none;
@@ -885,10 +924,12 @@ button:focus-visible,
 .template-link .snippet {
   color: var(--color-text-secondary);
   font-size: var(--fs-small);
+  flex: 1 1 12rem;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 55%;
+  max-width: 100%;
 }
 
 .provider-status {
@@ -913,7 +954,7 @@ button:focus-visible,
 
 @media (max-width: 820px) {
   .app-shell {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: 56px auto auto auto 1fr;
     grid-template-areas:
       'brand'
@@ -925,6 +966,12 @@ button:focus-visible,
 
   .app-header {
     padding: 0 var(--space-4);
+    flex-wrap: wrap;
+  }
+
+  .account-menu {
+    flex-wrap: wrap;
+    justify-content: flex-end;
   }
 
   .account-menu {
@@ -945,6 +992,12 @@ button:focus-visible,
 
   .nav-link {
     white-space: nowrap;
+    min-height: 40px;
+  }
+
+  .checkbox-row input {
+    width: 40px;
+    height: 40px;
   }
 
   .app-main {
@@ -954,6 +1007,10 @@ button:focus-visible,
   .hours-row {
     grid-template-columns: 1fr;
     gap: var(--space-1);
+  }
+
+  .invoice-meta {
+    text-align: left;
   }
 
   .hours-times {
@@ -978,6 +1035,8 @@ button:focus-visible,
 
 .calendar-scroll {
   overflow-x: auto;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .calendar-weekdays,
@@ -1016,8 +1075,8 @@ button:focus-visible,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 26px;
-  height: 26px;
+  min-width: 40px;
+  height: 40px;
   padding: 0 var(--space-1);
   border: 1px solid transparent;
   border-radius: var(--radius-pill);
@@ -1434,6 +1493,7 @@ button:focus-visible,
 
 .nav-link {
   gap: var(--space-2);
+  min-height: 40px;
 }
 
 .nav-link.active {
@@ -1712,6 +1772,7 @@ button:focus-visible,
   background: transparent;
   color: var(--color-text);
   border-radius: var(--radius-pill);
+  min-height: 40px;
   padding: 6px 12px;
   font: inherit;
   font-weight: 800;
@@ -1969,7 +2030,7 @@ button:focus-visible,
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
   gap: var(--space-2);
   padding: var(--space-3);
 }
@@ -2002,6 +2063,7 @@ button:focus-visible,
 
 .invoice-letterhead {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: var(--space-4);
   margin-bottom: var(--space-4);
