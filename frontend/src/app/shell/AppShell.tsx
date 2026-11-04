@@ -11,6 +11,7 @@ const SECTION_TITLES: Record<string, string> = {
   workspace: 'Workspace',
   leads: 'Leads',
   patients: 'Patients',
+  'patient-billing': 'Patient billing',
   doctors: 'Doctors',
   appointments: 'Appointments',
   communications: 'Communications',

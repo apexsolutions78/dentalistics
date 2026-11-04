@@ -23,6 +23,7 @@ import { createDoctorsRouter } from './routes/doctors';
 import { createLeadsRouter } from './routes/leads';
 import { createOrganizationsRouter } from './routes/organizations';
 import { createObservabilityRouter } from './routes/observability';
+import { createPatientBillingRouter } from './routes/patientBilling';
 import { createPatientsRouter } from './routes/patients';
 import { createPublicRouter } from './routes/public';
 import { createRecallsRouter } from './routes/recalls';
@@ -192,6 +193,7 @@ export function createApp(deps: AppDeps = {}): Express {
     app.use('/api/organizations', createLeadsRouter({ db, logger }));
     app.use('/api/organizations', createDoctorsRouter({ db, logger }));
     app.use('/api/organizations', createPatientsRouter({ db, logger }));
+    app.use('/api/organizations', createPatientBillingRouter({ db, logger }));
     app.use('/api/organizations', createAppointmentsRouter({ db, logger }));
     app.use('/api/organizations', createDashboardRouter({ db, logger }));
     app.use('/api/organizations', createWorkspaceRouter({ db, logger }));

@@ -88,6 +88,12 @@ export const LOCAL_WALL_CLOCK_COLUMNS: readonly TimestampColumn[] = [
   { table: 'manual_payment_methods', column: 'updated_at' },
   { table: 'setup_help_requests', column: 'created_at' },
   { table: 'schema_migrations', column: 'applied_at' },
+  { table: 'clinic_billing_settings', column: 'updated_at' },
+  { table: 'patient_invoices', column: 'created_at' },
+  { table: 'patient_invoices', column: 'updated_at' },
+  { table: 'patient_payments', column: 'created_at' },
+  { table: 'clinic_expenses', column: 'created_at' },
+  { table: 'clinic_expenses', column: 'updated_at' },
 ];
 
 export const EQUAL_CREATED_AT_COLUMNS: readonly TimestampColumn[] = [
@@ -122,6 +128,8 @@ export const DO_NOT_SHIFT_COLUMNS: readonly TimestampColumn[] = [
   { table: 'password_reset_tokens', column: 'used_at' },
   { table: 'lead_slot_suggestions', column: 'decided_at' },
   { table: 'payments', column: 'paid_at' },
+  { table: 'patient_invoices', column: 'issued_at' },
+  { table: 'patient_invoices', column: 'voided_at' },
 ];
 
 const MAX_OFFSET_MINUTES = 14 * 60;

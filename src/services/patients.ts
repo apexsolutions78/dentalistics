@@ -294,6 +294,18 @@ export async function deletePatient(
       true,
     );
   }
+  const [invoiceRows] = await db.query<IdRow[]>(
+    'SELECT id FROM patient_invoices WHERE patient_id = ? LIMIT 1',
+    [patientId],
+  );
+  if (invoiceRows[0] !== undefined) {
+    throw new AppError(
+      'Patient has invoices and cannot be deleted',
+      409,
+      'patient_has_invoices',
+      true,
+    );
+  }
   await db.query('DELETE FROM patients WHERE id = ? AND organization_id = ?', [patientId, organizationId]);
   await recordAudit(db, logger, {
     organizationId,
