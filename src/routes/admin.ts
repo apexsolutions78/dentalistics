@@ -122,7 +122,15 @@ export function createAdminRouter(deps: AdminRouterDeps): Router {
       return;
     }
     await deps.db.query(
-      "UPDATE organizations SET plan = 'full', trial_ends_at = NULL WHERE id = ?",
+      `UPDATE organizations
+       SET plan = 'full',
+           trial_ends_at = NULL,
+           subscription_lapsed_at = NULL,
+           paid_until = DATE_ADD(
+             IF(paid_until IS NOT NULL AND paid_until > UTC_TIMESTAMP(), paid_until, UTC_TIMESTAMP()),
+             INTERVAL 1 MONTH
+           )
+       WHERE id = ?`,
       [organizationId],
     );
     await recordAudit(deps.db, deps.logger, {

@@ -337,11 +337,23 @@ describe.skipIf(testHost === undefined || testHost === '')('Phase B: payments an
     );
     expect((paidAuditAgain[0] as mysql.RowDataPacket).n).toBe(1);
 
-    const checkout = await request(app)
-      .post(billingPath(orgAId, '/checkout'))
-      .set('Cookie', ownerCookie);
-    expect(checkout.status).toBe(409);
-    expect(checkout.body.error.code).toBe('already_active');
+    const [extended] = await pool.query<mysql.RowDataPacket[]>(
+      "SELECT COUNT(*) AS n FROM audit_logs WHERE organization_id = ? AND action = 'subscription_extended'",
+      [orgAId],
+    );
+    expect((extended[0] as mysql.RowDataPacket).n).toBe(1);
+
+    const repeatPay = await request(app)
+      .post(billingPath(orgAId, `/payments/${orgAOrder}/mock-complete`))
+      .set('Cookie', ownerCookie)
+      .send({ result: 'paid' });
+    expect(repeatPay.status).toBe(200);
+    expect(repeatPay.body.status).toBe('paid');
+    const [extendedAgain] = await pool.query<mysql.RowDataPacket[]>(
+      "SELECT COUNT(*) AS n FROM audit_logs WHERE organization_id = ? AND action = 'subscription_extended'",
+      [orgAId],
+    );
+    expect((extendedAgain[0] as mysql.RowDataPacket).n).toBe(1);
   });
 
   it('records a failed mock payment without activating the plan', async () => {
@@ -414,5 +426,105 @@ describe.skipIf(testHost === undefined || testHost === '')('Phase B: payments an
       .set('Cookie', ownerBCookie);
     expect(summary.status).toBe(200);
     expect(summary.body.organization.plan).toBe('trial');
+    expect(summary.body.billing.phase).toBe('trial_expired');
+    expect(summary.body.billing.readOnly).toBe(true);
+  });
+
+  it('extends paid_until by one month and stacks a later payment', async () => {
+    const [beforeRows] = await pool.query<mysql.RowDataPacket[]>(
+      'SELECT paid_until FROM organizations WHERE id = ?',
+      [orgAId],
+    );
+    const firstPaidUntil = (beforeRows[0] as mysql.RowDataPacket).paid_until as Date;
+    expect(firstPaidUntil.getTime()).toBeGreaterThan(Date.now());
+
+    await pool.query('UPDATE organizations SET paid_until = ? WHERE id = ?', [
+      '2030-06-15 12:00:00',
+      orgAId,
+    ]);
+
+    const checkout = await request(app)
+      .post(billingPath(orgAId, '/checkout'))
+      .set('Cookie', ownerCookie);
+    expect(checkout.status).toBe(201);
+    const order = checkout.body.payment.orderId as string;
+    const paid = await request(app)
+      .post(billingPath(orgAId, `/payments/${order}/mock-complete`))
+      .set('Cookie', ownerCookie)
+      .send({ result: 'paid' });
+    expect(paid.status).toBe(200);
+    expect(paid.body.plan).toBe('full');
+
+    const [afterRows] = await pool.query<mysql.RowDataPacket[]>(
+      "SELECT DATE_FORMAT(paid_until, '%Y-%m-%d %H:%i:%s') AS paid_until FROM organizations WHERE id = ?",
+      [orgAId],
+    );
+    expect((afterRows[0] as mysql.RowDataPacket).paid_until).toBe('2030-07-15 12:00:00');
+
+    const again = await request(app)
+      .post(billingPath(orgAId, `/payments/${order}/mock-complete`))
+      .set('Cookie', ownerCookie)
+      .send({ result: 'paid' });
+    expect(again.status).toBe(200);
+    const [still] = await pool.query<mysql.RowDataPacket[]>(
+      "SELECT DATE_FORMAT(paid_until, '%Y-%m-%d %H:%i:%s') AS paid_until FROM organizations WHERE id = ?",
+      [orgAId],
+    );
+    expect((still[0] as mysql.RowDataPacket).paid_until).toBe('2030-07-15 12:00:00');
+  });
+
+  it('keeps access during grace and locks writes after grace without deleting data', async () => {
+    await pool.query(
+      `UPDATE organizations
+       SET paid_until = DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 DAY), subscription_lapsed_at = NULL
+       WHERE id = ?`,
+      [orgAId],
+    );
+    const duringGrace = await request(app)
+      .patch(`/api/organizations/${orgAId}`)
+      .set('Cookie', ownerCookie)
+      .send({ timezone: 'UTC' });
+    expect(duringGrace.status).toBe(200);
+    const graceSummary = await request(app).get(billingPath(orgAId)).set('Cookie', ownerCookie);
+    expect(graceSummary.body.billing.phase).toBe('grace');
+    expect(graceSummary.body.billing.readOnly).toBe(false);
+
+    await pool.query(
+      `UPDATE organizations
+       SET paid_until = DATE_SUB(UTC_TIMESTAMP(), INTERVAL 10 DAY)
+       WHERE id = ?`,
+      [orgAId],
+    );
+    const read = await request(app)
+      .get(`/api/organizations/${orgAId}`)
+      .set('Cookie', ownerCookie);
+    expect(read.status).toBe(200);
+    const locked = await request(app)
+      .patch(`/api/organizations/${orgAId}`)
+      .set('Cookie', ownerCookie)
+      .send({ timezone: 'Asia/Karachi' });
+    expect(locked.status).toBe(403);
+    expect(locked.body.error.code).toBe('subscription_expired');
+
+    const expiredSummary = await request(app).get(billingPath(orgAId)).set('Cookie', ownerCookie);
+    expect(expiredSummary.status).toBe(200);
+    expect(expiredSummary.body.billing.phase).toBe('expired');
+    expect(expiredSummary.body.organization.paidUntil).toBeTruthy();
+
+    const checkout = await request(app)
+      .post(billingPath(orgAId, '/checkout'))
+      .set('Cookie', ownerCookie);
+    expect(checkout.status).toBe(201);
+    const order = checkout.body.payment.orderId as string;
+    const paid = await request(app)
+      .post(billingPath(orgAId, `/payments/${order}/mock-complete`))
+      .set('Cookie', ownerCookie)
+      .send({ result: 'paid' });
+    expect(paid.status).toBe(200);
+    const restored = await request(app)
+      .patch(`/api/organizations/${orgAId}`)
+      .set('Cookie', ownerCookie)
+      .send({ timezone: 'UTC' });
+    expect(restored.status).toBe(200);
   });
 });

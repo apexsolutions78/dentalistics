@@ -18,6 +18,7 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "migrate": "tsx src/db/migrate.ts",
+    "db:correct-timestamps": "tsx src/db/correct-local-timestamps.ts",
     "seed:admin": "tsx src/db/seed-admin.ts",
     "dev:frontend": "npm --prefix frontend run dev",
     "build:frontend": "npm --prefix frontend run build",

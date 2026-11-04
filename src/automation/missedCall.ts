@@ -85,7 +85,7 @@ export interface MissedCallResponseInput {
 }
 
 export interface MissedCallResponseResult {
-  action: 'sent' | 'failed' | 'skipped_disabled' | 'duplicate' | 'not_found' | 'error';
+  action: 'sent' | 'failed' | 'skipped_disabled' | 'skipped_billing' | 'duplicate' | 'not_found' | 'error';
   messageId?: number;
 }
 
@@ -115,6 +115,10 @@ export async function sendMissedCallResponse(
       leadId: input.leadId,
       messageType: MISSED_CALL_TEMPLATE_NAME,
     });
+    if (result.held === true) {
+      logger.info('missed-call response skipped', { eventId: input.eventId, reason: 'billing_read_only' });
+      return { action: 'skipped_billing' };
+    }
     if (!result.created) {
       logger.info('missed-call response duplicate skipped', { eventId: input.eventId });
       return { action: 'duplicate', messageId: result.message.id as number };

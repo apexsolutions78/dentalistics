@@ -4,6 +4,7 @@ import { getProvider } from '../communications/registry';
 import { sendTemplateMessage, sendMessage } from '../services/messages';
 import type { NoShowConfig } from './noShowConfig';
 import { NO_SHOW_CONFIG_META_KEY, loadNoShowConfig } from './noShowConfig';
+import { readOnlyOrganizationPredicate } from '../billing/subscription';
 import { loadOrgEnabledFilter } from '../db/orgMeta';
 
 const HOUR_MS = 3_600_000;
@@ -640,6 +641,7 @@ export async function runNoShowTick(
      WHERE c.status = 'OPEN'
        AND (m.status = 'PENDING' OR (m.status = 'FAILED' AND m.attempts < ?))
        AND m.scheduled_at <= ?${filter.clause}
+       AND ${readOnlyOrganizationPredicate('m.organization_id')}
      ORDER BY m.scheduled_at ASC, m.id ASC
      LIMIT ?`,
     [cfg.maxAttempts, now, batchSize, ...filter.params],

@@ -1,3 +1,4 @@
+import { runBillingTick } from './automation/billing';
 import { runNoShowTick } from './automation/noShow';
 import { runRecallTick } from './automation/recall';
 import { runReminderTick } from './automation/reminders';
@@ -90,6 +91,7 @@ async function main(): Promise<void> {
       track('no_show', 'no-show', () => runNoShowTick(getPool(), logger));
       track('recall', 'recall', () => runRecallTick(getPool(), logger));
       track('review_request', 'review request', () => runReviewRequestTick(getPool(), logger));
+      track('billing', 'billing', () => runBillingTick(getPool(), logger));
     }, tickMs);
     reminderTimer.unref();
     logger.info('reminder tick scheduled', { intervalMs: tickMs });

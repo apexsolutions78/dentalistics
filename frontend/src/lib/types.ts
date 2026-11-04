@@ -7,11 +7,31 @@ export interface SessionUser {
   organizationId: number | null;
 }
 
+export type BillingPhase =
+  | 'trial'
+  | 'trial_expired'
+  | 'active'
+  | 'renewal_due'
+  | 'grace'
+  | 'expired'
+  | 'unmetered';
+
+export interface BillingState {
+  phase: BillingPhase;
+  readOnly: boolean;
+  paidUntil: string | null;
+  graceDays: number;
+  noticeDays: number;
+}
+
 export interface SessionOrganization {
   id: number;
   name: string;
   plan: 'trial' | 'full';
   trialEndsAt: string | null;
+  paidUntil?: string | null;
+  billingPhase?: BillingPhase;
+  readOnly?: boolean;
   onboardingCompletedAt: string | null;
 }
 
@@ -458,7 +478,9 @@ export interface BillingSummary {
     name: string;
     plan: 'trial' | 'full';
     trialEndsAt: string | null;
+    paidUntil?: string | null;
   };
+  billing?: BillingState;
   price: {
     amountUsdCents: number;
     currency: string;

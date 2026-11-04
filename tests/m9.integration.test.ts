@@ -485,7 +485,7 @@ describe.skipIf(testHost === undefined || testHost === '')(
       const caseId = (await caseRows(apptId))[0]?.id ?? 0;
 
       const replacement = await createAppt(patientId, {
-        date: '2026-10-20',
+        date: '2026-12-20',
         time: '10:00',
       });
       expect(replacement.status).toBe(201);

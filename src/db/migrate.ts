@@ -5,6 +5,7 @@ import { ConfigError, loadEnv } from '../config';
 import type { DbConfig } from '../config';
 import { createLogger } from '../logger';
 import type { Logger } from '../logger';
+import { enforceUtcSession } from './pool';
 
 export interface MigrationResult {
   applied: string[];
@@ -44,6 +45,7 @@ export async function runMigrations(
     .sort();
 
   const pool = mysql.createPool(migrationPoolOptions(cfg));
+  enforceUtcSession(pool);
   try {
     await pool.query(CREATE_TRACKING_TABLE);
     const [rows] = await pool.query('SELECT name FROM schema_migrations');

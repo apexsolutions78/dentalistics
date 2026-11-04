@@ -5,6 +5,8 @@ import { AppError } from '../errors';
 import type { Logger } from '../logger';
 import type { PaymentGatewayConfig } from '../payments/gatewayConfig';
 import type { PaymentGateway } from '../payments/types';
+import { describeBilling } from '../billing/subscription';
+import type { BillingDescription } from '../billing/subscription';
 import { PLANS } from '../plans';
 
 const FULL_PLAN = PLANS.find((plan) => plan.id === 'full');
@@ -43,6 +45,7 @@ interface OrganizationRow extends RowDataPacket {
   name: string;
   plan: 'trial' | 'full';
   trial_ends_at: Date | null;
+  paid_until: Date | null;
 }
 
 function generateOrderId(): string {
@@ -69,7 +72,7 @@ function paymentDto(row: PaymentRow): Record<string, unknown> {
 
 async function loadOrganization(db: Pool, organizationId: number): Promise<OrganizationRow> {
   const [rows] = await db.query<OrganizationRow[]>(
-    'SELECT id, name, plan, trial_ends_at FROM organizations WHERE id = ?',
+    'SELECT id, name, plan, trial_ends_at, paid_until FROM organizations WHERE id = ?',
     [organizationId],
   );
   const row = rows[0];
@@ -88,7 +91,14 @@ function buildReturnUrl(config: PaymentGatewayConfig, orderId: string): string |
 }
 
 export interface BillingSummary {
-  organization: { id: number; name: string; plan: 'trial' | 'full'; trialEndsAt: Date | null };
+  organization: {
+    id: number;
+    name: string;
+    plan: 'trial' | 'full';
+    trialEndsAt: Date | null;
+    paidUntil: Date | null;
+  };
+  billing: BillingDescription;
   price: typeof BILLING_PRICE;
   gateway: { enabled: boolean; provider: string; configured: boolean; reasons: string[] };
   payments: Array<Record<string, unknown>>;
@@ -105,13 +115,20 @@ export async function getBillingSummary(
     'SELECT * FROM payments WHERE organization_id = ? ORDER BY id DESC LIMIT 10',
     [organizationId],
   );
+  const billing = describeBilling({
+    plan: org.plan,
+    trialEndsAt: org.trial_ends_at,
+    paidUntil: org.paid_until,
+  });
   return {
     organization: {
       id: org.id,
       name: org.name,
       plan: org.plan,
       trialEndsAt: org.trial_ends_at,
+      paidUntil: org.paid_until,
     },
+    billing,
     price: BILLING_PRICE,
     gateway: {
       enabled: config.enabled,
@@ -143,9 +160,6 @@ export async function createCheckout(
   },
 ): Promise<CheckoutResult> {
   const org = await loadOrganization(db, input.organizationId);
-  if (org.plan === 'full') {
-    throw new AppError('This clinic is already on the Full Plan.', 409, 'already_active', true);
-  }
   if (!input.config.enabled) {
     throw new AppError(
       'Online payment is not enabled. Please contact support to activate this clinic.',
@@ -225,34 +239,65 @@ async function markPaidAndActivate(
   payment: PaymentRow,
   actorId: number | null,
 ): Promise<boolean> {
-  const [result] = await db.query<ResultSetHeader>(
-    `UPDATE payments SET status = 'PAID', paid_at = UTC_TIMESTAMP(), last_error = NULL
-     WHERE id = ? AND status <> 'PAID'`,
-    [payment.id],
-  );
-  const newlyPaid = result.affectedRows > 0;
-
-  const [orgResult] = await db.query<ResultSetHeader>(
-    `UPDATE organizations SET plan = 'full', trial_ends_at = NULL
-     WHERE id = ? AND plan = 'trial'`,
-    [payment.organization_id],
-  );
+  const connection = await db.getConnection();
+  let newlyPaid: boolean;
+  let previousPlan: OrganizationRow['plan'] | null = null;
+  try {
+    await connection.beginTransaction();
+    const [result] = await connection.query<ResultSetHeader>(
+      `UPDATE payments SET status = 'PAID', paid_at = UTC_TIMESTAMP(), last_error = NULL
+       WHERE id = ? AND status <> 'PAID'`,
+      [payment.id],
+    );
+    newlyPaid = result.affectedRows > 0;
+    if (newlyPaid) {
+      const [orgRows] = await connection.query<OrganizationRow[]>(
+        'SELECT plan FROM organizations WHERE id = ? FOR UPDATE',
+        [payment.organization_id],
+      );
+      previousPlan = orgRows[0]?.plan ?? null;
+      await connection.query(
+        `UPDATE organizations
+         SET plan = 'full',
+             trial_ends_at = NULL,
+             subscription_lapsed_at = NULL,
+             paid_until = DATE_ADD(
+               IF(paid_until IS NOT NULL AND paid_until > UTC_TIMESTAMP(), paid_until, UTC_TIMESTAMP()),
+               INTERVAL 1 MONTH
+             )
+         WHERE id = ?`,
+        [payment.organization_id],
+      );
+    }
+    await connection.commit();
+  } catch (err) {
+    await connection.rollback();
+    throw err;
+  } finally {
+    connection.release();
+  }
 
   if (newlyPaid) {
     await recordAudit(db, logger, {
       organizationId: payment.organization_id,
       userId: actorId,
       action: 'payment_completed',
-      detail: `orderId=${payment.order_id} amountUsdBc=${payment.amount_usd_cents}`,
+      detail: `orderId=${payment.order_id} amountUsdCents=${payment.amount_usd_cents}`,
     });
-  }
-  if (orgResult.affectedRows > 0) {
     await recordAudit(db, logger, {
       organizationId: payment.organization_id,
       userId: actorId,
-      action: 'trial_activated',
-      detail: `from=trial to=full via payment orderId=${payment.order_id}`,
+      action: 'subscription_extended',
+      detail: `orderId=${payment.order_id} period=1 month`,
     });
+    if (previousPlan === 'trial') {
+      await recordAudit(db, logger, {
+        organizationId: payment.organization_id,
+        userId: actorId,
+        action: 'trial_activated',
+        detail: `from=trial to=full via payment orderId=${payment.order_id}`,
+      });
+    }
   }
   return newlyPaid;
 }

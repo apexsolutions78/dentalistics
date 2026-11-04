@@ -6155,3 +6155,78 @@ session's G3/G5/S1 work on instruction; (2) deployment when the owner
 is ready - prepared DirectAdmin blocks + a fresh pull/migrate/frontend
 build/restart, same pattern as rev 72 (Rule 11); (3) G4 docs-only
 wording correction; (4) AssanPay credentials when available.
+
+---
+
+## Session 45 - 2026-11-04 - UTC timestamps and monthly subscription
+
+**Authorization / scope.** Owner instruction to fix two production
+problems on one branch and open a PR: timestamps stored/read 5 hours
+off on the Asia/Karachi server, and one-time billing where the plan
+says $20/month. No new milestone. No production deploy from this
+session (Rule 11). No secrets committed.
+
+**Timezone.** CONFIRMED by a local MySQL 8.0.46 session set to
+`+05:00`: `NOW()` ran about 18000 seconds ahead of `UTC_TIMESTAMP()`,
+and a `CURRENT_TIMESTAMP` default `created_at` had the same skew.
+mysql2 `timezone: 'Z'` then reads that local wall clock as UTC, so
+API instants and dashboard UTC windows move. Fix: every pool
+connection, including the migration pool, runs
+`SET time_zone = '+00:00'` before use (`enforceUtcSession`). A pool
+insert's `created_at` then stays within 5 seconds of
+`UTC_TIMESTAMP()`, and a JavaScript `Date` of
+`2026-11-04T07:34:00.000Z` round-trips through a DATETIME column.
+`zonedToUtc` still owns clinic-local appointment times (unit test:
+Asia/Karachi 07:34 -> 02:34 UTC). Reminder/no-show/recall/review
+due queries compare `scheduled_at` to a JavaScript `Date`, not
+`NOW()`. Historical rows are not rewritten by migrate. The manual
+script `npm run db:correct-timestamps` is dry-run unless `--apply`,
+subtracts `--offset-minutes` only from session-clock columns older
+than `--before`, and records `app_meta.timestamp_local_correction`
+so a second apply is a no-op. UTC-written columns (`scheduled_at`,
+`sent_at`, `trial_ends_at`, `paid_at`, and the rest of
+`DO_NOT_SHIFT_COLUMNS`) are not shifted. `leads.last_activity_at`
+moves only while it still equals `created_at`.
+
+**Subscription.** Migration `0021` adds `paid_until` and
+`subscription_lapsed_at`. Backfill: existing `full` clinics get one
+month from the migration timestamp (guarded by `paid_until IS NULL`)
+so deploy does not lock clinics that were permanent under the old
+model. Each successful payment extends `paid_until` by one calendar
+month from the later of now and the current `paid_until`, inside the
+same transaction as the `PENDING -> PAID` update. A repeat callback
+does not extend. Grace default 3 days (`BILLING_GRACE_DAYS`); renewal
+notice default 7 days. After grace, writes return
+`subscription_expired`, reads and billing stay open, and patient
+automations are not sent (due jobs stay PENDING). `runBillingTick`
+audits the lapse once. Billing page shows renewal-due, grace, and
+expired notices with the paid-until date and a Renew button. No
+email/SMS renewal reminder (K8). Platform-admin activation grants one
+month rather than permanent full. NULL `paid_until` on `full` stays
+unmetered so pre-existing fixtures that never paid are not locked.
+
+**Tests actually executed.** Local MySQL started in this VM (no
+Docker). `npm run verify` exit 0: eslint, tsc, **425/425 tests / 41
+files / 0 skipped** (TEST_DB_* set; integration suites ran), build.
+`npm run verify:frontend` exit 0: eslint, **144/144 / 24 files**, vite
+build. `npm run migrate` second run: applied 0, skipped 21, including
+`0021_subscription_paid_until.sql`. Pre-existing fixture dates that
+had reached 2026-11-04 (m8 reminder 2026-11-05, m9 rebook 2026-10-20,
+m10 recall due 2026-11-04) were moved later; the assertions still
+check the same offsets and due-date math. STATUS: CODE_WRITTEN +
+CODE_EXECUTED + TEST_PASSED.
+
+**Could not verify.** The production DirectAdmin host was not
+accessed. The +05:00 skew was reproduced on a local session, not by
+reading the live `created_at` row. The correction script was executed
+against the isolated test database, not production.
+
+**Assumptions.** Grace default 3 days and notice default 7 days were
+chosen here (the owner asked for a configurable grace of a few days,
+not a specific number). NULL `paid_until` on `full` means not on the
+subscription clock. Admin activation grants one billing period.
+
+**Recommended next phase (PROPOSED):** deploy with the PR steps, then
+run the timestamp correction once with `--offset-minutes 300` and
+`--before` set to the UTC restart instant. K8 (outbound renewal
+reminder) remains a follow-up.

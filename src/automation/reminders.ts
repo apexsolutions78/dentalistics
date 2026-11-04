@@ -4,6 +4,7 @@ import { getProvider } from '../communications/registry';
 import { sendTemplateMessage, sendMessage } from '../services/messages';
 import type { ReminderConfig } from './reminderConfig';
 import { DEFAULT_REMINDER_TEMPLATE_2H, REMINDER_CONFIG_META_KEY, loadReminderConfig } from './reminderConfig';
+import { readOnlyOrganizationPredicate } from '../billing/subscription';
 import { loadOrgEnabledFilter } from '../db/orgMeta';
 import { clinicLocalTime, isWithinQuietHours, quietHoursEndInstant, zonedToUtc } from './time';
 
@@ -508,6 +509,7 @@ export async function runReminderTick(
      FROM appointment_reminders
      WHERE (status = 'PENDING' OR (status = 'FAILED' AND attempts < ?))
        AND scheduled_at <= ?${filter.clause}
+       AND ${readOnlyOrganizationPredicate('organization_id')}
      ORDER BY scheduled_at ASC, id ASC
      LIMIT ?`,
     [cfg.maxAttempts, now, batchSize, ...filter.params],

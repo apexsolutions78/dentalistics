@@ -300,7 +300,7 @@ describe.skipIf(testHost === undefined || testHost === '')(
     it('schedules exact UTC reminder instants for every configured offset', async () => {
       const res = await createAppt(ownerACookie, orgAId, {
         patientId: patientAId,
-        date: '2026-11-05',
+        date: '2026-12-15',
         time: '10:00',
         service: 'Check-up',
       });
@@ -311,9 +311,9 @@ describe.skipIf(testHost === undefined || testHost === '')(
       expect(rows.map((r) => r.offset_hours)).toEqual([48, 24, 2]);
       expect(rows.every((r) => r.status === 'PENDING')).toBe(true);
       expect(rows.every((r) => r.attempts === 0)).toBe(true);
-      expect(rows[0]?.scheduled_at.toISOString()).toBe('2026-11-03T10:00:00.000Z');
-      expect(rows[1]?.scheduled_at.toISOString()).toBe('2026-11-04T10:00:00.000Z');
-      expect(rows[2]?.scheduled_at.toISOString()).toBe('2026-11-05T08:00:00.000Z');
+      expect(rows[0]?.scheduled_at.toISOString()).toBe('2026-12-13T10:00:00.000Z');
+      expect(rows[1]?.scheduled_at.toISOString()).toBe('2026-12-14T10:00:00.000Z');
+      expect(rows[2]?.scheduled_at.toISOString()).toBe('2026-12-15T08:00:00.000Z');
       expect(rows.every((r) => r.message_id === null)).toBe(true);
     });
 

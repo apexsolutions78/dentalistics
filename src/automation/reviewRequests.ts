@@ -4,6 +4,7 @@ import { getProvider } from '../communications/registry';
 import { sendTemplateMessage, sendMessage } from '../services/messages';
 import type { ReviewConfig } from './reviewConfig';
 import { REVIEW_CONFIG_META_KEY, loadReviewConfig } from './reviewConfig';
+import { readOnlyOrganizationPredicate } from '../billing/subscription';
 import { loadOrgEnabledFilter } from '../db/orgMeta';
 
 const HOUR_MS = 3_600_000;
@@ -578,6 +579,7 @@ export async function runReviewRequestTick(
      FROM review_requests
      WHERE (status = 'PENDING' OR (status = 'FAILED' AND attempts < ?))
        AND scheduled_at <= ?${filter.clause}
+       AND ${readOnlyOrganizationPredicate('organization_id')}
      ORDER BY scheduled_at ASC, id ASC
      LIMIT ?`,
     [cfg.maxAttempts, now, batchSize, ...filter.params],

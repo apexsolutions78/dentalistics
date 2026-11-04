@@ -348,6 +348,22 @@ describe('route access', () => {
     expect(screen.getByText(/read-only/)).toBeInTheDocument();
   });
 
+  it('shows the read-only lock banner after the subscription expires', async () => {
+    await renderAt(
+      '/dashboard',
+      makeUser({ role: 'owner' }),
+      makeOrganization({
+        plan: 'full',
+        readOnly: true,
+        paidUntil: '2020-01-01T00:00:00.000Z',
+        billingPhase: 'expired',
+      }),
+    );
+    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
+    expect(screen.getByText(/Subscription ended/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open billing' })).toBeInTheDocument();
+  });
+
   it('shows no lock banner while the trial is still active', async () => {
     await renderAt(
       '/dashboard',
