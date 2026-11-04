@@ -178,6 +178,14 @@ export function RecallPage() {
                 ? 'No recalls match the current filters. Try resetting them.'
                 : 'Recalls open automatically when a completed appointment reaches its follow-up interval.'
             }
+            preview={
+              isFiltered ? undefined : (
+                <p>
+                  <span className="badge badge-warn">Sample</span> Example only — Omar Nasser,
+                  6-month check-up, due 12 May, status DUE. Not saved data.
+                </p>
+              )
+            }
           />
         ) : null}
         {data !== null && recalls.length > 0 ? (

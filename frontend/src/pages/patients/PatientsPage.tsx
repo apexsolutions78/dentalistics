@@ -243,6 +243,14 @@ export function PatientsPage() {
                 ? 'No patients match this search. Try a different name or phone number.'
                 : 'Patients appear here once leads convert or staff add them.'
             }
+            preview={
+              query !== '' ? undefined : (
+                <p>
+                  <span className="badge badge-success">Sample</span> Example only — Layla Rahman,
+                  +97336001204, layla@example.com, SMS allowed. Not saved data.
+                </p>
+              )
+            }
           />
         ) : null}
         {data !== null && data.patients.length > 0 ? (
