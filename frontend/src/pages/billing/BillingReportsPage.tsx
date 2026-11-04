@@ -113,7 +113,7 @@ export function BillingReportsPage() {
         <>
           <section className="card">
             <h2 className="card-title">Summary · {currency}</h2>
-            <div className="table-scroll" tabIndex={0} role="region" aria-label="Billing summary">
+            <div className="table-scroll table-cards" tabIndex={0} role="region" aria-label="Billing summary">
               <table className="table">
                 <tbody>
                   <tr>
@@ -174,7 +174,7 @@ export function BillingReportsPage() {
 
           <section className="card">
             <h2 className="card-title">By {applied.groupBy}</h2>
-            <div className="table-scroll" tabIndex={0} role="region" aria-label="Billing report">
+            <div className="table-scroll table-cards" tabIndex={0} role="region" aria-label="Billing report">
               <table className="table">
                 <thead>
                   <tr>

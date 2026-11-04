@@ -202,7 +202,7 @@ export function LeadDetailPage() {
             tone={urgencyTone(lead.urgencyLevel)}
           />
         </h2>
-        <div className="table-scroll" tabIndex={0} role="region" aria-label="Lead contact details">
+        <div className="table-scroll table-cards" tabIndex={0} role="region" aria-label="Lead contact details">
           <table className="table">
             <tbody>
               <tr>
@@ -327,7 +327,7 @@ export function LeadDetailPage() {
             preview={<SampleLine>Thursday 10:30 with Dr Huda Al-Khalifa.</SampleLine>}
           />
         ) : (
-          <div className="table-scroll" tabIndex={0} role="region" aria-label="Slot suggestions">
+          <div className="table-scroll table-cards" tabIndex={0} role="region" aria-label="Slot suggestions">
             <table className="table">
               <thead>
                 <tr>
@@ -485,7 +485,7 @@ export function LeadDetailPage() {
             preview={<SampleLine>a booked cleaning.</SampleLine>}
           />
         ) : (
-          <div className="table-scroll" tabIndex={0} role="region" aria-label="Lead appointments">
+          <div className="table-scroll table-cards" tabIndex={0} role="region" aria-label="Lead appointments">
             <table className="table">
               <thead>
                 <tr>

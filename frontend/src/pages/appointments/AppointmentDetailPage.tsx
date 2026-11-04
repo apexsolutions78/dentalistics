@@ -185,7 +185,7 @@ export function AppointmentDetailPage() {
         <h2 className="card-title">
           Details <StatusBadge label={appointment.status} tone={statusTone(appointment.status)} />
         </h2>
-        <div className="table-scroll" tabIndex={0} role="region" aria-label="Appointment details">
+        <div className="table-scroll table-cards" tabIndex={0} role="region" aria-label="Appointment details">
           <table className="table">
             <tbody>
               <tr>
@@ -425,7 +425,7 @@ export function AppointmentDetailPage() {
             preview={<SampleLine>a 24-hour reminder marked sent.</SampleLine>}
           />
         ) : (
-          <div className="table-scroll" tabIndex={0} role="region" aria-label="Automation activity table">
+          <div className="table-scroll table-cards" tabIndex={0} role="region" aria-label="Automation activity table">
             <table className="table">
               <thead>
                 <tr>

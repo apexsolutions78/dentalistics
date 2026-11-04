@@ -179,7 +179,7 @@ export function AppointmentCalendarPage() {
                 list view for the full set.
               </p>
             ) : null}
-            <div className="calendar-scroll" role="region" aria-label="Appointment calendar">
+            <div className="calendar-scroll calendar-week" role="region" aria-label="Appointment calendar">
               <div className="calendar-weekdays">
                 {WEEKDAYS.map((day) => (
                   <div key={day}>{day}</div>
@@ -230,11 +230,47 @@ export function AppointmentCalendarPage() {
                 })}
               </div>
             </div>
+            <ol className="calendar-days">
+              {Array.from({ length: dayCount }, (_, index) => {
+                const day = index + 1;
+                const key = dateKey(cursor.year, cursor.month, day);
+                const appointments = byDay.get(key) ?? [];
+                const weekday = new Date(cursor.year, cursor.month, day).toLocaleDateString(undefined, {
+                  weekday: 'long',
+                });
+                return (
+                  <li key={key} className="calendar-day-row">
+                    <div className="calendar-day-date">
+                      <span className="calendar-day-number">{day}</span>
+                      <span>{weekday}</span>
+                    </div>
+                    {appointments.length === 0 ? (
+                      <p className="calendar-day-empty">No appointments</p>
+                    ) : (
+                      <ul className="calendar-day-list">
+                        {appointments.map((appointment) => (
+                          <li key={appointment.id}>
+                            <Link to={`/appointments/${appointment.id}`}>
+                              {formatTime(appointment.time)}{' '}
+                              {fullName(appointment.patient.firstName, appointment.patient.lastName)}
+                              {appointment.service !== null && appointment.service !== ''
+                                ? ` · ${appointment.service}`
+                                : ''}
+                              {appointment.status !== '' ? ` · ${appointment.status}` : ''}
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
           </>
         ) : null}
       </section>
 
-      <section className="card">
+      <section className="card calendar-selected">
         <h2 className="card-title">
           {new Date(`${selected}T00:00:00`).toLocaleDateString(undefined, {
             weekday: 'long',
@@ -252,7 +288,7 @@ export function AppointmentCalendarPage() {
         ) : null}
         {data !== null && selectedAppointments.length > 0 ? (
           <div
-            className="table-scroll"
+            className="table-scroll table-cards"
             tabIndex={0}
             role="region"
             aria-label="Selected day appointments"

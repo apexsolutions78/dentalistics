@@ -131,7 +131,7 @@ export function WorkspacePage() {
         emptyDescription="New website enquiries and manually added leads appear here."
         preview={<SampleLine>Sara Halim, website, cleaning.</SampleLine>}
       >
-        <div className="table-scroll" tabIndex={0} role="region" aria-label="New leads table">
+        <div className="table-scroll table-cards" tabIndex={0} role="region" aria-label="New leads table">
           <table className="table">
             <thead>
               <tr>
@@ -168,7 +168,7 @@ export function WorkspacePage() {
         emptyDescription="Missed, rejected and busy calls from the last 30 days appear here."
         preview={<SampleLine>a missed call from a mobile number, turned into a lead.</SampleLine>}
       >
-        <div className="table-scroll" tabIndex={0} role="region" aria-label="Missed calls table">
+        <div className="table-scroll table-cards" tabIndex={0} role="region" aria-label="Missed calls table">
           <table className="table">
             <thead>
               <tr>
@@ -211,7 +211,7 @@ export function WorkspacePage() {
         emptyDescription="Inbound patient messages from the last 30 days appear here."
         preview={<SampleLine>Layla replied that Thursday works.</SampleLine>}
       >
-        <div className="table-scroll" tabIndex={0} role="region" aria-label="Patient replies table">
+        <div className="table-scroll table-cards" tabIndex={0} role="region" aria-label="Patient replies table">
           <table className="table">
             <thead>
               <tr>
@@ -252,7 +252,7 @@ export function WorkspacePage() {
         emptyDescription="Scheduled and confirmed appointments from today onward appear here."
         preview={<SampleLine>Omar Nasser, Thursday 10:30, cleaning, scheduled.</SampleLine>}
       >
-        <div className="table-scroll" tabIndex={0} role="region" aria-label="Upcoming appointments table">
+        <div className="table-scroll table-cards" tabIndex={0} role="region" aria-label="Upcoming appointments table">
           <table className="table">
             <thead>
               <tr>
@@ -303,7 +303,7 @@ export function WorkspacePage() {
         emptyDescription="No-show appointments from the last 30 days appear here."
         preview={<SampleLine>a missed cleaning with a rebook link.</SampleLine>}
       >
-        <div className="table-scroll" tabIndex={0} role="region" aria-label="No-shows table">
+        <div className="table-scroll table-cards" tabIndex={0} role="region" aria-label="No-shows table">
           <table className="table">
             <thead>
               <tr>
@@ -338,7 +338,7 @@ export function WorkspacePage() {
         emptyDescription="Patients due for a recall appear here."
         preview={<SampleLine>Omar Nasser, hygiene recall due 12 May.</SampleLine>}
       >
-        <div className="table-scroll" tabIndex={0} role="region" aria-label="Recall opportunities table">
+        <div className="table-scroll table-cards" tabIndex={0} role="region" aria-label="Recall opportunities table">
           <table className="table">
             <thead>
               <tr>

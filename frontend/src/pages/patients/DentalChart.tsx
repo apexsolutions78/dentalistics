@@ -401,7 +401,7 @@ export function DentalChart({
           }
         />
       ) : (
-        <div className="table-scroll" tabIndex={0} role="region" aria-label="Chart history">
+        <div className="table-scroll table-cards" tabIndex={0} role="region" aria-label="Chart history">
           <table className="table">
             <thead>
               <tr>
@@ -440,7 +440,7 @@ export function DentalChart({
           }
         />
       ) : (
-        <div className="table-scroll" tabIndex={0} role="region" aria-label="Treatment plan">
+        <div className="table-scroll table-cards" tabIndex={0} role="region" aria-label="Treatment plan">
           <table className="table">
             <thead>
               <tr>

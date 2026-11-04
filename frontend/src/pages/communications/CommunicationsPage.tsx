@@ -168,7 +168,7 @@ export function CommunicationsPage() {
           />
         ) : null}
         {data !== null && messages.length > 0 ? (
-          <div className="table-scroll" tabIndex={0} role="region" aria-label="Communications table">
+          <div className="table-scroll table-cards" tabIndex={0} role="region" aria-label="Communications table">
             <table className="table">
               <thead>
                 <tr>

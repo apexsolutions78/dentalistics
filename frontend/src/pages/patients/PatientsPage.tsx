@@ -254,7 +254,7 @@ export function PatientsPage() {
           />
         ) : null}
         {data !== null && data.patients.length > 0 ? (
-          <div className="table-scroll" tabIndex={0} role="region" aria-label="Patients table">
+          <div className="table-scroll table-cards" tabIndex={0} role="region" aria-label="Patients table">
             <table className="table">
               <thead>
                 <tr>

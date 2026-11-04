@@ -92,7 +92,7 @@ export function RegionalPricingPage() {
       {status === 'error' ? <ErrorState message={error ?? 'Prices could not be loaded.'} onRetry={reload} /> : null}
       {regions.length > 0 ? (
         <section className="card">
-          <div className="table-scroll">
+          <div className="table-scroll table-cards">
             <table className="table">
               <thead>
                 <tr>

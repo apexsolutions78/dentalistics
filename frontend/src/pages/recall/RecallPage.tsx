@@ -190,7 +190,7 @@ export function RecallPage() {
           />
         ) : null}
         {data !== null && recalls.length > 0 ? (
-          <div className="table-scroll" tabIndex={0} role="region" aria-label="Recall table">
+          <div className="table-scroll table-cards" tabIndex={0} role="region" aria-label="Recall table">
             <table className="table">
               <thead>
                 <tr>

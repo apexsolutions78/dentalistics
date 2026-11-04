@@ -174,7 +174,7 @@ export function InvoicePage() {
           {invoice.patient.phone}
           {invoice.patient.email ? ` · ${invoice.patient.email}` : ''}
         </p>
-        <div className="table-scroll">
+        <div className="table-scroll table-cards">
           <table className="table">
             <thead>
               <tr>
@@ -254,7 +254,7 @@ export function InvoicePage() {
             }
           />
         ) : (
-          <div className="table-scroll" tabIndex={0} role="region" aria-label="Payments">
+          <div className="table-scroll table-cards" tabIndex={0} role="region" aria-label="Payments">
             <table className="table">
               <thead>
                 <tr>

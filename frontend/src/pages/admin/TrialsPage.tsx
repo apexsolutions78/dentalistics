@@ -72,7 +72,7 @@ export function TrialsPage() {
           />
         ) : null}
         {trials.length > 0 ? (
-          <div className="table-scroll">
+          <div className="table-scroll table-cards">
             <table className="table">
               <thead>
                 <tr>

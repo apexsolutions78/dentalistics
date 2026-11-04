@@ -123,7 +123,7 @@ export function AutomationFailuresPage() {
         {data !== null && jobs.length > 0 ? (
           <>
             <div
-              className="table-scroll"
+              className="table-scroll table-cards"
               tabIndex={0}
               role="region"
               aria-label="Failed automation jobs table"

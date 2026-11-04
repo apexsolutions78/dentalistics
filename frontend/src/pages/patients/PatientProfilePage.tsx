@@ -102,7 +102,7 @@ export function PatientProfilePage() {
 
       <section className="card">
         <h2 className="card-title">Contact information</h2>
-        <div className="table-scroll" tabIndex={0} role="region" aria-label="Patient contact details">
+        <div className="table-scroll table-cards" tabIndex={0} role="region" aria-label="Patient contact details">
           <table className="table">
             <tbody>
               <tr>
@@ -198,7 +198,7 @@ export function PatientProfilePage() {
             preview={<SampleLine>a completed check-up.</SampleLine>}
           />
         ) : (
-          <div className="table-scroll" tabIndex={0} role="region" aria-label="Appointment history table">
+          <div className="table-scroll table-cards" tabIndex={0} role="region" aria-label="Appointment history table">
             <table className="table">
               <thead>
                 <tr>
@@ -287,7 +287,7 @@ export function PatientProfilePage() {
             preview={<SampleLine>hygiene recall due 12 May.</SampleLine>}
           />
         ) : (
-          <div className="table-scroll" tabIndex={0} role="region" aria-label="Recall status table">
+          <div className="table-scroll table-cards" tabIndex={0} role="region" aria-label="Recall status table">
             <table className="table">
               <thead>
                 <tr>

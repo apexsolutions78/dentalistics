@@ -482,7 +482,7 @@ export function AppointmentsPage() {
           />
         ) : null}
         {data !== null && patients.length > 0 ? (
-          <div className="table-scroll" tabIndex={0} role="region" aria-label="Appointments table">
+          <div className="table-scroll table-cards" tabIndex={0} role="region" aria-label="Appointments table">
             <table className="table">
               <thead>
                 <tr>
