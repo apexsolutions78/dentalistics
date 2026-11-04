@@ -426,6 +426,21 @@ describe.skipIf(testHost === undefined || testHost === '')(
       expect(await leadStatus(leadId)).toBe('NEW');
     });
 
+    it('still lets a receptionist approve a suggestion (S1 capability gate)', async () => {
+      const leadId = await createLead('Polish');
+      const pending = (await suggestionsFor(leadId)).filter((item) => item.status === 'PENDING');
+      expect(pending.length).toBeGreaterThan(0);
+      const suggestion = pending[0] as { id: number };
+
+      const res = await request(app)
+        .post(`/api/organizations/${orgId}/leads/${leadId}/suggestions/${suggestion.id}/approve`)
+        .set('Cookie', receptionistCookie)
+        .send({});
+      expect(res.status).toBe(201);
+      expect(res.body.suggestion.status).toBe('ACCEPTED');
+      expect(await leadStatus(leadId)).toBe('APPOINTMENT_BOOKED');
+    });
+
     it('blocks double-booking an occupied slot and bookings outside working hours', async () => {
       const free = await availability(doctorId, dayAfter);
       expect(free.status).toBe(200);

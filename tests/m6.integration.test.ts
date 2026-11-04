@@ -512,6 +512,92 @@ describe.skipIf(testHost === undefined || testHost === '')(
       expect(orphan.message.leadId).toBeNull();
     });
 
+    it('advances a NEW lead to CONTACTED on the first inbound reply (G5)', async () => {
+      const phone = '15550202015';
+      const res = await postLead(keyA, {
+        firstName: 'Greta',
+        lastName: 'Reply',
+        phone,
+      });
+      expect(res.status).toBe(201);
+      const leadId = res.body.leadId as number;
+
+      const inbound = await handleInboundMessage(pool, logger, {
+        organizationId: orgAId,
+        channel: 'SMS',
+        from: `+${phone}`,
+        body: 'Still interested',
+        idempotencyKey: 'inb:m6:g5',
+      });
+      expect(inbound.created).toBe(true);
+      expect(inbound.message.leadId).toBe(leadId);
+
+      const get = await request(app)
+        .get(`/api/organizations/${orgAId}/leads/${leadId}`)
+        .set('Cookie', ownerCookie);
+      expect(get.status).toBe(200);
+      expect(get.body.lead.status).toBe('CONTACTED');
+      const activities = get.body.activity as Array<{ action: string; detail: string | null }>;
+      const advance = activities.find(
+        (a) => a.action === 'status_changed' && String(a.detail).includes('NEW -> CONTACTED'),
+      );
+      expect(advance).toBeDefined();
+
+      const repeat = await handleInboundMessage(pool, logger, {
+        organizationId: orgAId,
+        channel: 'SMS',
+        from: `+${phone}`,
+        body: 'Still interested',
+        idempotencyKey: 'inb:m6:g5-repeat',
+      });
+      expect(repeat.created).toBe(true);
+      const afterRepeat = await request(app)
+        .get(`/api/organizations/${orgAId}/leads/${leadId}`)
+        .set('Cookie', ownerCookie);
+      expect(afterRepeat.body.lead.status).toBe('CONTACTED');
+      const repeatActivities = afterRepeat.body.activity as Array<{
+        action: string;
+        detail: string | null;
+      }>;
+      expect(
+        repeatActivities.filter(
+          (a) => a.action === 'status_changed' && String(a.detail).includes('NEW -> CONTACTED'),
+        ),
+      ).toHaveLength(1);
+    });
+
+    it('leaves a QUALIFIED lead untouched on an inbound reply (G5)', async () => {
+      const phone = '15550202016';
+      const res = await postLead(keyA, {
+        firstName: 'Quinn',
+        lastName: 'Qualified',
+        phone,
+      });
+      expect(res.status).toBe(201);
+      const leadId = res.body.leadId as number;
+
+      const patch = await request(app)
+        .patch(`/api/organizations/${orgAId}/leads/${leadId}`)
+        .set('Cookie', ownerCookie)
+        .send({ status: 'QUALIFIED' });
+      expect(patch.status).toBe(200);
+
+      const inbound = await handleInboundMessage(pool, logger, {
+        organizationId: orgAId,
+        channel: 'SMS',
+        from: `+${phone}`,
+        body: 'Great, book me in',
+        idempotencyKey: 'inb:m6:g5-q',
+      });
+      expect(inbound.created).toBe(true);
+
+      const get = await request(app)
+        .get(`/api/organizations/${orgAId}/leads/${leadId}`)
+        .set('Cookie', ownerCookie);
+      expect(get.status).toBe(200);
+      expect(get.body.lead.status).toBe('QUALIFIED');
+    });
+
     it('tracks delivery status on the acknowledgement', async () => {
       const updated = await applyProviderStatus(pool, logger, {
         organizationId: orgAId,

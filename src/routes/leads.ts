@@ -7,7 +7,7 @@ import type { SessionUser } from '../auth/sessions';
 import { AppError } from '../errors';
 import { readJsonBody } from '../http/body';
 import type { Logger } from '../logger';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, requireCapability } from '../middleware/auth';
 import { assertCanManageMembers, assertOrgExists } from '../middleware/tenant';
 import { createLead, deleteLead, getLeadDetail, listLeads, updateLead } from '../services/leads';
 import {
@@ -103,6 +103,7 @@ export function createLeadsRouter(deps: LeadsRouterDeps): Router {
 
   router.post(
     '/:orgId/leads/:leadId/suggestions/:suggestionId/approve',
+    requireCapability('appointments.create'),
     async (req: Request, res: Response) => {
       const organizationId = parsePathId(req.params.orgId);
       const actor = req.user as SessionUser;
@@ -122,6 +123,7 @@ export function createLeadsRouter(deps: LeadsRouterDeps): Router {
 
   router.post(
     '/:orgId/leads/:leadId/suggestions/:suggestionId/decline',
+    requireCapability('appointments.create'),
     async (req: Request, res: Response) => {
       const organizationId = parsePathId(req.params.orgId);
       const actor = req.user as SessionUser;

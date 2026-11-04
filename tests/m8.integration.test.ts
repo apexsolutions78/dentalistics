@@ -605,7 +605,7 @@ describe.skipIf(testHost === undefined || testHost === '')(
         .send({ timezone: 'UTC' });
     });
 
-    it('suppresses sends during quiet hours and delivers outside them', async () => {
+    it('defers sends past quiet hours and delivers when the window closes (G3)', async () => {
       const anchor = new Date();
       const hhmm = (d: Date): string => d.toISOString().slice(11, 16);
       await setReminderConfig({
@@ -616,37 +616,71 @@ describe.skipIf(testHost === undefined || testHost === '')(
         },
       });
       try {
-        const suppressed = await createAppt(ownerACookie, orgAId, {
+        const deferred = await createAppt(ownerACookie, orgAId, {
           patientId: patientAId,
           date: '2026-12-08',
           time: '09:00',
         });
-        const suppressedId = suppressed.body.appointment.id as number;
-        await backdate(suppressedId, 2);
+        const deferredId = deferred.body.appointment.id as number;
+        await backdate(deferredId, 2);
 
         const before = await countMessages();
         const result = await runReminderTick(pool, logger);
-        expect(result).toEqual({ processed: 1, sent: 0, failed: 0, suppressed: 1, cancelled: 0 });
+        expect(result).toEqual({ processed: 1, sent: 0, failed: 0, suppressed: 0, cancelled: 0 });
         expect(await countMessages()).toBe(before);
-        const rows = await reminderRows(suppressedId);
+        const rows = await reminderRows(deferredId);
         const target = rows.find((r) => r.offset_hours === 2);
-        expect(target?.status).toBe('SUPPRESSED');
-        expect(target?.suppression_reason).toBe('quiet_hours');
+        expect(target?.status).toBe('PENDING');
+        expect(target?.suppression_reason).toBeNull();
         expect(target?.message_id).toBeNull();
+        const windowEnd = anchor.getTime() + 3_600_000;
+        expect(target?.scheduled_at.getTime()).toBeGreaterThan(windowEnd - 120_000);
+        expect(target?.scheduled_at.getTime()).toBeLessThan(windowEnd + 120_000);
 
-        const allowed = await createAppt(ownerACookie, orgAId, {
-          patientId: patientAId,
-          date: '2026-12-09',
-          time: '09:00',
-        });
-        const allowedId = allowed.body.appointment.id as number;
-        await backdate(allowedId, 2);
-
-        const outside = new Date(Date.now() + 2 * 3_600_000);
+        const outside = new Date((target?.scheduled_at.getTime() ?? windowEnd) + 60_000);
         const second = await runReminderTick(pool, logger, { now: outside });
         expect(second.sent).toBe(1);
-        const allowedRows = await reminderRows(allowedId);
-        expect(allowedRows.find((r) => r.offset_hours === 2)?.status).toBe('SENT');
+        const after = await reminderRows(deferredId);
+        expect(after.find((r) => r.offset_hours === 2)?.status).toBe('SENT');
+      } finally {
+        await resetReminderConfig();
+      }
+    });
+
+    it('suppresses a deferred reminder when the appointment starts before the window closes (G3 stale)', async () => {
+      const anchor = new Date();
+      const hhmm = (d: Date): string => d.toISOString().slice(11, 16);
+      await setReminderConfig({
+        quietHours: {
+          enabled: true,
+          start: hhmm(new Date(anchor.getTime() - 3_600_000)),
+          end: hhmm(new Date(anchor.getTime() + 3_600_000)),
+        },
+      });
+      try {
+        const soon = new Date(anchor.getTime() + 30 * 60_000);
+        const created = await createAppt(ownerACookie, orgAId, {
+          patientId: patientAId,
+          date: soon.toISOString().slice(0, 10),
+          time: soon.toISOString().slice(11, 16),
+        });
+        expect(created.status).toBe(201);
+        const createdId = created.body.appointment.id as number;
+        await pool.query(
+          `INSERT INTO appointment_reminders (organization_id, appointment_id, offset_hours, scheduled_at)
+           VALUES (?, ?, 2, DATE_SUB(UTC_TIMESTAMP(), INTERVAL 30 SECOND))`,
+          [orgAId, createdId],
+        );
+
+        const before = await countMessages();
+        const result = await runReminderTick(pool, logger);
+        expect(result.suppressed).toBe(1);
+        expect(await countMessages()).toBe(before);
+        const rows = await reminderRows(createdId);
+        const target = rows.find((r) => r.offset_hours === 2);
+        expect(target?.status).toBe('SUPPRESSED');
+        expect(target?.suppression_reason).toBe('quiet_hours_stale');
+        expect(target?.message_id).toBeNull();
       } finally {
         await resetReminderConfig();
       }

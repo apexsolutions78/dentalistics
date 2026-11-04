@@ -5,7 +5,7 @@ import { sendTemplateMessage, sendMessage } from '../services/messages';
 import type { ReminderConfig } from './reminderConfig';
 import { DEFAULT_REMINDER_TEMPLATE_2H, REMINDER_CONFIG_META_KEY, loadReminderConfig } from './reminderConfig';
 import { loadOrgEnabledFilter } from '../db/orgMeta';
-import { clinicLocalTime, isWithinQuietHours, zonedToUtc } from './time';
+import { clinicLocalTime, isWithinQuietHours, quietHoursEndInstant, zonedToUtc } from './time';
 
 const HOUR_MS = 3_600_000;
 
@@ -304,10 +304,36 @@ async function processReminder(
         cfg.quietHours.end,
       )
     ) {
+      const appointmentInstant = zonedToUtc(
+        ctx.appointment_date,
+        ctx.appointment_time,
+        ctx.timezone,
+      );
+      const deferred = quietHoursEndInstant(
+        now,
+        ctx.timezone,
+        cfg.quietHours.start,
+        cfg.quietHours.end,
+        appointmentInstant,
+      );
+      if (deferred !== null && !deferred.stale) {
+        await db.query(
+          `UPDATE appointment_reminders
+           SET status = 'PENDING', scheduled_at = ?, attempts = ?
+           WHERE id = ? AND status = 'SENDING'`,
+          [deferred.utcInstant, row.attempts, row.id],
+        );
+        logger.info('reminder deferred past quiet hours', {
+          reminderId: row.id,
+          appointmentId: row.appointment_id,
+          scheduledAt: deferred.utcInstant,
+        });
+        return;
+      }
       if (
         await finalizeSending(db, row.id, {
           status: 'SUPPRESSED',
-          suppressionReason: 'quiet_hours',
+          suppressionReason: deferred === null ? 'quiet_hours' : 'quiet_hours_stale',
         })
       ) {
         result.suppressed += 1;

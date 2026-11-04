@@ -53,3 +53,22 @@ export function requireRole(...roles: Array<SessionUser['role']>): RequestHandle
     next();
   };
 }
+
+const CAPABILITY_ROLES: Record<string, readonly SessionUser['role'][]> = {
+  'appointments.create': ['owner', 'admin', 'receptionist'],
+};
+
+export function requireCapability(capability: string): RequestHandler {
+  return (req, _res, next) => {
+    if (req.user === undefined) {
+      next(new AppError('Authentication required', 401, 'authentication_required', true));
+      return;
+    }
+    const allowed = CAPABILITY_ROLES[capability];
+    if (allowed === undefined || !allowed.includes(req.user.role)) {
+      next(new AppError('Forbidden', 403, 'forbidden', true));
+      return;
+    }
+    next();
+  };
+}

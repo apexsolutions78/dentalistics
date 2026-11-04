@@ -9,7 +9,7 @@ import { ProviderSendError } from '../communications/types';
 import { renderTemplate } from '../communications/template';
 import { AppError, ValidationError } from '../errors';
 import type { Logger } from '../logger';
-import { ACTIVE_STATUSES } from './leads';
+import { ACTIVE_STATUSES, recordLeadActivity } from './leads';
 import {
   normalizePhone,
   optionalText,
@@ -284,7 +284,7 @@ export async function handleInboundMessage(
     leadId = (leadRows[0]?.id as number | undefined) ?? null;
   }
 
-  return createMessage(db, logger, {
+  const result = await createMessage(db, logger, {
     organizationId: input.organizationId,
     channel: input.channel,
     to: from,
@@ -295,6 +295,26 @@ export async function handleInboundMessage(
     leadId,
     status: 'RECEIVED',
   });
+
+  if (leadId !== null) {
+    const [updated] = await db.query(
+      `UPDATE leads SET status = 'CONTACTED', last_activity_at = UTC_TIMESTAMP()
+       WHERE id = ? AND organization_id = ? AND status = 'NEW'`,
+      [leadId, input.organizationId],
+    );
+    if ((updated as { affectedRows: number }).affectedRows > 0) {
+      await recordLeadActivity(
+        db,
+        logger,
+        leadId,
+        null,
+        'status_changed',
+        'status: NEW -> CONTACTED (inbound reply)',
+      );
+    }
+  }
+
+  return result;
 }
 
 export async function sendMessage(

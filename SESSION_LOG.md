@@ -6005,3 +6005,153 @@ catch-up is future-only and therefore unbounded in horizon by design.
 sessions' work; (2) owner decisions on G3/G5 + S1; (3) G4 docs-only
 wording correction; (4) AssanPay credentials / deployment when the
 owner is ready (Rule 11).
+
+## Session 44 - 2026-10-10 - G3/G5/S1 fixed (D11 gap closure complete); all gates green
+
+**Authorization / scope.** The owner's chain for this session was
+"commit staged work -> decisions on G3/G5 + S1 -> deployment". Step 1
+was executed first: the Session 42-43 work (rev 77-78) was committed
+as `afdb3b4` ("D11 conformance fixes: G1/G2/G4/G6 automation resume
+gaps, N1 clarified, S4 org-filter binding defect", 16 files,
++732/-9) after a fresh tree check; the commit message notes G3/G5/S1
+as still open at that point. Step 2: the owner answered all three
+pending decisions via the question tool - **G3 "Defer to window end
+(Recommended)"**; **G5 "Auto-advance NEW/CONTACTED"**; **S1 "Enforce
+appointments.create (Recommended)"**. Everything below is inside those
+three decisions. Step 3 (deployment) is addressed at the end.
+
+**G3 - quiet-hours reminders now defer instead of dropping (owner:
+defer to window end).** Requirement as decided: reschedule to the
+first minute after the quiet-hours window; suppress as stale if the
+appointment is too close; never silently drop. Two latent defects in
+the draft implementation written earlier this session were found by
+self-review before any test ran and fixed at the root: (a) the
+deferral delta was computed from the window **start** (`s - t` /
+`s + (1440 - t)`) rather than the window **end**, producing instants
+on the wrong side of the window; (b) the staleness check built the
+appointment instant from the **current** local date/time instead of
+the appointment's own date/time, and compared it with an
+offset-shifted deferral instant - a formula that is trivially true
+for any due reminder (now >= scheduled_at = appointment - offset),
+i.e. every deferral would have been suppressed. The rework replaces
+minute arithmetic with the codebase's existing DST-aware converter:
+the window end is taken as the clinic-local `end` time converted via
+`zonedToUtc` (today's end if still ahead of now, else tomorrow's),
+and staleness is exactly `appointmentInstant <= windowEnd` - the
+appointment has already begun by the first legal send moment. The
+appointment instant is computed in `reminders.ts` from the context
+row (`zonedToUtc(appointment_date, appointment_time, timezone)`) and
+passed in, keeping `quietHoursEndInstant` pure. The deferral UPDATE
+resets the row to `PENDING` at the window end with `attempts` restored
+to the pre-claim value (no send was attempted, so the claim is
+unwound) and deliberately **keeps** `message_id`: clearing it (the
+draft behaviour) would orphan an existing `communication_messages`
+row on a retry-path deferral and create a duplicate on resume. Only
+an impossible window (`start === end`, unreachable while
+`isWithinQuietHours` is true, kept defensive) or a stale deferral
+suppresses, with reasons `quiet_hours` / `quiet_hours_stale`.
+**Tests (m8):** the old "suppresses sends during quiet hours" test
+was rewritten - not weakened - to the new semantics ("defers sends
+past quiet hours and delivers when the window closes (G3)": tick
+inside the window yields PENDING at ~window end with zero messages
+created, then a second tick at window end + 1 min yields SENT), and
+one new test covers the stale path ("...when the appointment starts
+before the window closes (G3 stale)": appointment 30 min out, quiet
+window ending in ~1 h -> SUPPRESSED `quiet_hours_stale`, no message).
+
+**G5 - inbound replies advance a NEW lead to CONTACTED (owner:
+auto-advance NEW/CONTACTED).** Single hook point: `handleInboundMessage`
+(`src/services/messages.ts`), which the WhatsApp webhook
+(`src/routes/whatsappWebhook.ts` -> `processInbound`) is the only production
+caller of; it already resolves the lead (explicit id or latest ACTIVE
+by phone) and links the stored message. After `createMessage` returns
+(created or duplicate), a guarded
+`UPDATE leads SET status='CONTACTED', last_activity_at=UTC_TIMESTAMP()
+WHERE id=? AND organization_id=? AND status='NEW'` fires, and when it
+affected a row a `status_changed` lead activity is written with detail
+`status: NEW -> CONTACTED (inbound reply)` (actor null = system,
+matching `createPublicLead`'s activity style). The `status='NEW'`
+guard makes it one-shot per lead: repeat replies, webhook retries,
+and every other status (CONTACTED/QUALIFIED/APPOINTMENT_BOOKED/LOST/
+CLOSED) are no-ops - exactly the owner's "does not touch QUALIFIED /
+APPOINTMENT_BOOKED". The `leads.ts` <-> `messages.ts` circular import
+already existed (`ACTIVE_STATUSES`); adding `recordLeadActivity` to
+the same import does not change the call-time resolution pattern.
+**Tests (m6, 2 new):** a NEW lead (created through the public-website
+POST so its first activity is the real `created` row) becomes
+CONTACTED with exactly one status_changed activity, and a second
+reply with a different idempotency key does not duplicate the
+activity; a lead explicitly set to QUALIFIED is untouched by an
+inbound reply. Regression sweep: m3/m5/m12/m13/m20/leadAutomation
+(57 tests) all pass - the pre-session audit's flagged `toBe('NEW')`
+assertions all execute **before** any inbound reply, so none conflict
+with the auto-advance.
+
+**S1 - backend capability gate on suggestion approve/decline (owner:
+enforce appointments.create).** The rev 76 side finding was that the
+frontend gates those actions on `appointments.create` (F-40) but the
+backend routes carried only `assertOrgExists` - net behaviour matches
+today because all three clinic roles hold the capability, but the
+F-40 backend-403 convention was unenforced. Smallest change honouring
+the decision: `src/middleware/auth.ts` gains
+`requireCapability(capability)` with a capability -> roles map
+mirroring the frontend `capabilities.ts` for the capability being
+enforced (`appointments.create` = owner/admin/receptionist) and
+**failing closed** (403) for capabilities the map does not know, so
+a future mis-wired route denies rather than admits;
+`src/routes/leads.ts` applies it as route middleware on the approve
+and decline handlers (after the router-level `requireAuth`, so 401
+still precedes 403). A full parallel copy of all 35 frontend
+capabilities was deliberately **not** created - that would be an
+invented second source of truth with drift risk; the map grows one
+entry per future backend enforcement. **Tests (4):** new
+`tests/capabilities.test.ts` unit file (3 tests, no DB: all three
+roles pass `appointments.create`; unauthenticated -> 401
+`authentication_required`; unknown capability -> 403 `forbidden`)
+plus one new leadAutomation integration test proving a receptionist
+can still approve a suggestion (201, lead APPOINTMENT_BOOKED) - the
+"net behaviour unchanged today" half of the decision.
+
+**Tests actually executed this session.** Docker was already up.
+Sequence: `npm run typecheck` 0; targeted `vitest run` m8 -> 18/18
+(incl. the 2 new G3 tests); targeted m6 -> 15/15 (incl. the 2 new G5
+tests); targeted m3+m5+m12+m13+m20+leadAutomation -> 57/57 (G5
+regression sweep); targeted capabilities+leadAutomation -> 14/14 (S1);
+full `npm run verify` -> exit 0 (eslint, tsc, **412/412 tests / 39
+files** = 405 + 7 new, build); `npm run verify:frontend` -> exit 0
+(142/142, 24 files, frontend untouched). STATUS: CODE_WRITTEN +
+CODE_EXECUTED + TEST_PASSED.
+
+**Files created/modified.** Code: `src/automation/time.ts` (G3
+rework), `src/automation/reminders.ts` (G3 defer branch),
+`src/services/messages.ts` (G5 auto-advance), `src/middleware/auth.ts`
+(+`requireCapability`), `src/routes/leads.ts` (gate on approve/decline);
+tests: `tests/m8.integration.test.ts` (1 rewritten + 1 new),
+`tests/m6.integration.test.ts` (+2), `tests/capabilities.test.ts`
+(new file, +3), `tests/leadAutomation.integration.test.ts` (+1).
+Docs: `PROJECT_STATE.md` (revision 79 + K7 updated: G3/G5/S1 FIXED)
+and this entry. Committed earlier this session: `afdb3b4` (Sessions
+42-43 work).
+
+**Unresolved:** commit of this session's work (explicit instruction
+required); G4 docs-only wording correction (rev 67 side-claim);
+AssanPay credentials; production deployment (Rule 11 - the owner's
+chain listed deployment third, but no server access exists from this
+workstation, so as in Sessions 33/72 prepared blocks would need the
+owner to execute them in DirectAdmin, and Rule 11 requires the
+explicit go-ahead); m8's fixed Nov/Dec test dates as a future expiry
+watch item.
+
+**Assumptions.** One load-bearing choice, recorded in PROJECT_STATE
+rev 79: "appointment too close" for G3 staleness = the appointment
+starts at or before the quiet-hours window end. No grace margin was
+invented (the owner specified the criterion, not a number); the
+templates' "tomorrow" wording can still be off by a calendar day when
+a 24h reminder is deferred onto the appointment's own day - accepted
+as the smallest correct change, not silently patched.
+
+**Recommended next phase (PROPOSED, Rule 1):** (1) commit this
+session's G3/G5/S1 work on instruction; (2) deployment when the owner
+is ready - prepared DirectAdmin blocks + a fresh pull/migrate/frontend
+build/restart, same pattern as rev 72 (Rule 11); (3) G4 docs-only
+wording correction; (4) AssanPay credentials when available.
