@@ -6,6 +6,7 @@ import type { Appointment, Paged } from '../../lib/types';
 import { formatTime, fullName } from '../../lib/format';
 import { PageHeader } from '../../components/PageHeader';
 import { ErrorState, LoadingState, EmptyState, StatusBadge } from '../../components/states';
+import { SampleLine } from '../../components/SampleLine';
 import { statusTone } from './AppointmentsPage';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -166,6 +167,7 @@ export function AppointmentCalendarPage() {
           <EmptyState
             title="No appointments this month"
             description="Book an appointment from the list view and it will appear here."
+            preview={<SampleLine>a Thursday cleaning on the month grid.</SampleLine>}
           />
         ) : null}
 
@@ -245,6 +247,7 @@ export function AppointmentCalendarPage() {
           <EmptyState
             title="No appointments"
             description="Nothing is booked on this day. Pick another day in the calendar above."
+            preview={<SampleLine>10:30 cleaning with Omar Nasser.</SampleLine>}
           />
         ) : null}
         {data !== null && selectedAppointments.length > 0 ? (

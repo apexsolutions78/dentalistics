@@ -4,6 +4,7 @@ import { AppError, ValidationError } from '../errors';
 import type { Logger } from '../logger';
 import {
   normalizePhone,
+  optionalDateOfBirth,
   optionalEmail,
   optionalText,
   parseListParams,
@@ -15,6 +16,7 @@ const UPDATABLE_PATIENT_FIELDS = [
   'lastName',
   'phone',
   'email',
+  'dateOfBirth',
   'notes',
   'smsOptOut',
 ] as const;
@@ -26,6 +28,7 @@ interface PatientRow extends RowDataPacket {
   last_name: string;
   phone: string;
   email: string | null;
+  date_of_birth: Date | string | null;
   notes: string | null;
   sms_opt_out: number | boolean;
   created_by: number | null;
@@ -38,8 +41,18 @@ interface IdRow extends RowDataPacket {
 }
 
 const PATIENT_SELECT = `SELECT id, organization_id, first_name, last_name, phone, email,
-    notes, sms_opt_out, created_by, created_at, updated_at
+    date_of_birth, notes, sms_opt_out, created_by, created_at, updated_at
   FROM patients`;
+
+function dateOnly(value: Date | string | null): string | null {
+  if (value === null) {
+    return null;
+  }
+  if (value instanceof Date) {
+    return value.toISOString().slice(0, 10);
+  }
+  return String(value).slice(0, 10);
+}
 
 function patientDto(row: PatientRow): Record<string, unknown> {
   return {
@@ -48,6 +61,7 @@ function patientDto(row: PatientRow): Record<string, unknown> {
     lastName: row.last_name,
     phone: row.phone,
     email: row.email,
+    dateOfBirth: dateOnly(row.date_of_birth),
     notes: row.notes,
     smsOptOut: row.sms_opt_out === true || row.sms_opt_out === 1,
     createdAt: row.created_at,
@@ -89,6 +103,7 @@ export async function createPatient(
   const lastName = requireString(body.lastName, 'lastName', { min: 1, max: 80 });
   const phone = normalizePhone(body.phone);
   const email = optionalEmail(body.email);
+  const dateOfBirth = optionalDateOfBirth(body.dateOfBirth);
   const notes = optionalText(body.notes, 'notes', 5000);
   if (body.smsOptOut !== undefined && typeof body.smsOptOut !== 'boolean') {
     throw new ValidationError('Invalid input', ['smsOptOut must be a boolean']);
@@ -98,9 +113,9 @@ export async function createPatient(
   let result;
   try {
     [result] = await db.query(
-      `INSERT INTO patients (organization_id, first_name, last_name, phone, email, notes, sms_opt_out, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [input.organizationId, firstName, lastName, phone, email, notes, smsOptOut, input.actorId],
+      `INSERT INTO patients (organization_id, first_name, last_name, phone, email, date_of_birth, notes, sms_opt_out, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [input.organizationId, firstName, lastName, phone, email, dateOfBirth, notes, smsOptOut, input.actorId],
     );
   } catch (err) {
     await translatePhoneDuplicate(err, phone);
@@ -219,6 +234,9 @@ export async function updatePatient(
   }
   if (body.email !== undefined) {
     apply('email', 'email', optionalEmail(body.email), existing.email);
+  }
+  if (body.dateOfBirth !== undefined) {
+    apply('date_of_birth', 'dateOfBirth', optionalDateOfBirth(body.dateOfBirth), dateOnly(existing.date_of_birth));
   }
   if (body.notes !== undefined) {
     apply('notes', 'notes', optionalText(body.notes, 'notes', 5000), existing.notes);

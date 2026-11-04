@@ -66,16 +66,18 @@ describe('OnboardingPage', () => {
     );
 
     expect(await screen.findByRole('heading', { name: 'Set up your clinic' })).toBeInTheDocument();
-    expect(screen.getByText('Step 1 of 3 - Clinic profile')).toBeInTheDocument();
+    expect(screen.getByText('Step 1 of 4 - Clinic profile')).toBeInTheDocument();
     const nameInput = (await screen.findByLabelText(/Clinic name/)) as HTMLInputElement;
     await waitFor(() => expect(nameInput.value).toBe('Test Clinic'));
 
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-    expect(await screen.findByText('Step 2 of 3 - Business hours')).toBeInTheDocument();
+    expect(await screen.findByText('Step 2 of 4 - Business hours')).toBeInTheDocument();
     expect(screen.getByText('When is your clinic open? Adjust the defaults if needed.')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-    expect(await screen.findByText('Step 3 of 3 - Review and finish')).toBeInTheDocument();
+    expect(await screen.findByText('Step 3 of 4 - Import your patients')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Skip for now' }));
+    expect(await screen.findByText('Step 4 of 4 - Review and finish')).toBeInTheDocument();
     expect(screen.getByText('Test Clinic')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Finish setup' }));
@@ -129,7 +131,7 @@ describe('OnboardingPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
 
     expect(await screen.findByText('Enter a valid email address.')).toBeInTheDocument();
-    expect(screen.getByText('Step 1 of 3 - Clinic profile')).toBeInTheDocument();
+    expect(screen.getByText('Step 1 of 4 - Clinic profile')).toBeInTheDocument();
     const calls = fetchMock.mock.calls as unknown as Array<[RequestInfo | URL, RequestInit?]>;
     expect(
       calls.some((c) => String(c[0]).includes('/settings/clinic') && c[1]?.method === 'PATCH'),

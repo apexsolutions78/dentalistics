@@ -13,6 +13,7 @@ import { CommunicationTimeline } from '../../components/CommunicationTimeline';
 import { FormField } from '../../components/FormField';
 import { Flash } from '../../components/Flash';
 import { StatusBadge, ErrorState, LoadingState, EmptyState, type BadgeTone } from '../../components/states';
+import { SampleLine } from '../../components/SampleLine';
 import type { LeadSlotSuggestion, UrgencyLevel } from '../../lib/types';
 
 function statusTone(status: string): BadgeTone {
@@ -323,6 +324,7 @@ export function LeadDetailPage() {
           <EmptyState
             title="No suggestions yet"
             description="Suggestions are generated automatically for active leads when doctors with free slots are configured."
+            preview={<SampleLine>Thursday 10:30 with Dr Huda Al-Khalifa.</SampleLine>}
           />
         ) : (
           <div className="table-scroll" tabIndex={0} role="region" aria-label="Slot suggestions">
@@ -480,6 +482,7 @@ export function LeadDetailPage() {
           <EmptyState
             title="No appointments yet"
             description="Book an appointment to move this lead further along."
+            preview={<SampleLine>a booked cleaning.</SampleLine>}
           />
         ) : (
           <div className="table-scroll" tabIndex={0} role="region" aria-label="Lead appointments">
@@ -523,7 +526,11 @@ export function LeadDetailPage() {
       <section className="card">
         <h2 className="card-title">Activity timeline</h2>
         {data.activity.length === 0 ? (
-          <EmptyState title="No activity yet" description="Changes to this lead are recorded here." />
+          <EmptyState
+            title="No activity yet"
+            description="Changes to this lead are recorded here."
+            preview={<SampleLine>status changed from new to contacted.</SampleLine>}
+          />
         ) : (
           <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: '6px' }}>
             {[...data.activity].reverse().map((item) => (

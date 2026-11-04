@@ -10,6 +10,7 @@ import { readJsonBody } from '../http/body';
 import type { Logger } from '../logger';
 import { requireAuth } from '../middleware/auth';
 import { assertCanManageMembers, assertOrgExists } from '../middleware/tenant';
+import { assertNoUnknownHelpFields, requestSetupHelp } from '../services/setupHelp';
 import { createUserInOrg } from '../services/users';
 import { generateSiteKey } from '../security/siteKey';
 import { parsePathId, parseReviewUrl, parseTimezone } from '../validate';
@@ -189,6 +190,20 @@ export function createOrganizationsRouter(deps: OrganizationsRouterDeps): Router
     }
     const org = await loadOrganization(deps.db, organizationId);
     res.status(200).json({ organization: organizationDto(org) });
+  });
+
+  router.post('/:orgId/setup-help', async (req: Request, res: Response) => {
+    const organizationId = parsePathId(req.params.orgId ?? '');
+    const actor = req.user as SessionUser;
+    assertCanManageMembers(actor, organizationId);
+    const body = readJsonBody(req);
+    assertNoUnknownHelpFields(body);
+    const result = await requestSetupHelp(deps.db, deps.logger, {
+      organizationId,
+      actorId: actor.id,
+      body,
+    });
+    res.status(result.created ? 201 : 200).json(result);
   });
 
   router.get('/:orgId/users', async (req: Request, res: Response) => {

@@ -10,6 +10,7 @@ import { FormField } from '../../components/FormField';
 import { Flash } from '../../components/Flash';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { StatusBadge, ErrorState, LoadingState, EmptyState, type BadgeTone } from '../../components/states';
+import { SampleLine } from '../../components/SampleLine';
 import { SettingsBody } from './SettingsBody';
 import { useSettings } from '../../lib/settings';
 
@@ -108,7 +109,11 @@ export function UsersRolesPage() {
               {status === 'loading' ? <LoadingState label="Loading users…" /> : null}
               {status === 'error' ? <ErrorState message={membersError ?? 'Users could not be loaded.'} onRetry={reloadMembers} /> : null}
               {status === 'success' && members.length === 0 ? (
-                <EmptyState title="No users" description="No users belong to this clinic yet." />
+                <EmptyState
+                  title="No users"
+                  description="No users belong to this clinic yet."
+                  preview={<SampleLine>receptionist@clinic.example, receptionist, active.</SampleLine>}
+                />
               ) : null}
               {status === 'success' && members.length > 0 ? (
                 <div className="table-scroll" tabIndex={0} role="region" aria-label="Clinic users table">
