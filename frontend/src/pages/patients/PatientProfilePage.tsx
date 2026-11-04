@@ -1,11 +1,13 @@
 import { Link, useParams } from 'react-router-dom';
 import { useAuth } from '../../lib/auth';
+import { can } from '../../lib/capabilities';
 import { useApi } from '../../lib/useApi';
 import type { Appointment, Lead, Message, Paged, Patient, Recall } from '../../lib/types';
 import { formatDate, formatTime, fullName } from '../../lib/format';
 import { PageHeader } from '../../components/PageHeader';
 import { CommunicationTimeline } from '../../components/CommunicationTimeline';
 import { StatusBadge, ErrorState, LoadingState, EmptyState, type BadgeTone } from '../../components/states';
+import { DentalChart } from './DentalChart';
 
 function appointmentTone(status: string): BadgeTone {
   if (status === 'CONFIRMED' || status === 'COMPLETED') return 'success';
@@ -26,6 +28,7 @@ export function PatientProfilePage() {
   const { patientId } = useParams();
   const { user } = useAuth();
   const orgId = user?.organizationId ?? null;
+  const canEditChart = can(user, 'patients.edit');
 
   const patientPath =
     orgId === null || patientId === undefined
@@ -140,6 +143,10 @@ export function PatientProfilePage() {
           </Link>
         </div>
       </section>
+
+      {orgId !== null ? (
+        <DentalChart organizationId={orgId} patientId={patient.id} canEdit={canEditChart} />
+      ) : null}
 
       <section className="card">
         <h2 className="card-title">Current appointment</h2>

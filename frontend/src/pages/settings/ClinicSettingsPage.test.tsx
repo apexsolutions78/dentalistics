@@ -43,6 +43,7 @@ describe('ClinicSettingsPage', () => {
     mockFetch(baseRoutes());
     renderPage();
     expect(await screen.findByLabelText('Clinic name')).toHaveValue('Test Clinic');
+    expect(screen.getByLabelText('Tooth numbering')).toHaveValue('FDI');
     expect(screen.getByLabelText('Monday opening time')).toHaveValue('09:00');
     expect(screen.getByLabelText('Saturday opening time')).toBeDisabled();
   });
@@ -64,6 +65,7 @@ describe('ClinicSettingsPage', () => {
     expect(patchBody).not.toBeNull();
     const body = patchBody as unknown as Record<string, unknown>;
     expect(body.name).toBe('Renamed Clinic');
+    expect(body.chartNumbering).toBe('FDI');
     expect(body.timezone).toBe('Asia/Bahrain');
     const hours = body.businessHours as Record<string, unknown>;
     expect(Object.keys(hours).sort()).toEqual(['fri', 'mon', 'sat', 'sun', 'thu', 'tue', 'wed']);

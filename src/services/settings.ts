@@ -1,6 +1,7 @@
 import type { Pool, RowDataPacket } from 'mysql2/promise';
 import { recordAudit } from '../audit';
 import { loadOrgSetting } from '../db/orgMeta';
+import { loadChartNumbering, parseChartNumbering, saveChartNumbering } from '../clinical/numbering';
 import { listTemplateVariables, renderTemplate } from '../communications/template';
 import { AppError, ValidationError } from '../errors';
 import type { Logger } from '../logger';
@@ -311,6 +312,7 @@ function buildDefinitions(): Record<string, unknown> {
       'businessHours',
       'timezone',
       'reviewUrl',
+      'chartNumbering',
     ],
   };
 }
@@ -327,6 +329,7 @@ export async function getSettings(db: Pool, organizationId: number): Promise<Rec
     leadAutomation,
     telephony,
     whatsapp,
+    chartNumbering,
   ] = await Promise.all([
     db.query<OrganizationSettingsRow[]>(
       `SELECT name, phone, email, address, logo_url, business_hours, timezone, review_url
@@ -366,6 +369,7 @@ export async function getSettings(db: Pool, organizationId: number): Promise<Rec
       isWhatsAppConfig,
       DEFAULT_WHATSAPP_CONFIG,
     ),
+    loadChartNumbering(db, organizationId),
   ]);
   const org = orgRows[0];
   if (org === undefined) {
@@ -386,6 +390,7 @@ export async function getSettings(db: Pool, organizationId: number): Promise<Rec
       businessHours: parseStoredBusinessHours(org.business_hours),
       timezone: org.timezone,
       reviewUrl: org.review_url,
+      chartNumbering,
     },
     automations: {
       reminder: { config: reminder.config, source: reminder.source },
@@ -472,12 +477,15 @@ export async function patchClinic(
     'businessHours',
     'timezone',
     'reviewUrl',
+    'chartNumbering',
   ];
   for (const key of provided) {
     if (!allowed.includes(key)) {
       throw new ValidationError('Invalid input', [`unknown or not updatable field: ${key}`]);
     }
   }
+  const chartNumbering =
+    body.chartNumbering === undefined ? undefined : parseChartNumbering(body.chartNumbering);
   const sets: string[] = [];
   const params: unknown[] = [];
   if (body.name !== undefined) {
@@ -518,13 +526,26 @@ export async function patchClinic(
     sets.push('review_url = ?');
     params.push(parseReviewUrl(body.reviewUrl, 'reviewUrl'));
   }
-  params.push(organizationId);
-  const [result] = await db.query(
-    `UPDATE organizations SET ${sets.join(', ')} WHERE id = ?`,
-    params,
-  );
-  if ((result as { affectedRows: number }).affectedRows === 0) {
-    throw new AppError('Organization not found', 404, 'not_found', true);
+  if (sets.length > 0) {
+    params.push(organizationId);
+    const [result] = await db.query(
+      `UPDATE organizations SET ${sets.join(', ')} WHERE id = ?`,
+      params,
+    );
+    if ((result as { affectedRows: number }).affectedRows === 0) {
+      throw new AppError('Organization not found', 404, 'not_found', true);
+    }
+  } else {
+    const [rows] = await db.query<RowDataPacket[]>(
+      'SELECT id FROM organizations WHERE id = ?',
+      [organizationId],
+    );
+    if (rows[0] === undefined) {
+      throw new AppError('Organization not found', 404, 'not_found', true);
+    }
+  }
+  if (chartNumbering !== undefined) {
+    await saveChartNumbering(db, organizationId, chartNumbering);
   }
   await auditSettingsUpdate(db, logger, organizationId, userId, 'clinic', provided);
   return getSettings(db, organizationId);

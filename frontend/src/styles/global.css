@@ -1804,3 +1804,104 @@ button:focus-visible,
   outline: 3px solid var(--color-accent);
   outline-offset: 2px;
 }
+
+.odontogram {
+  display: grid;
+  gap: var(--space-3);
+  margin: var(--space-3) 0;
+}
+
+.odontogram-arch {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.odontogram-midline {
+  width: 2px;
+  align-self: stretch;
+  background: var(--color-border-control);
+  margin: 0 2px;
+}
+
+.tooth {
+  width: 46px;
+  min-height: 56px;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--color-border-control);
+  border-radius: 12px;
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.tooth[aria-pressed='true'] {
+  background: var(--color-accent);
+  border-color: var(--color-ink);
+  color: var(--color-accent-contrast);
+}
+
+.tooth.is-missing {
+  opacity: 0.55;
+}
+
+.tooth.is-missing .tooth-number {
+  text-decoration: line-through;
+}
+
+.tooth-number {
+  font-size: var(--fs-label);
+  font-weight: 700;
+}
+
+.tooth-marks {
+  min-height: 1em;
+  font-size: var(--fs-caption);
+  letter-spacing: 0.02em;
+}
+
+.chart-numbering,
+.chart-hint {
+  color: var(--color-text-secondary);
+  font-size: var(--fs-label);
+}
+
+.tooth-editor,
+.tooth-plan-form {
+  margin-top: var(--space-4);
+  display: grid;
+  gap: var(--space-3);
+}
+
+.tooth-conditions {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-2);
+  padding: var(--space-3);
+}
+
+.tooth-conditions legend {
+  padding: 0 var(--space-2);
+  font-size: var(--fs-label);
+}
+
+.whatsapp-send {
+  display: inline-grid;
+  justify-items: start;
+  gap: 4px;
+  vertical-align: middle;
+}
+
+.whatsapp-send-note {
+  font-size: var(--fs-caption);
+  color: var(--color-text-secondary);
+}

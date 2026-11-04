@@ -5,6 +5,9 @@ function describe(message: Message): { who: string; label: string } {
   if (message.direction === 'INBOUND') {
     return { who: 'Patient', label: 'Patient replied' };
   }
+  if (message.providerKey === 'whatsapp_manual') {
+    return { who: 'Clinic', label: 'Sent via WhatsApp (manual)' };
+  }
   if (message.template !== null && message.template !== '') {
     return { who: 'Automated', label: 'Clinic sent (automated)' };
   }

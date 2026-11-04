@@ -69,6 +69,7 @@ export interface ClinicSettings {
   businessHours: BusinessHours | null;
   timezone: string | null;
   reviewUrl: string | null;
+  chartNumbering: 'FDI' | 'UNIVERSAL';
 }
 
 export interface QuietHours {
@@ -316,7 +317,7 @@ export interface Appointment {
   doctorId: number | null;
   doctor: { id: number; name: string } | null;
   previousAppointmentId: number | null;
-  patient: { id: number; firstName: string; lastName: string; phone: string };
+  patient: { id: number; firstName: string; lastName: string; phone: string; smsOptOut?: boolean };
   createdBy: number | null;
   createdAt: string;
   updatedAt: string;
@@ -348,7 +349,7 @@ export type RecallStatus = 'DUE' | 'CONTACTED' | 'BOOKED' | 'COMPLETED' | 'CLOSE
 export interface Recall {
   id: number;
   patientId: number;
-  patient: { id: number; firstName: string; lastName: string; phone: string };
+  patient: { id: number; firstName: string; lastName: string; phone: string; smsOptOut?: boolean };
   recallType: string;
   dueDate: string;
   status: RecallStatus;

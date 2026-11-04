@@ -14,6 +14,7 @@ import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { FormField } from '../../components/FormField';
 import { Flash } from '../../components/Flash';
 import { StatusBadge, ErrorState, LoadingState, EmptyState } from '../../components/states';
+import { WhatsAppSendButton } from '../../components/WhatsAppSendButton';
 import { statusTone } from './AppointmentsPage';
 
 interface AutomationLogRow {
@@ -235,6 +236,14 @@ export function AppointmentDetailPage() {
           </table>
         </div>
         <div className="btn-row">
+          {orgId !== null ? (
+            <WhatsAppSendButton
+              organizationId={orgId}
+              kind="appointment"
+              subjectId={appointment.id}
+              optedOut={appointment.patient.smsOptOut === true}
+            />
+          ) : null}
           {allowed.includes('CONFIRMED') ? (
             <button
               type="button"
