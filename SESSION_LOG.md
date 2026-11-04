@@ -6230,3 +6230,31 @@ subscription clock. Admin activation grants one billing period.
 run the timestamp correction once with `--offset-minutes 300` and
 `--before` set to the UTC restart instant. K8 (outbound renewal
 reminder) remains a follow-up.
+
+
+## Session 46 - 2026-11-04 - Clinic patient billing
+
+**Authorization / scope.** Owner instruction to add clinic-side patient
+billing (invoices, payments, expenses, reports) for the named markets,
+distinct from Apex subscription billing. One PR against master. No
+deploy (Rule 11).
+
+**Executed.** Migration `0023_patient_billing.sql`. Services and routes
+under `/api/organizations/:orgId/patient-billing`. Frontend screens at
+`/patient-billing`, invoice detail with letterhead and print CSS,
+expenses, and reports with CSV. Capabilities `patientBilling.view`,
+`patientBilling.manage`, and `patientBilling.reports`. Audit actions
+listed in PROJECT_STATE revision 84. Patient delete refuses when an
+invoice exists.
+
+**Gates.** `npm run verify` exit 0 (eslint, tsc, 450/450 tests in 45
+files, 0 skipped, build) against MariaDB 10.11.14. `npm run
+verify:frontend` exit 0 (eslint, 192/192 tests in 31 files, vite
+build). Fresh database migrate: applied 23, skipped 0; second run
+applied 0, skipped 23, including `0023_patient_billing.sql`. Browser
+walkthrough: empty-list sample, INV-0001 issued for Marina Dental,
+cash payment, report totals AED 157.50 revenue / AED 100.00 collected
+/ AED 57.50 outstanding.
+
+**Not deployed.** Defaults AED and VAT, discount as a line amount, and
+owner/admin-only writes are recorded as assumptions in revision 84.

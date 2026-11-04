@@ -35,6 +35,10 @@ import { AuditLogPage } from '../pages/admin/AuditLogPage';
 import { TrialsPage } from '../pages/admin/TrialsPage';
 import { PaymentGatewayPage } from '../pages/admin/PaymentGatewayPage';
 import { BillingPage } from '../pages/settings/BillingPage';
+import { PatientBillingPage } from '../pages/billing/PatientBillingPage';
+import { InvoicePage } from '../pages/billing/InvoicePage';
+import { ExpensesPage } from '../pages/billing/ExpensesPage';
+import { BillingReportsPage } from '../pages/billing/BillingReportsPage';
 import { MockCheckoutPage } from '../pages/billing/MockCheckoutPage';
 import { SettingsOverviewPage } from '../pages/settings/SettingsOverviewPage';
 import { ClinicSettingsPage } from '../pages/settings/ClinicSettingsPage';
@@ -72,6 +76,16 @@ export function AppRouter() {
                 <Route path="leads/:leadId" element={<LeadDetailPage />} />
                 <Route path="patients" element={<PatientsPage />} />
                 <Route path="patients/:patientId" element={<PatientProfilePage />} />
+                <Route path="patient-billing" element={<RequireCapability capability="patientBilling.view" />}>
+                  <Route index element={<PatientBillingPage />} />
+                  <Route path="invoices/:invoiceId" element={<InvoicePage />} />
+                  <Route element={<RequireCapability capability="patientBilling.manage" />}>
+                    <Route path="expenses" element={<ExpensesPage />} />
+                  </Route>
+                  <Route element={<RequireCapability capability="patientBilling.reports" />}>
+                    <Route path="reports" element={<BillingReportsPage />} />
+                  </Route>
+                </Route>
                 <Route path="doctors" element={<RequireCapability capability="doctors.view" />}>
                   <Route index element={<DoctorsPage />} />
                 </Route>

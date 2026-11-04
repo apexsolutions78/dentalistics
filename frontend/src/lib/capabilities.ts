@@ -32,6 +32,9 @@ const MANAGER_CAPABILITIES = [
   'settings.automation.manage',
   'doctors.view',
   'doctors.manage',
+  'patientBilling.view',
+  'patientBilling.manage',
+  'patientBilling.reports',
   'admin.webhooks.view',
   'admin.automation_failures.view',
   'admin.audit.view',
@@ -55,6 +58,7 @@ const RECEPTIONIST_CAPABILITIES: readonly Capability[] = [
   'recall.view',
   'doctors.view',
   'doctors.manage',
+  'patientBilling.view',
 ];
 
 export const CAPABILITIES: Record<Role, readonly Capability[]> = {

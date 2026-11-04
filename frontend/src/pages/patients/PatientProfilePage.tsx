@@ -1,5 +1,6 @@
 import { Link, useParams } from 'react-router-dom';
 import { useAuth } from '../../lib/auth';
+import { can } from '../../lib/capabilities';
 import { useApi } from '../../lib/useApi';
 import type { Appointment, Lead, Message, Paged, Patient, Recall } from '../../lib/types';
 import { formatDate, formatTime, fullName } from '../../lib/format';
@@ -135,6 +136,11 @@ export function PatientProfilePage() {
           <Link className="btn btn-secondary" to={`/appointments?patientId=${patient.id}`}>
             View appointments
           </Link>
+          {can(user, 'patientBilling.view') ? (
+            <Link className="btn btn-secondary" to={`/patient-billing?patientId=${patient.id}`}>
+              Patient billing
+            </Link>
+          ) : null}
           <Link className="btn btn-secondary" to={`/appointments?new=1&patientId=${patient.id}`}>
             Book appointment
           </Link>

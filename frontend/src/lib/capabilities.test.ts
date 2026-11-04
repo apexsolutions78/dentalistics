@@ -8,7 +8,8 @@ describe('capability map', () => {
   it('gives owners the full set and admins the extra trials screen', () => {
     expect(CAPABILITIES.owner).toEqual(ALL);
     expect(CAPABILITIES.admin).toEqual([...ALL, 'admin.trials.view', 'admin.payments.view']);
-    expect(ALL.length).toBe(34);
+    expect(ALL.length).toBe(37);
+    expect(can(makeUser({ role: 'owner' }), 'patientBilling.reports')).toBe(true);
     expect(can(makeUser({ role: 'owner' }), 'admin.trials.view')).toBe(false);
     expect(can(makeUser({ role: 'admin' }), 'admin.trials.view')).toBe(true);
     expect(can(makeUser({ role: 'owner' }), 'admin.payments.view')).toBe(false);
@@ -34,6 +35,8 @@ describe('capability map', () => {
       'appointments.reschedule',
       'recall.manage',
       'leads.notes.edit',
+      'patientBilling.manage',
+      'patientBilling.reports',
     ];
     for (const capability of denied) {
       expect(can(makeUser({ role: 'receptionist' }), capability)).toBe(false);
@@ -51,6 +54,7 @@ describe('capability map', () => {
       'recall.view',
       'doctors.view',
       'doctors.manage',
+      'patientBilling.view',
     ];
     for (const capability of allowed) {
       expect(can(makeUser({ role: 'receptionist' }), capability)).toBe(true);
