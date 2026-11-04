@@ -150,6 +150,38 @@ a {
   box-shadow: var(--shadow-raised);
 }
 
+.account-menu-drawer {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  justify-items: start;
+  gap: var(--space-2) var(--space-3);
+  margin: 0 var(--space-2) var(--space-4);
+  width: calc(100% - var(--space-4));
+  background: transparent;
+  color: var(--color-sidebar-text);
+  border-color: rgba(214, 255, 74, 0.4);
+  box-shadow: none;
+}
+
+.account-menu-drawer .account-email {
+  grid-column: 2;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+.account-menu-drawer .account-email,
+.account-menu-drawer .btn-ghost {
+  color: var(--color-sidebar-text);
+}
+
+.account-menu-drawer .btn-ghost:hover:not(:disabled) {
+  background: var(--color-sidebar-hover);
+  color: #fff;
+}
+
 .app-brand,
 .app-header,
 .app-sidebar,
@@ -360,6 +392,11 @@ a {
   font-size: var(--fs-label);
   font-weight: 600;
   font-family: inherit;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: keep-all;
+  flex-shrink: 0;
+  min-width: max-content;
   cursor: pointer;
   transition:
     background-color var(--dur-1) var(--ease),
@@ -569,7 +606,7 @@ button:focus-visible,
   padding: var(--space-3);
   border-bottom: 1px solid var(--color-border);
   vertical-align: middle;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .table tbody tr {
@@ -954,6 +991,7 @@ button:focus-visible,
 
 .nav-toggle {
   display: none;
+  white-space: nowrap;
 }
 
 .nav-toggle-icon {
@@ -978,6 +1016,7 @@ button:focus-visible,
 }
 
 .nav-drawer-close {
+  white-space: nowrap;
   min-height: 40px;
   min-width: 40px;
   padding: 8px 14px;
@@ -1002,9 +1041,8 @@ button:focus-visible,
 @media (max-width: 820px) {
   .app-shell {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: 56px auto auto 1fr;
+    grid-template-rows: auto auto 1fr;
     grid-template-areas:
-      'brand'
       'header'
       'banner'
       'main';
@@ -1027,6 +1065,24 @@ button:focus-visible,
   .app-header {
     padding: 0 var(--space-4);
     flex-wrap: wrap;
+  }
+
+  .app-header-compact {
+    flex-wrap: nowrap;
+    justify-content: space-between;
+    align-items: center;
+    min-height: 56px;
+    padding: 0 var(--space-3);
+    background: var(--color-sidebar-bg);
+  }
+
+  .app-header-compact .brand-logo {
+    height: 36px;
+  }
+
+  .app-brand,
+  .shell-crumb {
+    display: none;
   }
 
   .account-menu {
@@ -1161,7 +1217,7 @@ button:focus-visible,
   font-size: var(--fs-label);
 }
 
-@media (max-width: 640px) {
+@media (max-width: 820px) {
   .calendar-week,
   .calendar-selected {
     display: none;
@@ -1240,8 +1296,10 @@ button:focus-visible,
   }
 
   .table-cards .table td .btn,
-  .table-cards .table td a {
+  .table-cards .table td a.btn {
     min-height: 40px;
+    min-width: max-content;
+    white-space: nowrap;
   }
 }
 

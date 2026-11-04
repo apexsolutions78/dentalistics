@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from '../../lib/auth';
 import { makeUser, jsonResponse } from '../../test/fixtures';
 import type { SessionUser } from '../../lib/types';
+import { DRAWER_QUERY } from '../../lib/breakpoints';
 import { AppShell } from './AppShell';
 
 afterEach(() => {
@@ -16,7 +17,7 @@ function mockDrawer(matches: boolean): void {
   vi.stubGlobal(
     'matchMedia',
     vi.fn().mockImplementation((query: string) => ({
-      matches: query === '(max-width: 820px)' ? matches : false,
+      matches: query === DRAWER_QUERY ? matches : false,
       media: query,
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
@@ -65,6 +66,7 @@ describe('clinic navigation drawer', () => {
     renderShell(makeUser({ role: 'owner' }));
     expect(await screen.findByRole('link', { name: 'Patients' })).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Menu' })).not.toBeInTheDocument();
+    expect(screen.getByText('owner@example.com')).toBeVisible();
   });
 
   it('opens a focus-trapped menu for an owner and closes it', async () => {
@@ -73,12 +75,16 @@ describe('clinic navigation drawer', () => {
     renderShell(makeUser({ role: 'owner' }));
     const toggle = await screen.findByRole('button', { name: 'Menu' });
     expect(screen.queryByRole('link', { name: 'Patients' })).not.toBeInTheDocument();
+    expect(screen.getByText('owner@example.com').closest('nav')).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.queryByText('Home')).not.toBeInTheDocument();
     await user.click(toggle);
     expect(await screen.findByRole('link', { name: 'Patients' })).toBeVisible();
     expect(screen.getByRole('link', { name: 'Dashboard' })).toBeVisible();
     const close = screen.getByRole('button', { name: 'Close menu' });
     await waitFor(() => expect(close).toHaveFocus());
 
+    expect(screen.getByText('owner@example.com')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Sign out' })).toBeVisible();
     close.focus();
     await user.tab({ shift: true });
     expect(screen.getByRole('link', { name: 'Settings' })).toHaveFocus();
@@ -120,5 +126,10 @@ describe('clinic navigation drawer', () => {
     expect(screen.getByRole('link', { name: 'Pricing' })).toBeVisible();
     expect(screen.queryByRole('link', { name: 'Patients' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Workspace' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Clinic tools appear/)).not.toBeInTheDocument();
+    expect(screen.getByText('platform@example.com')).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Payments' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Manual payments' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Setup help' })).toBeVisible();
   });
 });

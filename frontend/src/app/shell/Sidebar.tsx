@@ -2,6 +2,7 @@ import type { KeyboardEvent as ReactKeyboardEvent, RefObject } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../../lib/auth';
 import { can } from '../../lib/capabilities';
+import { AccountMenu } from './AccountMenu';
 
 const PRIMARY_LINKS: Array<{ to: string; label: string; end?: boolean }> = [
   { to: '/workspace', label: 'Workspace', end: true },
@@ -228,19 +229,18 @@ export function Sidebar({
           </button>
         </div>
       ) : null}
+      {drawer ? <AccountMenu placement="drawer" /> : null}
+      {hasClinic ? (
       <div className="nav-group">
         <p className="nav-label">Today</p>
-        {hasClinic ? (
-          <ul className="nav-list" aria-label="Clinic">
-            {PRIMARY_LINKS.filter((link) => link.to !== '/patient-billing' || showPatientBilling).map((link) => (
-              <NavLinkItem key={link.to} link={link} />
-            ))}
-            {showDoctors ? <NavLinkItem link={{ to: '/doctors', label: 'Doctors' }} /> : null}
-          </ul>
-        ) : (
-          <p className="nav-empty">Clinic tools appear after this account is linked to a clinic.</p>
-        )}
+        <ul className="nav-list" aria-label="Clinic">
+          {PRIMARY_LINKS.filter((link) => link.to !== '/patient-billing' || showPatientBilling).map((link) => (
+            <NavLinkItem key={link.to} link={link} />
+          ))}
+          {showDoctors ? <NavLinkItem link={{ to: '/doctors', label: 'Doctors' }} /> : null}
+        </ul>
       </div>
+      ) : null}
       {showManagement ? (
         <div className="nav-group">
           <p className="nav-label">Oversight</p>

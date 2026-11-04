@@ -2,14 +2,13 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import logoWhite from '../../assets/apex-logo-white.png';
 import { useAuth } from '../../lib/auth';
+import { DRAWER_QUERY } from '../../lib/breakpoints';
 import { stampCardTables } from '../../lib/cardTables';
 import { useMediaQuery } from '../../lib/useMediaQuery';
 import { GuidedTour } from '../../components/tour/GuidedTour';
 import { Sidebar } from './Sidebar';
 import { AccountMenu } from './AccountMenu';
 import { TrialLockBanner } from './TrialLockBanner';
-
-const DRAWER_QUERY = '(max-width: 820px)';
 
 const SECTION_TITLES: Record<string, string> = {
   dashboard: 'Dashboard',
@@ -85,10 +84,17 @@ export function AppShell() {
       <a className="skip-link" href="#main-content">
         Skip to content
       </a>
-      <div className="app-brand" data-tour="brand">
-        <img className="brand-logo" src={logoWhite} alt="Apex Dentalistics" />
-      </div>
-      <header className="app-header">
+      {drawer ? null : (
+        <div className="app-brand" data-tour="brand">
+          <img className="brand-logo" src={logoWhite} alt="Apex Dentalistics" />
+        </div>
+      )}
+      <header className={drawer ? 'app-header app-header-compact' : 'app-header'}>
+        {drawer ? (
+          <img className="brand-logo" src={logoWhite} alt="Apex Dentalistics" data-tour="brand" />
+        ) : (
+          <span className="shell-crumb">{title}</span>
+        )}
         {drawer ? (
           <button
             ref={toggleRef}
@@ -103,9 +109,9 @@ export function AppShell() {
             </svg>
             <span className="sr-only">Menu</span>
           </button>
-        ) : null}
-        <span className="shell-crumb">{title}</span>
-        <AccountMenu />
+        ) : (
+          <AccountMenu />
+        )}
       </header>
       <TrialLockBanner />
       {drawer && open ? (
