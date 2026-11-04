@@ -114,6 +114,16 @@ function jsonIf(match: string, body: unknown): Handler {
   return (url) => (url.includes(match) ? jsonResponse(200, body) : null);
 }
 
+async function expectSampleToggle(sample: RegExp): Promise<void> {
+  expect(screen.queryByText(sample)).not.toBeInTheDocument();
+  fireEvent.click(await screen.findByRole('button', { name: 'Peek at an example' }));
+  expect(screen.getByText(sample)).toBeInTheDocument();
+  expect(screen.getByText('Sample')).toBeInTheDocument();
+  expect(screen.getByText(/Not saved data/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Hide the example' }));
+  expect(screen.queryByText(sample)).not.toBeInTheDocument();
+}
+
 describe('LeadsPage', () => {
   it('renders lead rows from the API', async () => {
     stub(jsonIf('/leads?', { leads: [leadRow], total: 1, limit: 20, offset: 0 }));
@@ -135,6 +145,13 @@ describe('LeadsPage', () => {
     renderPage(<LeadsPage />, '/leads');
     expect(await screen.findByText('Database unavailable')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+  });
+
+  it('hides the example when real leads exist', async () => {
+    stub(jsonIf('/leads?', { leads: [leadRow], total: 1, limit: 20, offset: 0 }));
+    renderPage(<LeadsPage />, '/leads');
+    expect(await screen.findByRole('link', { name: 'Sara Halim' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Peek at an example' })).not.toBeInTheDocument();
   });
 });
 
@@ -169,6 +186,33 @@ describe('RecallPage', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Close' }));
     expect(await screen.findByText('Close this recall?')).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: /Reason/ })).toBeInTheDocument();
+  });
+
+  it('reveals a display-only 6-month recall example and hides it again', async () => {
+    const fn = stub(jsonIf('/recalls?', { recalls: [], total: 0, limit: 20, offset: 0 }));
+    renderPage(<RecallPage />, '/recall');
+    expect(await screen.findByText('No recalls found')).toBeInTheDocument();
+    const callsBefore = fn.mock.calls.length;
+    await expectSampleToggle(/6-month check-up/);
+    expect(fn.mock.calls.length).toBe(callsBefore);
+    expect(fn.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false);
+  });
+
+  it('hides the example when a recall filter matches nothing', async () => {
+    stub(jsonIf('/recalls?', { recalls: [], total: 0, limit: 20, offset: 0 }));
+    renderPage(<RecallPage />, '/recall');
+    expect(await screen.findByRole('button', { name: 'Peek at an example' })).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('combobox', { name: 'Status' }), { target: { value: 'DUE' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Apply filters' }));
+    expect(await screen.findByText(/No recalls match the current filters/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Peek at an example' })).not.toBeInTheDocument();
+  });
+
+  it('hides the example when a real recall exists', async () => {
+    stub(recallHandler, makeUser({ role: 'owner' }));
+    renderPage(<RecallPage />, '/recall');
+    expect(await screen.findByRole('link', { name: 'Omar Nasser' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Peek at an example' })).not.toBeInTheDocument();
   });
 });
 
@@ -208,6 +252,24 @@ describe('CommunicationsPage', () => {
     renderPage(<CommunicationsPage />, '/communications?recipient=%2B1555');
     expect(await screen.findByText('No messages found')).toBeInTheDocument();
     expect(screen.getByText('No messages match the current filters. Try resetting them.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Peek at an example' })).not.toBeInTheDocument();
+  });
+
+  it('reveals a display-only WhatsApp thread and does not call the API again', async () => {
+    const fn = stub(jsonIf('/communications?', { messages: [], total: 0, limit: 20, offset: 0 }));
+    renderPage(<CommunicationsPage />, '/communications');
+    expect(await screen.findByText('No messages found')).toBeInTheDocument();
+    const callsBefore = fn.mock.calls.length;
+    await expectSampleToggle(/WhatsApp thread/);
+    expect(fn.mock.calls.length).toBe(callsBefore);
+    expect(fn.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false);
+  });
+
+  it('hides the example when a real message exists', async () => {
+    stub(jsonIf('/communications?', { messages: [message], total: 1, limit: 20, offset: 0 }));
+    renderPage(<CommunicationsPage />, '/communications');
+    expect(await screen.findByText('+15550300001')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Peek at an example' })).not.toBeInTheDocument();
   });
 });
 
@@ -305,6 +367,17 @@ describe('DoctorsPage', () => {
     renderPage(<DoctorsPage />, '/doctors');
     expect(await screen.findByText('Inactive')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Reactivate' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Peek at an example' })).not.toBeInTheDocument();
+  });
+
+  it('reveals a display-only doctor example and does not call the API again', async () => {
+    const fn = stub(jsonIf('/doctors', { doctors: [] }));
+    renderPage(<DoctorsPage />, '/doctors');
+    expect(await screen.findByText('No doctors yet')).toBeInTheDocument();
+    const callsBefore = fn.mock.calls.length;
+    await expectSampleToggle(/orthodontics/);
+    expect(fn.mock.calls.length).toBe(callsBefore);
+    expect(fn.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false);
   });
 });
 
@@ -365,5 +438,53 @@ describe('PatientsPage lead conversion', () => {
     renderPage(<PatientsPage />, '/patients?new=1&firstName=Sara');
     await screen.findByText('All patients');
     expect(screen.queryByText('Add a patient')).not.toBeInTheDocument();
+  });
+
+  it('reveals a display-only patient record and does not call the API again', async () => {
+    const fn = stub(jsonIf('/patients?', { patients: [], total: 0, limit: 20, offset: 0 }));
+    renderPage(<PatientsPage />, '/patients');
+    expect(await screen.findByText('No patients found')).toBeInTheDocument();
+    const callsBefore = fn.mock.calls.length;
+    await expectSampleToggle(/Layla Rahman/);
+    expect(fn.mock.calls.length).toBe(callsBefore);
+    expect(fn.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false);
+  });
+
+  it('hides the example when a patient search matches nothing', async () => {
+    stub(jsonIf('/patients?', { patients: [], total: 0, limit: 20, offset: 0 }));
+    renderPage(<PatientsPage />, '/patients');
+    expect(await screen.findByRole('button', { name: 'Peek at an example' })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Name or phone'), { target: { value: 'Nobody' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+    expect(
+      await screen.findByText('No patients match this search. Try a different name or phone number.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Peek at an example' })).not.toBeInTheDocument();
+  });
+
+  it('hides the example when a real patient exists', async () => {
+    stub(
+      jsonIf('/patients?', {
+        patients: [
+          {
+            id: 2,
+            organizationId: 1,
+            firstName: 'Sara',
+            lastName: 'Halim',
+            phone: '+15550300001',
+            email: null,
+            smsOptOut: false,
+            createdAt: '2026-09-30T10:00:00.000Z',
+            updatedAt: '2026-09-30T10:00:00.000Z',
+          },
+        ],
+        total: 1,
+        limit: 20,
+        offset: 0,
+      }),
+    );
+    renderPage(<PatientsPage />, '/patients');
+    expect(await screen.findByRole('link', { name: 'Sara Halim' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Peek at an example' })).not.toBeInTheDocument();
   });
 });
