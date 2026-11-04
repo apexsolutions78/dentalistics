@@ -9,12 +9,18 @@ import type { Logger } from '../logger';
 import { PLANS } from '../plans';
 import type { RateLimiter } from '../security/rateLimit';
 import { createPublicLead } from '../services/leads';
+import { createDbPublicActivityReader } from '../services/publicActivity';
+import type { PublicActivityReader } from '../services/publicActivity';
 
 export interface PublicRouterDeps {
   db: Pool;
   logger: Logger;
   ipLimiter: RateLimiter;
   keyLimiter: RateLimiter;
+  activityLimiter?: RateLimiter;
+  activityReader?: PublicActivityReader;
+  activityNow?: () => number;
+  activityTtlMs?: number;
 }
 
 interface SiteKeyOrgRow extends RowDataPacket {
@@ -23,9 +29,26 @@ interface SiteKeyOrgRow extends RowDataPacket {
 
 export function createPublicRouter(deps: PublicRouterDeps): Router {
   const router = Router();
+  const activity =
+    deps.activityReader ??
+    createDbPublicActivityReader(deps.db, {
+      now: deps.activityNow,
+      ttlMs: deps.activityTtlMs,
+    });
+  const activityLimiter = deps.activityLimiter ?? deps.ipLimiter;
 
   router.get('/plans', (_req: Request, res: Response) => {
     res.status(200).json({ plans: PLANS });
+  });
+
+  router.get('/activity', async (req: Request, res: Response) => {
+    if (!activityLimiter.check(`public-activity|ip|${req.ip ?? 'unknown'}`)) {
+      deps.logger.warn('public activity rate limited', { scope: 'ip' });
+      throw new AppError('Too many requests, try again later', 429, 'rate_limited', true);
+    }
+    const body = await activity.read();
+    res.setHeader('Cache-Control', 'public, max-age=30');
+    res.status(200).json(body);
   });
 
   router.post('/leads', async (req: Request, res: Response) => {
