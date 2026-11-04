@@ -6,6 +6,10 @@ import { errorMessage } from '../lib/api';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
 import { FormField } from '../components/FormField';
 import { Flash } from '../components/Flash';
+import { activityLine } from '../lib/publicActivity';
+import { usePublicActivity } from '../lib/usePublicActivity';
+
+const FLOAT_CLASS = ['float-card', 'float-card float-2', 'float-card float-3'];
 
 const EMAIL_PATTERN = /^\S+@\S+\.\S+$/;
 
@@ -23,6 +27,7 @@ export function LoginPage() {
   const [expiredDismissed, setExpiredDismissed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const activity = usePublicActivity();
   useDocumentTitle('Sign in');
   const passwordResetDone =
     (location.state as { passwordReset?: boolean } | null)?.passwordReset === true;
@@ -66,10 +71,24 @@ export function LoginPage() {
   return (
     <div className="login-page">
       <div className="auth-stage">
-      <aside className="login-aside" aria-hidden="true">
-        <div className="float-card">New enquiry · cleaning</div>
-        <div className="float-card float-2">Reply sent</div>
-        <div className="float-card float-3">Booked · Thu 10:30</div>
+      <aside
+        className="login-aside"
+        aria-label="Recent clinic activity"
+        aria-busy={activity.status === 'loading'}
+      >
+        {activity.events.length > 0 ? (
+          <ul className="login-activity">
+            {activity.events.map((event, index) => (
+              <li key={`${event.kind}-${index}`} className={FLOAT_CLASS[index] ?? 'float-card'}>
+                {activityLine(event)}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="float-card login-activity-placeholder">
+            Quiet for now. Fresh enquiries, replies, and bookings will float in here.
+          </p>
+        )}
       </aside>
       <div className="login-card">
         <h1>

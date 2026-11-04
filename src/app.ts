@@ -40,6 +40,8 @@ import {
   PASSWORD_RESET_RATE_WINDOW_MS,
   PASSWORD_RESET_REQUEST_LIMIT,
   PASSWORD_RESET_SUBMIT_LIMIT,
+  PUBLIC_ACTIVITY_IP_LIMIT,
+  PUBLIC_ACTIVITY_RATE_WINDOW_MS,
   PUBLIC_LEAD_IP_LIMIT,
   PUBLIC_LEAD_KEY_LIMIT,
   PUBLIC_LEAD_RATE_WINDOW_MS,
@@ -58,6 +60,7 @@ export interface AppDeps {
   secureCookies?: boolean;
   trustProxy?: boolean | number;
   publicLeadRate?: { perIp: number; perKey: number; windowMs?: number };
+  publicActivity?: { perIp?: number; windowMs?: number; ttlMs?: number; now?: () => number };
   uiDistDir?: string | null;
   passwordResetMailer?: PasswordResetMailer;
   resetBaseUrl?: string;
@@ -196,6 +199,7 @@ export function createApp(deps: AppDeps = {}): Express {
     app.use('/api/organizations', createCommunicationsRouter({ db, logger }));
 
     const publicRate = deps.publicLeadRate;
+    const activityRate = deps.publicActivity;
     app.use(
       '/api/public',
       createPublicRouter({
@@ -209,6 +213,12 @@ export function createApp(deps: AppDeps = {}): Express {
           publicRate?.perKey ?? PUBLIC_LEAD_KEY_LIMIT,
           publicRate?.windowMs ?? PUBLIC_LEAD_RATE_WINDOW_MS,
         ),
+        activityLimiter: createRateLimiter(
+          activityRate?.perIp ?? PUBLIC_ACTIVITY_IP_LIMIT,
+          activityRate?.windowMs ?? PUBLIC_ACTIVITY_RATE_WINDOW_MS,
+        ),
+        activityNow: activityRate?.now,
+        activityTtlMs: activityRate?.ttlMs,
       }),
     );
 

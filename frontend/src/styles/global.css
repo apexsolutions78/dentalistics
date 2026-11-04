@@ -1509,6 +1509,24 @@ button:focus-visible,
   justify-items: start;
 }
 
+.login-activity {
+  display: grid;
+  gap: var(--space-3);
+  justify-items: start;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.login-aside .float-card {
+  max-width: 280px;
+  text-wrap: pretty;
+}
+
+.login-activity-placeholder {
+  font-weight: 700;
+}
+
 .float-card {
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-card);
