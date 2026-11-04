@@ -1,6 +1,8 @@
+import type { KeyboardEvent as ReactKeyboardEvent, RefObject } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../../lib/auth';
 import { can } from '../../lib/capabilities';
+import { AccountMenu } from './AccountMenu';
 
 const PRIMARY_LINKS: Array<{ to: string; label: string; end?: boolean }> = [
   { to: '/workspace', label: 'Workspace', end: true },
@@ -143,7 +145,26 @@ function NavLinkItem({ link }: { link: { to: string; label: string; end?: boolea
   );
 }
 
-export function Sidebar() {
+const FOCUSABLE =
+  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+function focusableItems(root: HTMLElement): HTMLElement[] {
+  return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+    (el) => !el.hasAttribute('disabled') && el.tabIndex !== -1,
+  );
+}
+
+export function Sidebar({
+  drawer,
+  open,
+  onClose,
+  navRef,
+}: {
+  drawer: boolean;
+  open: boolean;
+  onClose: () => void;
+  navRef: RefObject<HTMLElement | null>;
+}) {
   const { user } = useAuth();
   const hasClinic = (user?.organizationId ?? null) !== null;
   const showManagement = hasClinic && can(user, 'dashboard.view');
@@ -154,21 +175,72 @@ export function Sidebar() {
   const location = useLocation();
   const inSettings = location.pathname.startsWith('/settings');
 
+  const onKeyDown = (event: ReactKeyboardEvent<HTMLElement>): void => {
+    if (!drawer || !open) return;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      onClose();
+      return;
+    }
+    if (event.key !== 'Tab') return;
+    const root = navRef.current;
+    if (root === null) return;
+    const items = focusableItems(root);
+    if (items.length === 0) return;
+    const first = items[0];
+    const last = items[items.length - 1];
+    if (first === undefined || last === undefined) return;
+    const active = document.activeElement;
+    if (event.shiftKey) {
+      if (active === first || active === null || !root.contains(active)) {
+        event.preventDefault();
+        last.focus();
+      }
+    } else if (active === last || active === null || !root.contains(active)) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
+
+  const className = drawer
+    ? open
+      ? 'app-sidebar is-drawer is-open'
+      : 'app-sidebar is-drawer'
+    : 'app-sidebar';
+
   return (
-    <nav className="app-sidebar" aria-label="Main navigation" data-tour="nav">
+    <nav
+      ref={navRef}
+      id="app-nav"
+      className={className}
+      aria-label="Main navigation"
+      aria-modal={drawer && open ? true : undefined}
+      aria-hidden={drawer && !open ? true : undefined}
+      inert={drawer && !open ? true : undefined}
+      data-tour="nav"
+      onKeyDown={onKeyDown}
+    >
+      {drawer ? (
+        <div className="nav-drawer-bar">
+          <p className="nav-label">Menu</p>
+          <button type="button" className="nav-drawer-close" onClick={onClose}>
+            Close menu
+          </button>
+        </div>
+      ) : null}
+      {drawer ? <AccountMenu placement="drawer" /> : null}
+      {hasClinic ? (
       <div className="nav-group">
         <p className="nav-label">Today</p>
-        {hasClinic ? (
-          <ul className="nav-list" aria-label="Clinic">
-            {PRIMARY_LINKS.filter((link) => link.to !== '/patient-billing' || showPatientBilling).map((link) => (
-              <NavLinkItem key={link.to} link={link} />
-            ))}
-            {showDoctors ? <NavLinkItem link={{ to: '/doctors', label: 'Doctors' }} /> : null}
-          </ul>
-        ) : (
-          <p className="nav-empty">Clinic tools appear after this account is linked to a clinic.</p>
-        )}
+        <ul className="nav-list" aria-label="Clinic">
+          {PRIMARY_LINKS.filter((link) => link.to !== '/patient-billing' || showPatientBilling).map((link) => (
+            <NavLinkItem key={link.to} link={link} />
+          ))}
+          {showDoctors ? <NavLinkItem link={{ to: '/doctors', label: 'Doctors' }} /> : null}
+        </ul>
       </div>
+      ) : null}
       {showManagement ? (
         <div className="nav-group">
           <p className="nav-label">Oversight</p>

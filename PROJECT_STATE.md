@@ -6,7 +6,11 @@
 
 **Governing protocol:** `CLAUDE.md` — MASTER_AI_RELIABILITY_PROTOCOL v1.0. This document is structured to its `<PROJECT_STATE>` durable-state categories.
 
-**Last updated:** 2026-11-04 (revision 86)
+**Last updated:** 2026-11-04 (revision 87)
+
+**Phone navigation, calendar, and tables (revision 87, CONFIRMED executed, not deployed):** One breakpoint, 820px, drives the drawer, the stacked calendar, and the card lists. Under that width the header is the logo plus a Menu button; the account email, role, and sign out live in the drawer. Platform admins do not see the “clinic tools” note, and their links are in the drawer rather than a sideways tab row. Buttons use nowrap so labels such as Activate stay on one line. Wider screens keep the sidebar, week grid, and tables. Not deployed.
+
+**Phone and desktop layout pass (revision 86, CONFIRMED executed, not deployed):** Clinic screens no longer grow wider than the viewport. Wide tables and the week calendar scroll inside their own regions. Buttons, fields, nav links, and calendar days meet a 40px target. The appointment confirmation template has a readable name. A platform administrator who signs in lands on Trials, and the access-denied message no longer talks only about settings. Verified with `npm run verify`, `npm run verify:frontend`, and a Playwright pass against MariaDB 10.11. Not deployed.
 
 **Phone and desktop layout pass (revision 86, CONFIRMED executed, not deployed):** Clinic screens no longer grow wider than the viewport. Wide tables and the week calendar scroll inside their own regions. Buttons, fields, nav links, and calendar days meet a 40px target. The appointment confirmation template has a readable name. A platform administrator who signs in lands on Trials, and the access-denied message no longer talks only about settings. Verified with `npm run verify`, `npm run verify:frontend`, and a Playwright pass against MariaDB 10.11. Not deployed.
 

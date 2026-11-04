@@ -78,6 +78,11 @@ describe('AppointmentCalendarPage', () => {
     renderPage();
     const cells = await screen.findAllByRole('link', { name: /Omar Nasser/ });
     expect(cells.length).toBeGreaterThan(0);
+    const dayList = document.querySelector('.calendar-days');
+    expect(dayList).not.toBeNull();
+    expect(dayList?.textContent).toMatch(/Omar Nasser/);
+    expect(dayList?.textContent).toMatch(/Cleaning/);
+    expect(document.querySelector('.calendar-week')).not.toBeNull();
     expect(screen.getByRole('heading', { name: 'Appointment calendar' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: String(DAY) }));

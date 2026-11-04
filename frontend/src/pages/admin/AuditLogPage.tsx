@@ -141,7 +141,7 @@ export function AuditLogPage() {
         {data !== null && logs.length > 0 ? (
           <>
             <div
-              className="table-scroll"
+              className="table-scroll table-cards"
               tabIndex={0}
               role="region"
               aria-label="Audit log table"

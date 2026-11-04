@@ -190,7 +190,7 @@ export function PatientImportStep({
             {preview.readyCount} ready, {preview.errorCount} need a fix, {preview.duplicateCount}{' '}
             duplicates.
           </p>
-          <div className="table-scroll">
+          <div className="table-scroll table-cards">
             <table className="import-preview">
               <thead>
                 <tr>

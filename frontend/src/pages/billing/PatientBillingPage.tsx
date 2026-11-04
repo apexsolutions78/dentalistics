@@ -450,7 +450,7 @@ export function PatientBillingPage() {
           />
         ) : null}
         {invoices.length > 0 ? (
-          <div className="table-scroll" tabIndex={0} role="region" aria-label="Invoices">
+          <div className="table-scroll table-cards" tabIndex={0} role="region" aria-label="Invoices">
             <table className="table">
               <thead>
                 <tr>

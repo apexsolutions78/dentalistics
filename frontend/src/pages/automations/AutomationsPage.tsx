@@ -111,7 +111,7 @@ export function AutomationsPage() {
             onRetry={settingsQuery.reload}
           />
         ) : automations === null ? null : (
-          <div className="table-scroll" tabIndex={0} role="region" aria-label="Automation overview table">
+          <div className="table-scroll table-cards" tabIndex={0} role="region" aria-label="Automation overview table">
             <table className="table">
               <thead>
                 <tr>
@@ -240,7 +240,7 @@ export function AutomationsPage() {
             />
           ) : logsQuery.data !== null ? (
             <>
-              <div className="table-scroll" tabIndex={0} role="region" aria-label="Automation activity table">
+              <div className="table-scroll table-cards" tabIndex={0} role="region" aria-label="Automation activity table">
                 <table className="table">
                   <thead>
                     <tr>

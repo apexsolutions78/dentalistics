@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../lib/auth';
 import { StatusBadge } from '../../components/states';
 
-export function AccountMenu() {
+export function AccountMenu({ placement = 'header' }: { placement?: 'header' | 'drawer' }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
@@ -21,7 +21,7 @@ export function AccountMenu() {
   };
 
   return (
-    <div className="account-menu" data-tour="account">
+    <div className={placement === 'drawer' ? 'account-menu account-menu-drawer' : 'account-menu'} data-tour="account">
       <span className="avatar" aria-hidden="true">
         {user.email.slice(0, 1).toUpperCase()}
       </span>

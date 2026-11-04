@@ -158,7 +158,7 @@ export function DashboardPage() {
 
       <section className="card">
         <h2 className="card-title">Lead performance</h2>
-        <div className="table-scroll" tabIndex={0} role="region" aria-label="Lead performance table">
+        <div className="table-scroll table-cards" tabIndex={0} role="region" aria-label="Lead performance table">
           <table className="table">
             <tbody>
               <tr>
@@ -184,7 +184,7 @@ export function DashboardPage() {
 
       <section className="card">
         <h2 className="card-title">Appointment performance</h2>
-        <div className="table-scroll" tabIndex={0} role="region" aria-label="Appointment performance table">
+        <div className="table-scroll table-cards" tabIndex={0} role="region" aria-label="Appointment performance table">
           <table className="table">
             <tbody>
               <tr>
@@ -210,7 +210,7 @@ export function DashboardPage() {
 
       <section className="card">
         <h2 className="card-title">Communication activity</h2>
-        <div className="table-scroll" tabIndex={0} role="region" aria-label="Communication activity table">
+        <div className="table-scroll table-cards" tabIndex={0} role="region" aria-label="Communication activity table">
           <table className="table">
             <tbody>
               <tr>
@@ -240,7 +240,7 @@ export function DashboardPage() {
 
       <section className="card card-dark">
         <h2 className="card-title">Daily trends</h2>
-        <div className="table-scroll" tabIndex={0} role="region" aria-label="Daily trends table">
+        <div className="table-scroll table-cards" tabIndex={0} role="region" aria-label="Daily trends table">
           <table className="table">
             <thead>
               <tr>
