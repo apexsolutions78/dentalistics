@@ -65,6 +65,12 @@ export function LoginPage() {
 
   return (
     <div className="login-page">
+      <div className="auth-stage">
+      <aside className="login-aside" aria-hidden="true">
+        <div className="float-card">New enquiry · cleaning</div>
+        <div className="float-card float-2">Reply sent</div>
+        <div className="float-card float-3">Booked · Thu 10:30</div>
+      </aside>
       <div className="login-card">
         <h1>
           <img className="brand-logo" src={logoBlue} alt="Apex Dentalistics" />
@@ -132,6 +138,7 @@ export function LoginPage() {
         <p style={{ marginTop: '12px', fontSize: 'var(--fs-label)', textAlign: 'center' }}>
           <Link to="/forgot-password">Forgot password?</Link>
         </p>
+      </div>
       </div>
     </div>
   );

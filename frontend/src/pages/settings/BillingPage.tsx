@@ -239,6 +239,12 @@ export function BillingPage() {
               <EmptyState
                 title="No payments yet"
                 description="Payments made for this clinic will appear here."
+                preview={
+                  <p>
+                    <span className="badge badge-success">Sample</span> Example only — a paid monthly
+                    renewal would be listed here. Not saved data.
+                  </p>
+                }
               />
             ) : (
               <div className="table-scroll">

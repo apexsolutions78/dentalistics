@@ -18,21 +18,21 @@ interface MetricCardProps {
 function MetricCard({ label, value, definition, to }: MetricCardProps) {
   const body = (
     <>
-      <div style={{ fontSize: 'var(--fs-label)', color: 'var(--color-text-secondary)' }}>{label}</div>
-      <div style={{ fontSize: '28px', fontWeight: 800, lineHeight: 1.2, letterSpacing: '-0.02em' }}>{value}</div>
+      <div className="metric-label">{label}</div>
+      <div className="metric-value">{value}</div>
     </>
   );
   if (to !== undefined) {
     return (
-      <div className="card" title={definition} style={{ margin: 0 }}>
-        <Link to={to} style={{ display: 'block', color: 'inherit', textDecoration: 'none' }}>
+      <div className="card metric-card" title={definition}>
+        <Link to={to} className="metric-link">
           {body}
         </Link>
       </div>
     );
   }
   return (
-    <div className="card" title={definition} style={{ margin: 0 }}>
+    <div className="card metric-card" title={definition}>
       {body}
     </div>
   );
@@ -127,7 +127,7 @@ export function DashboardPage() {
         </div>
       </form>
 
-      <div className="metric-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px' }}>
+      <div className="metric-grid">
         <MetricCard label="New leads" value={count(m.leads.new)} definition={defs['leads.new']} to="/leads?status=NEW" />
         <MetricCard
           label="Appointments booked"

@@ -470,6 +470,14 @@ export function AppointmentsPage() {
                 ? 'No appointments match the current filters. Try resetting them.'
                 : 'Book the first appointment to see it here.'
             }
+            preview={
+              filtered ? undefined : (
+                <p>
+                  <span className="badge badge-success">Sample</span> Example only — Thursday 10:30,
+                  cleaning, confirmed. Not saved data.
+                </p>
+              )
+            }
           />
         ) : null}
         {data !== null && patients.length > 0 ? (

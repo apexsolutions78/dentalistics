@@ -63,6 +63,12 @@ export function TrialsPage() {
           <EmptyState
             title="No trial clinics"
             description="Clinics that sign up for the free trial will appear here."
+            preview={
+              <p>
+                <span className="badge badge-warn">Sample</span> Example only — a clinic name with an
+                active or expired trial would be listed here. Not saved data.
+              </p>
+            }
           />
         ) : null}
         {trials.length > 0 ? (

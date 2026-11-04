@@ -6,6 +6,7 @@ import { errorMessage } from '../lib/api';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
 import { FormField } from '../components/FormField';
 import { Flash } from '../components/Flash';
+import { FeaturePlayground } from '../components/playground/FeaturePlayground';
 
 const EMAIL_PATTERN = /^\S+@\S+\.\S+$/;
 
@@ -72,6 +73,7 @@ export function SignupPage() {
 
   return (
     <div className="login-page">
+      <div className="signup-layout">
       <div className="login-card">
         <h1>
           <img className="brand-logo" src={logoBlue} alt="Apex Dentalistics" />
@@ -140,6 +142,8 @@ export function SignupPage() {
         <p style={{ marginTop: '12px', fontSize: 'var(--fs-label)', textAlign: 'center' }}>
           Already have an account? <Link to="/login">Sign in</Link>
         </p>
+      </div>
+      <FeaturePlayground compact />
       </div>
     </div>
   );

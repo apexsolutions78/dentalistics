@@ -5,6 +5,7 @@ import { apiFetch } from '../lib/api';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
 import type { PublicPlan } from '../lib/types';
 import { LoadingState } from '../components/states';
+import { FeatureGrid, FeaturePlayground, VisitorWelcome } from '../components/playground/FeaturePlayground';
 
 function priceLabel(plan: PublicPlan): string {
   const dollars = plan.priceUsdCents / 100;
@@ -97,26 +98,23 @@ export function MarketingPage() {
       </header>
 
       <section className="marketing-hero">
-        <h1>Run your dental clinic from one place</h1>
-        <p className="sub">
-          Leads, appointments, recalls, and patient messages in a single workspace built for
-          dental practices.
-        </p>
-        <Link to="/signup" className="btn btn-primary">
-          Start your free trial
-        </Link>
+        <VisitorWelcome />
+        <div className="hero-copy">
+          <h1>Run your dental clinic from one place</h1>
+          <p className="sub">
+            Leads, appointments, recalls, and patient messages in a single workspace built for
+            dental practices.
+          </p>
+          <Link to="/signup" className="btn btn-primary">
+            Start your free trial
+          </Link>
+        </div>
+        <FeaturePlayground />
       </section>
 
       <section className="marketing-features" aria-label="Features">
         <h2>Everything your clinic needs</h2>
-        <div className="card-grid marketing-feature-grid">
-          {FEATURES.map((feature) => (
-            <div className="card marketing-feature" key={feature.title}>
-              <div className="card-title">{feature.title}</div>
-              <p className="sub">{feature.description}</p>
-            </div>
-          ))}
-        </div>
+        <FeatureGrid features={FEATURES} />
       </section>
 
       <section className="marketing-pricing" aria-label="Pricing">
