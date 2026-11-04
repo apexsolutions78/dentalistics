@@ -4,6 +4,7 @@ import { getProvider } from '../communications/registry';
 import { sendTemplateMessage, sendMessage } from '../services/messages';
 import type { RecallConfig } from './recallConfig';
 import { RECALL_CONFIG_META_KEY, loadRecallConfig } from './recallConfig';
+import { readOnlyOrganizationPredicate } from '../billing/subscription';
 import { loadOrgEnabledFilter } from '../db/orgMeta';
 
 const HOUR_MS = 3_600_000;
@@ -760,6 +761,7 @@ export async function runRecallTick(
      WHERE r.status IN ${OPEN_STATUSES}
        AND (m.status = 'PENDING' OR (m.status = 'FAILED' AND m.attempts < ?))
        AND m.scheduled_at <= ?${filter.clause}
+       AND ${readOnlyOrganizationPredicate('m.organization_id')}
      ORDER BY m.scheduled_at ASC, m.id ASC
      LIMIT ?`,
     [cfg.maxAttempts, now, batchSize, ...filter.params],

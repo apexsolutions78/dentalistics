@@ -1,7 +1,7 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { can, type Capability } from '../lib/capabilities';
-import { trialLocked } from '../lib/trial';
+import { clinicReadOnly } from '../lib/trial';
 import { EmptyState, LoadingState } from '../components/states';
 import { UnauthorizedPage } from '../pages/UnauthorizedPage';
 
@@ -57,7 +57,7 @@ export function RequireOnboarding() {
   if (
     organization !== null &&
     organization.onboardingCompletedAt === null &&
-    !trialLocked(organization)
+    !clinicReadOnly(organization)
   ) {
     return <Navigate to="/onboarding" replace />;
   }

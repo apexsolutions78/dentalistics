@@ -4,6 +4,7 @@ import type { ReactElement } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { AuthProvider } from '../../lib/auth';
 import { BillingPage } from './BillingPage';
+import type { BillingState } from '../../lib/types';
 import { jsonResponse, makeUser } from '../../test/fixtures';
 
 afterEach(() => {
@@ -41,16 +42,26 @@ function makeSummary(
     gatewayEnabled: boolean;
     reasons: string[];
     payments: Array<Record<string, unknown>>;
+    billing: BillingState;
   }> = {},
 ) {
   const plan = overrides.plan ?? 'trial';
+  const billing: BillingState = overrides.billing ?? {
+    phase: plan === 'full' ? 'unmetered' : 'trial',
+    readOnly: false,
+    paidUntil: null,
+    graceDays: 3,
+    noticeDays: 7,
+  };
   return {
     organization: {
       id: 1,
       name: 'Test Clinic',
       plan,
       trialEndsAt: plan === 'trial' ? '2099-01-01T00:00:00.000Z' : null,
+      paidUntil: billing.paidUntil,
     },
+    billing,
     price: { amountUsdCents: 2000, currency: 'USD', interval: 'month', name: 'Full Plan' },
     gateway: {
       enabled: overrides.gatewayEnabled ?? false,
@@ -161,20 +172,56 @@ describe('BillingPage', () => {
     expect(await screen.findByText(/Payment still pending/)).toBeInTheDocument();
   });
 
-  it('shows the Full Plan state without an upgrade button', async () => {
+  it('shows a renewal-due notice with the paid-until date and a renew button', async () => {
     stub((url) =>
       url.includes('/billing')
         ? jsonResponse(
             200,
-            makeSummary({ plan: 'full', gatewayEnabled: true, reasons: [] }),
+            makeSummary({
+              plan: 'full',
+              gatewayEnabled: true,
+              reasons: [],
+              billing: {
+                phase: 'renewal_due',
+                readOnly: false,
+                paidUntil: '2030-06-15T12:00:00.000Z',
+                graceDays: 3,
+                noticeDays: 7,
+              },
+            }),
           )
         : null,
     );
     renderPage(<BillingPage />);
-    expect(
-      await screen.findByText('This clinic is already on the Full Plan.'),
-    ).toBeInTheDocument();
-    expect(screen.getByText('Online payment available')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Upgrade/ })).toBeNull();
+    const notice = await screen.findByText(/Renewal is due/);
+    expect(notice).toHaveTextContent(/2030/);
+    expect(screen.getByRole('button', { name: 'Renew — $20.00/month' })).toBeEnabled();
+  });
+
+  it('shows an expired notice and still offers renewal', async () => {
+    stub((url) =>
+      url.includes('/billing')
+        ? jsonResponse(
+            200,
+            makeSummary({
+              plan: 'full',
+              gatewayEnabled: true,
+              reasons: [],
+              billing: {
+                phase: 'expired',
+                readOnly: true,
+                paidUntil: '2020-01-01T00:00:00.000Z',
+                graceDays: 3,
+                noticeDays: 7,
+              },
+            }),
+          )
+        : null,
+    );
+    renderPage(<BillingPage />);
+    const notice = await screen.findByRole('alert');
+    expect(notice).toHaveTextContent(/read-only/);
+    expect(notice).toHaveTextContent(/2020/);
+    expect(screen.getByRole('button', { name: 'Renew — $20.00/month' })).toBeEnabled();
   });
 });

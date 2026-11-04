@@ -405,7 +405,7 @@ describe.skipIf(testHost === undefined || testHost === '')(
         await setRecallConfig({ intervalDays: 30, followUpDelayHours: 4 });
 
         const created = await createAppt(patientId, {
-          date: '2026-10-05',
+          date: '2026-11-20',
           time: '11:00',
           service: 'Cleaning',
         });
@@ -415,13 +415,13 @@ describe.skipIf(testHost === undefined || testHost === '')(
         const recalls = await recallsForPatient(patientId);
         expect(recalls).toHaveLength(1);
         const recallId = recalls[0]?.id ?? 0;
-        expect(recalls[0]?.due_date).toBe('2026-11-04');
+        expect(recalls[0]?.due_date).toBe('2026-12-20');
         expect(recalls[0]?.status).toBe('DUE');
 
         const rows = await recallMessages(recallId);
         expect(rows.map((r) => r.status)).toEqual(['PENDING', 'PENDING']);
         const initial = rows.find((r) => r.phase === 'INITIAL');
-        const dueAt = new Date('2026-11-04T00:00:00.000Z').getTime();
+        const dueAt = new Date('2026-12-20T00:00:00.000Z').getTime();
         expect(Math.abs((initial?.scheduled_at.getTime() ?? 0) - dueAt)).toBeLessThan(5 * MINUTE);
 
         const before = await runRecallTick(pool, logger, { now: new Date(dueAt - MINUTE) });
@@ -735,7 +735,7 @@ describe.skipIf(testHost === undefined || testHost === '')(
         });
 
         const created = await createAppt(patientId, {
-          date: '2026-10-05',
+          date: '2026-11-20',
           time: '17:45',
           service: 'Cleaning',
         });
@@ -743,7 +743,7 @@ describe.skipIf(testHost === undefined || testHost === '')(
         expect((await completeApp(apptId)).status).toBe(200);
 
         const recallId = (await recallsForPatient(patientId))[0]?.id ?? 0;
-        const dueAt = new Date('2026-11-04T00:00:00.000Z').getTime();
+        const dueAt = new Date('2026-12-20T00:00:00.000Z').getTime();
         const tick = await runRecallTick(pool, logger, { now: new Date(dueAt + MINUTE) });
         expect(tick.sent).toBeGreaterThanOrEqual(1);
 

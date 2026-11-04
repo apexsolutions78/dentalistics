@@ -502,7 +502,7 @@ describe.skipIf(testHost === undefined || testHost === '')('M17 observability AP
     expect(d.recent.errorEvents).toBeGreaterThanOrEqual(1);
     expect(d.scheduler.intervalMs).toBeNull();
     expect(Object.keys(d.scheduler.ticks).sort()).toEqual(
-      ['no_show', 'recall', 'reminder', 'review_request'],
+      ['billing', 'no_show', 'recall', 'reminder', 'review_request'],
     );
     expect(d.scheduler.ticks.reminder.lastSuccessAt).toBeNull();
   });

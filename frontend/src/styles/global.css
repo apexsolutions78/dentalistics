@@ -66,6 +66,19 @@ a {
   animation: fade-slide-down var(--dur-2) var(--ease) both;
 }
 
+.billing-notice {
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid #f59e0b;
+  border-radius: 8px;
+  background: #fffbeb;
+}
+
+.billing-notice-danger {
+  border-color: #dc2626;
+  background: #fef2f2;
+}
+
 .app-brand {
   grid-area: brand;
   display: flex;

@@ -106,6 +106,26 @@ webhook traffic is rate-limited per client IP.
 6. Serve over HTTPS: with `NODE_ENV=production` session cookies are
    `Secure`, so browsers only send them over HTTPS.
 
+### One-time timestamp correction
+
+Deploy the session-timezone fix and restart the app before correcting
+rows. New writes are UTC. Historical `CURRENT_TIMESTAMP` values on a
+server whose zone was ahead of UTC (Asia/Karachi is 300 minutes) are
+stored as that local wall clock. Correct them once:
+
+```powershell
+npm run db:correct-timestamps -- --offset-minutes 300 --before 2026-11-04T08:00:00Z
+npm run db:correct-timestamps -- --offset-minutes 300 --before 2026-11-04T08:00:00Z --apply
+```
+
+`--before` is the UTC instant the corrected process started. The first
+command is a dry run. `--apply` writes `app_meta.timestamp_local_correction`
+and every later run changes nothing. Do not run this on a database that
+was already writing UTC. Details are in `src/db/localTimestamps.ts`.
+
+Subscription grace defaults to 3 days (`BILLING_GRACE_DAYS`). Renewal
+notices start 7 days before `paid_until` (`BILLING_RENEWAL_NOTICE_DAYS`).
+
 ## Notes
 
 - Secrets are never logged (logger redacts password/token/secret-like keys)

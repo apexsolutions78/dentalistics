@@ -8,6 +8,8 @@ import type { BillingSummary, CheckoutPayment, PaymentStatusResult } from '../..
 import { PageHeader } from '../../components/PageHeader';
 import { Flash } from '../../components/Flash';
 import { EmptyState, ErrorState, LoadingState, StatusBadge } from '../../components/states';
+import { formatDateTime } from '../../lib/format';
+import type { BillingPhase, BillingState } from '../../lib/types';
 
 const POLL_INTERVAL_MS = 3000;
 const POLL_ATTEMPTS = 5;
@@ -44,7 +46,10 @@ export function BillingPage() {
         );
         reload();
         if (result.status === 'paid') {
-          setBanner({ kind: 'success', text: 'Payment received. This clinic is now on the Full Plan.' });
+          setBanner({
+            kind: 'success',
+            text: 'Payment received. This clinic\'s paid period has been extended by one month.',
+          });
           return 'paid';
         }
         if (result.status === 'failed' || result.status === 'expired') {
@@ -116,6 +121,18 @@ export function BillingPage() {
     summary?.organization.trialEndsAt !== null &&
     summary?.organization.trialEndsAt !== undefined &&
     Date.parse(summary.organization.trialEndsAt) <= Date.now();
+  const billing: BillingState = summary?.billing ?? {
+    phase: plan === 'full' ? 'unmetered' : trialEnded ? 'trial_expired' : 'trial',
+    readOnly: trialEnded,
+    paidUntil: summary?.organization.paidUntil ?? null,
+    graceDays: 3,
+    noticeDays: 7,
+  };
+  const phase: BillingPhase = billing.phase;
+  const paidUntilLabel =
+    billing.paidUntil === null ? null : formatDateTime(billing.paidUntil);
+  const showRenew = phase === 'renewal_due' || phase === 'grace' || phase === 'expired' || phase === 'active';
+  const showUpgrade = phase === 'trial' || phase === 'trial_expired' || phase === 'unmetered';
 
   return (
     <div>
@@ -143,7 +160,7 @@ export function BillingPage() {
             <div className="provider-status">
               <StatusBadge
                 label={plan === 'full' ? 'Full Plan' : 'Free trial'}
-                tone={plan === 'full' ? 'success' : trialEnded ? 'danger' : 'warn'}
+                tone={phase === 'expired' || phase === 'trial_expired' ? 'danger' : plan === 'full' ? 'success' : 'warn'}
               />
               {plan === 'trial' ? (
                 <StatusBadge
@@ -157,6 +174,9 @@ export function BillingPage() {
                   tone={trialEnded ? 'danger' : 'default'}
                 />
               ) : null}
+              {paidUntilLabel !== null ? (
+                <StatusBadge label={`Paid until ${paidUntilLabel}`} tone={phase === 'expired' ? 'danger' : 'default'} />
+              ) : null}
               <StatusBadge
                 label={summary.gateway.enabled ? 'Online payment available' : 'Online payment unavailable'}
                 tone={summary.gateway.enabled ? 'success' : 'default'}
@@ -166,9 +186,31 @@ export function BillingPage() {
               <strong>{summary.price.name}</strong> — {formatUsd(summary.price.amountUsdCents)}{' '}
               {summary.price.currency} per {summary.price.interval}
             </p>
-            {plan === 'full' ? (
-              <p className="text-muted">This clinic is already on the Full Plan.</p>
-            ) : (
+            {phase === 'renewal_due' ? (
+              <div className="billing-notice" role="status">
+                Renewal is due. This clinic is paid until {paidUntilLabel}. Renew to add another month
+                on top of that date.
+              </div>
+            ) : null}
+            {phase === 'grace' ? (
+              <div className="billing-notice" role="status">
+                The paid period ended {paidUntilLabel}. Access continues during the {billing.graceDays}-day
+                grace period. Renew to avoid a read-only lock.
+              </div>
+            ) : null}
+            {phase === 'expired' ? (
+              <div className="billing-notice billing-notice-danger" role="alert">
+                The subscription ended {paidUntilLabel}. This clinic is read-only: existing records stay
+                available and patient automations are not sent. Renew to restore full access.
+              </div>
+            ) : null}
+            {phase === 'active' && paidUntilLabel !== null ? (
+              <p className="text-muted">Paid until {paidUntilLabel}. A renewal adds one month from that date.</p>
+            ) : null}
+            {phase === 'unmetered' ? (
+              <p className="text-muted">This clinic is on the Full Plan with no renewal date on file.</p>
+            ) : null}
+            {showUpgrade || showRenew ? (
               <div className="btn-row">
                 <button
                   type="button"
@@ -180,11 +222,11 @@ export function BillingPage() {
                 >
                   {saving
                     ? 'Redirecting…'
-                    : `Upgrade — ${formatUsd(summary.price.amountUsdCents)}/${summary.price.interval}`}
+                    : `${showRenew && !showUpgrade ? 'Renew' : 'Upgrade'} — ${formatUsd(summary.price.amountUsdCents)}/${summary.price.interval}`}
                 </button>
               </div>
-            )}
-            {!summary.gateway.enabled && plan !== 'full' ? (
+            ) : null}
+            {!summary.gateway.enabled && (showUpgrade || showRenew) ? (
               <p className="text-muted" style={{ marginTop: 'var(--space-2)' }}>
                 {summary.gateway.reasons.join(' · ') || 'Payment gateway is not enabled.'}
               </p>

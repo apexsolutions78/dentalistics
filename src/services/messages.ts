@@ -6,6 +6,7 @@ import type {
   MessageStatus,
 } from '../communications/types';
 import { ProviderSendError } from '../communications/types';
+import { clinicMaySend } from '../billing/entitlement';
 import { renderTemplate } from '../communications/template';
 import { AppError, ValidationError } from '../errors';
 import type { Logger } from '../logger';
@@ -214,6 +215,13 @@ export async function createMessage(
 
 export type SendOutcome = 'sent' | 'failed' | 'skipped';
 
+export interface TemplateSendResult {
+  message: Record<string, unknown>;
+  created: boolean;
+  outcome: SendOutcome | 'duplicate';
+  held?: boolean;
+}
+
 export interface SendTemplateInput {
   organizationId: number;
   channel: unknown;
@@ -231,7 +239,14 @@ export async function sendTemplateMessage(
   logger: Logger,
   provider: CommunicationProvider,
   input: SendTemplateInput,
-): Promise<{ message: Record<string, unknown>; created: boolean; outcome: SendOutcome | 'duplicate' }> {
+): Promise<TemplateSendResult> {
+  if (!(await clinicMaySend(db, input.organizationId))) {
+    logger.info('outbound message held', {
+      organizationId: input.organizationId,
+      reason: 'billing_read_only',
+    });
+    return { message: {}, created: false, outcome: 'skipped', held: true };
+  }
   const templateName = requireString(input.templateName, 'templateName', { min: 1, max: 64 });
   const templateText = requireString(input.templateText, 'templateText', { min: 1, max: 4096 });
   const rendered = renderTemplate(templateText, input.variables);
@@ -334,6 +349,11 @@ export async function sendMessage(
       messageId,
       status: existing.status,
     });
+    return { message: messageDto(existing), outcome: 'skipped' };
+  }
+
+  if (!(await clinicMaySend(db, organizationId))) {
+    logger.info('message send skipped', { messageId, reason: 'billing_read_only' });
     return { message: messageDto(existing), outcome: 'skipped' };
   }
 

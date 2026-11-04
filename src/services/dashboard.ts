@@ -2,6 +2,9 @@ import type { Pool, RowDataPacket } from 'mysql2/promise';
 import { ValidationError } from '../errors';
 import { parseDateOnly } from '../validate';
 
+// The pool forces the MySQL session time zone to UTC, so CURRENT_TIMESTAMP
+// wall clocks and these windows are the same UTC instants. Clinic-local
+// appointment_date / due_date values are not converted.
 export const DASHBOARD_WINDOW_BASIS =
   'Timestamps (created_at, sent_at, delivered_at, updated_at, last_contacted_at, closed_at) ' +
   'are compared as UTC instants [from 00:00 UTC, to+1d 00:00 UTC). appointment_date and ' +

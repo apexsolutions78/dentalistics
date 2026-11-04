@@ -2,6 +2,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import type { Pool, RowDataPacket } from 'mysql2/promise';
 import { recordAudit } from '../audit';
+import { describeBilling } from '../billing/subscription';
 import { revokeUserSessions } from '../auth/sessions';
 import type { SessionUser } from '../auth/sessions';
 import { AppError, ValidationError } from '../errors';
@@ -28,6 +29,7 @@ interface OrganizationRow extends RowDataPacket {
   site_key: string | null;
   plan: 'trial' | 'full';
   trial_ends_at: Date | null;
+  paid_until: Date | null;
   onboarding_completed_at: Date | null;
 }
 
@@ -59,11 +61,12 @@ async function loadOrganization(
   siteKey: string;
   plan: 'trial' | 'full';
   trialEndsAt: Date | null;
+  paidUntil: Date | null;
   onboardingCompletedAt: Date | null;
 }> {
   const [rows] = await db.query<OrganizationRow[]>(
     `SELECT id, name, status, timezone, review_url, created_at, site_key,
-            plan, trial_ends_at, onboarding_completed_at
+            plan, trial_ends_at, paid_until, onboarding_completed_at
      FROM organizations WHERE id = ?`,
     [organizationId],
   );
@@ -94,6 +97,7 @@ async function loadOrganization(
     siteKey,
     plan: row.plan,
     trialEndsAt: row.trial_ends_at,
+    paidUntil: row.paid_until,
     onboardingCompletedAt: row.onboarding_completed_at,
   };
 }
@@ -109,6 +113,12 @@ function organizationDto(org: Awaited<ReturnType<typeof loadOrganization>>): Rec
     siteKey: org.siteKey,
     plan: org.plan,
     trialEndsAt: org.trialEndsAt,
+    paidUntil: org.paidUntil,
+    billing: describeBilling({
+      plan: org.plan,
+      trialEndsAt: org.trialEndsAt,
+      paidUntil: org.paidUntil,
+    }),
     onboardingCompletedAt: org.onboardingCompletedAt,
   };
 }

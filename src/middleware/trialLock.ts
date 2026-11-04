@@ -1,5 +1,6 @@
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
-import type { Pool, RowDataPacket } from 'mysql2/promise';
+import type { Pool } from 'mysql2/promise';
+import { organizationAccess } from '../billing/entitlement';
 import { AppError } from '../errors';
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
@@ -27,19 +28,17 @@ export function createTrialLock(db: Pool): RequestHandler {
       next();
       return;
     }
-    db.query<RowDataPacket[]>(
-      `SELECT id FROM organizations
-       WHERE id = ? AND plan = 'trial'
-         AND trial_ends_at IS NOT NULL AND trial_ends_at <= UTC_TIMESTAMP()`,
-      [user.organizationId],
-    )
-      .then(([rows]) => {
-        if (rows.length > 0) {
+    organizationAccess(db, user.organizationId)
+      .then((access) => {
+        if (access !== null && access.readOnly) {
+          const trial = access.phase === 'trial_expired';
           next(
             new AppError(
-              'Your free trial has ended. This clinic is now read-only until it is activated.',
+              trial
+                ? 'Your free trial has ended. This clinic is now read-only until it is activated.'
+                : 'The subscription for this clinic has ended. It is read-only until it is renewed. Existing records are unchanged.',
               403,
-              'trial_expired',
+              trial ? 'trial_expired' : 'subscription_expired',
               true,
             ),
           );

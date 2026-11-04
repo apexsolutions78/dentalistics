@@ -17,6 +17,7 @@ export type LeadAutomationAction =
   | 'skipped_disabled'
   | 'skipped_source'
   | 'skipped_missing_lead'
+  | 'skipped_billing'
   | 'error';
 
 export interface LeadAutomationResult {
@@ -106,6 +107,10 @@ export async function triggerLeadCreated(
       messageType: LEAD_ACK_TEMPLATE_NAME,
     });
 
+    if (result.held === true) {
+      logger.info('lead automation skipped', { ...event, reason: 'billing_read_only' });
+      return { action: 'skipped_billing' };
+    }
     if (!result.created) {
       logger.info('lead acknowledgement duplicate skipped', { ...event });
       return { action: 'ack_duplicate', messageId: result.message.id as number };

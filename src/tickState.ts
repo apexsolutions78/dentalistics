@@ -5,7 +5,7 @@ export interface TickRecord {
   lastError: string | null;
 }
 
-export type TickName = 'reminder' | 'no_show' | 'recall' | 'review_request';
+export type TickName = 'reminder' | 'no_show' | 'recall' | 'review_request' | 'billing';
 
 const ticks = new Map<TickName, TickRecord>();
 let intervalMs: number | null = null;
@@ -44,7 +44,7 @@ export function recordTickFailed(name: TickName, error: unknown): void {
 
 export function tickSnapshot(): Record<TickName, TickRecord> {
   const snapshot = {} as Record<TickName, TickRecord>;
-  for (const name of ['reminder', 'no_show', 'recall', 'review_request'] as TickName[]) {
+  for (const name of ['reminder', 'no_show', 'recall', 'review_request', 'billing'] as TickName[]) {
     const record = ticks.get(name) ?? emptyRecord();
     snapshot[name] = { ...record };
   }

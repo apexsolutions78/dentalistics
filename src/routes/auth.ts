@@ -2,6 +2,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import type { Pool, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { recordAudit } from '../audit';
+import { describeBilling } from '../billing/subscription';
 import { getDummyHash, hashPassword, verifyPassword } from '../auth/password';
 import {
   consumePasswordResetToken,
@@ -59,6 +60,7 @@ interface OrgSummaryRow extends RowDataPacket {
   name: string;
   plan: 'trial' | 'full';
   trial_ends_at: Date | null;
+  paid_until: Date | null;
   onboarding_completed_at: Date | null;
 }
 
@@ -67,18 +69,26 @@ async function loadSessionOrganization(
   organizationId: number,
 ): Promise<Record<string, unknown> | null> {
   const [rows] = await db.query<OrgSummaryRow[]>(
-    'SELECT id, name, plan, trial_ends_at, onboarding_completed_at FROM organizations WHERE id = ?',
+    'SELECT id, name, plan, trial_ends_at, paid_until, onboarding_completed_at FROM organizations WHERE id = ?',
     [organizationId],
   );
   const row = rows[0];
   if (row === undefined) {
     return null;
   }
+  const billing = describeBilling({
+    plan: row.plan,
+    trialEndsAt: row.trial_ends_at,
+    paidUntil: row.paid_until,
+  });
   return {
     id: row.id,
     name: row.name,
     plan: row.plan,
     trialEndsAt: row.trial_ends_at,
+    paidUntil: row.paid_until,
+    billingPhase: billing.phase,
+    readOnly: billing.readOnly,
     onboardingCompletedAt: row.onboarding_completed_at,
   };
 }
