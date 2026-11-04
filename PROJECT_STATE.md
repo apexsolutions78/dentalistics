@@ -8,7 +8,7 @@
 
 **Last updated:** 2026-11-04 (revision 87)
 
-**Phone navigation, calendar, and tables (revision 87, CONFIRMED executed, not deployed):** Below 820px the clinic nav is a hamburger drawer (closes on navigation, Escape, and backdrop tap, and traps focus) for every role. At 640px and below, the month calendar is a vertical day list and wide data tables are stacked cards. Wider screens keep the sidebar, week grid, and tables. Not deployed.
+**Phone navigation, calendar, and tables (revision 87, CONFIRMED executed, not deployed):** Below 820px the clinic nav is a hamburger drawer (closes on navigation, Escape, and backdrop tap, and traps focus) for every role. At 640px and below, the month calendar is a vertical day list and wide data tables are stacked cards. Wider screens keep the sidebar, week grid, and tables. Gates: `npm run verify` 469 passed, `npm run verify:frontend` 213 passed, Playwright page scroll clean at 360, 390, 768, 1024, 1280, and 1920. Not deployed.
 
 **Phone and desktop layout pass (revision 86, CONFIRMED executed, not deployed):** Clinic screens no longer grow wider than the viewport. Wide tables and the week calendar scroll inside their own regions. Buttons, fields, nav links, and calendar days meet a 40px target. The appointment confirmation template has a readable name. A platform administrator who signs in lands on Trials, and the access-denied message no longer talks only about settings. Verified with `npm run verify`, `npm run verify:frontend`, and a Playwright pass against MariaDB 10.11. Not deployed.
 
