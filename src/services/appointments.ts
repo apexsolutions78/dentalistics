@@ -49,6 +49,7 @@ interface AppointmentRow extends RowDataPacket {
   patient_first_name: string;
   patient_last_name: string;
   patient_phone: string;
+  patient_sms_opt_out: number | boolean;
 }
 
 interface CountRow extends RowDataPacket {
@@ -60,7 +61,8 @@ const APPOINTMENT_SELECT = `SELECT a.id, a.organization_id, a.patient_id, a.lead
     a.appointment_time, a.status, a.service, a.provider, a.doctor_id,
     d.name AS doctor_name,
     a.previous_appointment_id, a.created_by, a.created_at, a.updated_at,
-    p.first_name AS patient_first_name, p.last_name AS patient_last_name, p.phone AS patient_phone
+    p.first_name AS patient_first_name, p.last_name AS patient_last_name, p.phone AS patient_phone,
+    p.sms_opt_out AS patient_sms_opt_out
   FROM appointments a
   JOIN patients p ON p.id = a.patient_id
   LEFT JOIN doctors d ON d.id = a.doctor_id`;
@@ -87,6 +89,7 @@ function appointmentDto(row: AppointmentRow): Record<string, unknown> {
       firstName: row.patient_first_name,
       lastName: row.patient_last_name,
       phone: row.patient_phone,
+      smsOptOut: row.patient_sms_opt_out === true || row.patient_sms_opt_out === 1,
     },
     createdBy: row.created_by,
     createdAt: row.created_at,

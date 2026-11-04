@@ -12,6 +12,7 @@ import { Pager } from '../../components/Pager';
 import { FormField } from '../../components/FormField';
 import { Flash } from '../../components/Flash';
 import { StatusBadge, ErrorState, LoadingState, EmptyState, type BadgeTone } from '../../components/states';
+import { WhatsAppSendButton } from '../../components/WhatsAppSendButton';
 
 const PAGE_SIZE = 20;
 
@@ -512,6 +513,14 @@ export function AppointmentsPage() {
                     </td>
                     <td>{appt.provider ?? '—'}</td>
                     <td style={{ textAlign: 'right' }}>
+                      {orgId !== null ? (
+                        <WhatsAppSendButton
+                          organizationId={orgId}
+                          kind="appointment"
+                          subjectId={appt.id}
+                          optedOut={appt.patient.smsOptOut === true}
+                        />
+                      ) : null}{' '}
                       <Link className="btn btn-secondary" to={`/appointments/${appt.id}`}>
                         Open
                       </Link>

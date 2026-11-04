@@ -193,6 +193,11 @@ export function CommunicationsPage() {
                       </td>
                       <td>
                         <StatusBadge label={message.status} tone={messageTone(message.status)} />
+                        {message.providerKey === 'whatsapp_manual' ? (
+                          <div style={{ fontSize: 'var(--fs-caption)', color: 'var(--color-text-secondary)' }}>
+                            WhatsApp · manual
+                          </div>
+                        ) : null}
                       </td>
                       <td>{formatDateTime(message.createdAt)}</td>
                       <td style={{ textAlign: 'right' }}>
@@ -211,6 +216,9 @@ export function CommunicationsPage() {
                         <td colSpan={7}>
                           <div style={{ display: 'grid', gap: '6px', padding: '4px 0' }}>
                             <div style={{ whiteSpace: 'pre-wrap' }}>{message.body}</div>
+                            {message.providerKey === 'whatsapp_manual' ? (
+                              <div>Sent via WhatsApp (manual).</div>
+                            ) : null}
                             <div style={{ fontSize: 'var(--fs-label)', color: 'var(--color-text-secondary)' }}>
                               {message.leadId !== null ? (
                                 <>

@@ -20,6 +20,7 @@ import type { Logger } from '../logger';
 import { requireAuth } from '../middleware/auth';
 import { assertCanManageMembers, assertOrgExists } from '../middleware/tenant';
 import { markLeadAppointmentBooked } from '../services/leads';
+import { deliverWhatsAppReminder } from '../services/whatsappManual';
 import {
   cancelAppointment,
   completeAppointment,
@@ -262,6 +263,20 @@ export function createAppointmentsRouter(deps: AppointmentsRouterDeps): Router {
       actor.id,
     );
     res.status(201).json(created);
+  });
+
+  router.post('/:orgId/appointments/:appointmentId/whatsapp', async (req: Request, res: Response) => {
+    const organizationId = parsePathId(req.params.orgId);
+    const actor = req.user as SessionUser;
+    assertOrgExists(actor, organizationId);
+    const appointmentId = parsePathId(req.params.appointmentId);
+    const result = await deliverWhatsAppReminder(deps.db, deps.logger, {
+      organizationId,
+      actorId: actor.id,
+      kind: 'appointment',
+      subjectId: appointmentId,
+    });
+    res.status(201).json(result);
   });
 
   router.get('/:orgId/appointments/:appointmentId', async (req: Request, res: Response) => {

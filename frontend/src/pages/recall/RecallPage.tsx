@@ -14,6 +14,7 @@ import { FormField } from '../../components/FormField';
 import { Flash } from '../../components/Flash';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { StatusBadge, ErrorState, LoadingState, EmptyState, type BadgeTone } from '../../components/states';
+import { WhatsAppSendButton } from '../../components/WhatsAppSendButton';
 
 const PAGE_SIZE = 20;
 
@@ -224,6 +225,14 @@ export function RecallPage() {
                     </td>
                     <td>{recall.lastContactedAt === null ? '—' : formatDate(recall.lastContactedAt)}</td>
                     <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                      {orgId !== null ? (
+                        <WhatsAppSendButton
+                          organizationId={orgId}
+                          kind="recall"
+                          subjectId={recall.id}
+                          optedOut={recall.patient.smsOptOut === true}
+                        />
+                      ) : null}{' '}
                       <Link
                         className="btn btn-secondary"
                         to={`/communications?recipient=${encodeURIComponent(recall.patient.phone)}`}

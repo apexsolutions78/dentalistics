@@ -31,6 +31,7 @@ interface ClinicForm {
   address: string;
   logoUrl: string;
   timezone: string;
+  chartNumbering: 'FDI' | 'UNIVERSAL';
   hours: Record<string, DayRow>;
 }
 
@@ -48,6 +49,7 @@ function toForm(settings: Settings): ClinicForm {
     address: settings.clinic.address ?? '',
     logoUrl: settings.clinic.logoUrl ?? '',
     timezone: settings.clinic.timezone ?? '',
+    chartNumbering: settings.clinic.chartNumbering === 'UNIVERSAL' ? 'UNIVERSAL' : 'FDI',
     hours,
   };
 }
@@ -106,6 +108,7 @@ export function ClinicSettingsPage() {
         address: form.address.trim(),
         logoUrl: form.logoUrl.trim(),
         timezone: form.timezone.trim(),
+        chartNumbering: form.chartNumbering,
         businessHours,
       }),
     );
@@ -160,6 +163,19 @@ export function ClinicSettingsPage() {
                     value={form.address}
                     onChange={(e) => update('address', e.target.value)}
                   />
+                </FormField>
+                <FormField
+                  label="Tooth numbering"
+                  hint="FDI is the default. Choose Universal for clinics that chart with the US numbering system."
+                >
+                  <select
+                    className="select"
+                    value={form.chartNumbering}
+                    onChange={(e) => update('chartNumbering', e.target.value === 'UNIVERSAL' ? 'UNIVERSAL' : 'FDI')}
+                  >
+                    <option value="FDI">FDI (default)</option>
+                    <option value="UNIVERSAL">Universal (US)</option>
+                  </select>
                 </FormField>
                 <FormField label="Logo URL">
                   <input

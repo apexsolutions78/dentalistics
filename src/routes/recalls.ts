@@ -6,6 +6,7 @@ import type { Logger } from '../logger';
 import { requireAuth } from '../middleware/auth';
 import { assertOrgExists } from '../middleware/tenant';
 import { listRecalls } from '../services/recalls';
+import { deliverWhatsAppReminder } from '../services/whatsappManual';
 import { parsePathId } from '../validate';
 
 export interface RecallsRouterDeps {
@@ -25,6 +26,20 @@ export function createRecallsRouter(deps: RecallsRouterDeps): Router {
       query: req.query as unknown as Record<string, unknown>,
     });
     res.status(200).json(result);
+  });
+
+  router.post('/:orgId/recalls/:recallId/whatsapp', async (req: Request, res: Response) => {
+    const organizationId = parsePathId(req.params.orgId);
+    const actor = req.user as SessionUser;
+    assertOrgExists(actor, organizationId);
+    const recallId = parsePathId(req.params.recallId);
+    const result = await deliverWhatsAppReminder(deps.db, deps.logger, {
+      organizationId,
+      actorId: actor.id,
+      kind: 'recall',
+      subjectId: recallId,
+    });
+    res.status(201).json(result);
   });
 
   return router;

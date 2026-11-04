@@ -242,6 +242,7 @@ describe.skipIf(testHost === undefined || testHost === '')(
         businessHours: null,
         timezone: 'UTC',
         reviewUrl: null,
+        chartNumbering: 'FDI',
       });
       expect(Object.keys(settings.automations as object).sort()).toEqual([
         'leadAck',
@@ -383,6 +384,7 @@ describe.skipIf(testHost === undefined || testHost === '')(
         businessHours: null,
         timezone: 'UTC',
         reviewUrl: null,
+        chartNumbering: 'FDI',
       });
 
       const [auditRows] = await pool.query<mysql.RowDataPacket[]>(

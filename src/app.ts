@@ -16,6 +16,7 @@ import { createAppointmentsRouter } from './routes/appointments';
 import { createAuthRouter } from './routes/auth';
 import { createBillingRouter } from './routes/billing';
 import { createCallEventsRouter } from './routes/callEvents';
+import { createChartRouter } from './routes/chart';
 import { createCommunicationsRouter } from './routes/communications';
 import { createConversationStateRouter } from './routes/conversationState';
 import { createDashboardRouter } from './routes/dashboard';
@@ -193,6 +194,7 @@ export function createApp(deps: AppDeps = {}): Express {
     app.use('/api/organizations', createLeadsRouter({ db, logger }));
     app.use('/api/organizations', createDoctorsRouter({ db, logger }));
     app.use('/api/organizations', createPatientsRouter({ db, logger }));
+    app.use('/api/organizations', createChartRouter({ db, logger }));
     app.use('/api/organizations', createPatientBillingRouter({ db, logger }));
     app.use('/api/organizations', createAppointmentsRouter({ db, logger }));
     app.use('/api/organizations', createDashboardRouter({ db, logger }));

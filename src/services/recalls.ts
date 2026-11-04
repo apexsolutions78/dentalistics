@@ -22,6 +22,7 @@ interface RecallRow extends RowDataPacket {
   patient_first_name: string;
   patient_last_name: string;
   patient_phone: string;
+  patient_sms_opt_out: number | boolean;
 }
 
 function dateString(value: string | Date): string {
@@ -50,6 +51,7 @@ function recallDto(row: RecallRow): Record<string, unknown> {
       firstName: row.patient_first_name,
       lastName: row.patient_last_name,
       phone: row.patient_phone,
+      smsOptOut: row.patient_sms_opt_out === true || row.patient_sms_opt_out === 1,
     },
     recallType: row.recall_type,
     dueDate: dateString(row.due_date),
@@ -124,7 +126,7 @@ export async function listRecalls(
 
   const [rows] = await db.query<RecallRow[]>(
     `SELECT r.*, p.first_name AS patient_first_name, p.last_name AS patient_last_name,
-            p.phone AS patient_phone
+            p.phone AS patient_phone, p.sms_opt_out AS patient_sms_opt_out
      FROM recalls r JOIN patients p ON p.id = r.patient_id
      WHERE ${whereSql}
      ORDER BY r.due_date ASC, r.id ASC

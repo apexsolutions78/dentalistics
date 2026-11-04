@@ -64,6 +64,7 @@ export function makeSettings(overrides: Partial<Settings> = {}): Settings {
       },
       timezone: 'Asia/Bahrain',
       reviewUrl: null,
+      chartNumbering: 'FDI',
     },
     automations: {
       reminder: {
@@ -186,7 +187,17 @@ export function makeSettings(overrides: Partial<Settings> = {}): Settings {
       ],
       roleMatrix: { owner: ['settings.manage'], receptionist: ['appointments.work'] },
       businessHourDays: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'],
-      clinicFields: ['name', 'phone', 'email', 'address', 'logoUrl', 'businessHours', 'timezone', 'reviewUrl'],
+      clinicFields: [
+        'name',
+        'phone',
+        'email',
+        'address',
+        'logoUrl',
+        'businessHours',
+        'timezone',
+        'reviewUrl',
+        'chartNumbering',
+      ],
     },
   };
   return { ...base, ...overrides };
