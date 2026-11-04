@@ -48,7 +48,7 @@ export function BillingPage() {
         if (result.status === 'paid') {
           setBanner({
             kind: 'success',
-            text: 'Payment received. This clinic paid period has been extended by one month.',
+            text: 'Payment received. This clinic\'s paid period has been extended by one month.',
           });
           return 'paid';
         }
