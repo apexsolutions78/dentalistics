@@ -145,8 +145,9 @@ function NavLinkItem({ link }: { link: { to: string; label: string; end?: boolea
 
 export function Sidebar() {
   const { user } = useAuth();
-  const showManagement = can(user, 'dashboard.view');
-  const showSettingsSections = can(user, 'settings.view');
+  const hasClinic = (user?.organizationId ?? null) !== null;
+  const showManagement = hasClinic && can(user, 'dashboard.view');
+  const showSettingsSections = hasClinic && can(user, 'settings.view');
   const showTrials = can(user, 'admin.trials.view');
   const showDoctors = can(user, 'doctors.view');
   const showPatientBilling = can(user, 'patientBilling.view');
@@ -157,12 +158,16 @@ export function Sidebar() {
     <nav className="app-sidebar" aria-label="Main navigation" data-tour="nav">
       <div className="nav-group">
         <p className="nav-label">Today</p>
-        <ul className="nav-list" aria-label="Clinic">
-          {PRIMARY_LINKS.filter((link) => link.to !== '/patient-billing' || showPatientBilling).map((link) => (
-            <NavLinkItem key={link.to} link={link} />
-          ))}
-          {showDoctors ? <NavLinkItem link={{ to: '/doctors', label: 'Doctors' }} /> : null}
-        </ul>
+        {hasClinic ? (
+          <ul className="nav-list" aria-label="Clinic">
+            {PRIMARY_LINKS.filter((link) => link.to !== '/patient-billing' || showPatientBilling).map((link) => (
+              <NavLinkItem key={link.to} link={link} />
+            ))}
+            {showDoctors ? <NavLinkItem link={{ to: '/doctors', label: 'Doctors' }} /> : null}
+          </ul>
+        ) : (
+          <p className="nav-empty">Clinic tools appear after this account is linked to a clinic.</p>
+        )}
       </div>
       {showManagement ? (
         <div className="nav-group">

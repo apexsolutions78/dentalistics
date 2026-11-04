@@ -35,6 +35,8 @@ describe('TemplatesPage', () => {
     const configured = await screen.findAllByText('Configured');
     expect(configured).toHaveLength(settings.definitions.templateNames.length);
     expect(screen.queryByText('Empty')).not.toBeInTheDocument();
+    expect(screen.getByText('Appointment confirmation')).toBeInTheDocument();
+    expect(screen.queryByText('appointment_confirmation')).not.toBeInTheDocument();
   });
 
   it('labels an empty template with an empty badge', async () => {

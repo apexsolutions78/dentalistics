@@ -6,7 +6,9 @@
 
 **Governing protocol:** `CLAUDE.md` — MASTER_AI_RELIABILITY_PROTOCOL v1.0. This document is structured to its `<PROJECT_STATE>` durable-state categories.
 
-**Last updated:** 2026-11-04 (revision 85)
+**Last updated:** 2026-11-04 (revision 86)
+
+**Phone and desktop layout pass (revision 86, CONFIRMED executed, not deployed):** Clinic screens no longer grow wider than the viewport. Wide tables and the week calendar scroll inside their own regions. Buttons, fields, nav links, and calendar days meet a 40px target. The appointment confirmation template has a readable name. A platform administrator who signs in lands on Trials, and the access-denied message no longer talks only about settings. Verified with `npm run verify`, `npm run verify:frontend`, and a Playwright pass against MariaDB 10.11. Not deployed.
 
 **Dental chart and manual WhatsApp reminders (revision 85, CONFIRMED executed, not deployed):** Same chart and WhatsApp work as the earlier branch revision, with the migration renumbered to `0025_dental_chart.sql` after master took 0023 (regional pricing) and 0024 (patient billing). Post-merge gates are in the revision 85 change-log entry.
 

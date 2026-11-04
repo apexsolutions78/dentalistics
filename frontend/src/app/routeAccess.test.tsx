@@ -142,6 +142,19 @@ describe('route access', () => {
   it('denies a receptionist access to settings', async () => {
     await renderAt('/settings', makeUser({ role: 'receptionist', email: 'desk@example.com' }));
     expect(await screen.findByText('Access denied')).toBeInTheDocument();
+    expect(screen.getByText(/permission to open this screen/)).toBeInTheDocument();
+  });
+
+  it('opens the trial list when a platform administrator signs in', async () => {
+    await renderAt('/', makeUser({ role: 'admin', email: 'platform@example.com', organizationId: null }));
+    expect(await screen.findByRole('heading', { name: 'Trial clinics' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Patients' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Trials' })).toBeInTheDocument();
+  });
+
+  it('opens the dashboard when a clinic owner signs in', async () => {
+    await renderAt('/', makeUser({ role: 'owner' }));
+    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
   });
 
   it('shows a no-clinic message on the dashboard for an account without a clinic', async () => {

@@ -25,7 +25,7 @@ export function AccountMenu() {
       <span className="avatar" aria-hidden="true">
         {user.email.slice(0, 1).toUpperCase()}
       </span>
-      <span>{user.email}</span>
+      <span className="account-email">{user.email}</span>
       <StatusBadge
         label={user.role}
         tone={user.role === 'owner' ? 'new' : user.role === 'admin' ? 'success' : 'default'}
