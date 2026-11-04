@@ -156,6 +156,15 @@ export function CommunicationsPage() {
                 ? 'No messages match the current filters. Try resetting them.'
                 : 'Outbound and inbound messages appear here once automations or staff send them.'
             }
+            preview={
+              isFiltered ? undefined : (
+                <p>
+                  <span className="badge badge-new">Sample</span> Example only — WhatsApp thread
+                  with Layla Rahman (+97336001204). Clinic: Your 6-month check-up is due. Layla:
+                  Thursday morning works. Not saved data.
+                </p>
+              )
+            }
           />
         ) : null}
         {data !== null && messages.length > 0 ? (

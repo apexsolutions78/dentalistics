@@ -360,6 +360,12 @@ export function DoctorsPage() {
           <EmptyState
             title="No doctors yet"
             description="Add the first doctor to start generating slot suggestions for leads."
+            preview={
+              <p>
+                <span className="badge badge-success">Sample</span> Example only — Dr Huda
+                Al-Khalifa, orthodontics, Mon-Thu 09:00-17:00, 30 min slots. Not saved data.
+              </p>
+            }
           />
         ) : null}
         {doctors.length > 0 ? (
