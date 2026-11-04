@@ -298,6 +298,14 @@ export function LeadsPage() {
                 ? 'No leads match the current filters. Try resetting them.'
                 : 'New website enquiries and manually added leads will appear here.'
             }
+            preview={
+              applied.q || applied.status || applied.source || applied.from || applied.to ? undefined : (
+                <p>
+                  <span className="badge badge-new">Sample</span> Example only — Amina Yusuf, cleaning,
+                  from the website. Not saved data.
+                </p>
+              )
+            }
           />
         ) : null}
         {data !== null && data.leads.length > 0 ? (

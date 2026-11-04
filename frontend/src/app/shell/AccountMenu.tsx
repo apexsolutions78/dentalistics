@@ -21,7 +21,10 @@ export function AccountMenu() {
   };
 
   return (
-    <div className="account-menu">
+    <div className="account-menu" data-tour="account">
+      <span className="avatar" aria-hidden="true">
+        {user.email.slice(0, 1).toUpperCase()}
+      </span>
       <span>{user.email}</span>
       <StatusBadge
         label={user.role}

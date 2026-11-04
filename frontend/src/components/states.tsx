@@ -1,3 +1,6 @@
+import { useState } from 'react';
+import type { ReactNode } from 'react';
+
 export type BadgeTone = 'default' | 'new' | 'success' | 'warn' | 'danger';
 
 const toneClass: Record<BadgeTone, string> = {
@@ -15,6 +18,10 @@ export function StatusBadge({ label, tone = 'default' }: { label: string; tone?:
 export function LoadingState({ label = 'Loading…' }: { label?: string }) {
   return (
     <div className="state-block" role="status">
+      <div className="skeleton-stack" aria-hidden="true">
+        <span className="skeleton" />
+        <span className="skeleton is-short" />
+      </div>
       <span className="spinner" aria-hidden="true" /> {label}
     </div>
   );
@@ -44,14 +51,33 @@ export function ErrorState({
   );
 }
 
+function ExamplePeek({ children }: { children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="example-peek">
+      <button
+        type="button"
+        className="btn btn-secondary"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+      >
+        {open ? 'Hide the example' : 'Peek at an example'}
+      </button>
+      {open ? <div className="example-peek-body">{children}</div> : null}
+    </div>
+  );
+}
+
 export function EmptyState({
   title,
   description,
   heading = false,
+  preview,
 }: {
   title: string;
   description: string;
   heading?: boolean;
+  preview?: ReactNode;
 }) {
   return (
     <div className="state-block">
@@ -61,6 +87,7 @@ export function EmptyState({
         <div className="state-title">{title}</div>
       )}
       <div>{description}</div>
+      {preview != null ? <ExamplePeek>{preview}</ExamplePeek> : null}
     </div>
   );
 }
