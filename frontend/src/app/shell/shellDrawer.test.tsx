@@ -67,6 +67,9 @@ describe('clinic navigation drawer', () => {
     expect(await screen.findByRole('link', { name: 'Patients' })).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Menu' })).not.toBeInTheDocument();
     expect(screen.getByText('owner@example.com')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Sign out' })).toBeVisible();
+    expect(document.querySelector('header .account-menu')).toBeNull();
+    expect(document.querySelector('#app-nav .drawer-account')).not.toBeNull();
   });
 
   it('opens a focus-trapped menu for an owner and closes it', async () => {
@@ -77,6 +80,8 @@ describe('clinic navigation drawer', () => {
     expect(screen.queryByRole('link', { name: 'Patients' })).not.toBeInTheDocument();
     expect(screen.getByText('owner@example.com').closest('nav')).toHaveAttribute('aria-hidden', 'true');
     expect(screen.queryByText('Home')).not.toBeInTheDocument();
+    expect(document.querySelector('header .account-menu')).toBeNull();
+    expect(document.querySelector('header .shell-crumb')).toBeNull();
     await user.click(toggle);
     expect(await screen.findByRole('link', { name: 'Patients' })).toBeVisible();
     expect(screen.getByRole('link', { name: 'Dashboard' })).toBeVisible();
@@ -85,9 +90,13 @@ describe('clinic navigation drawer', () => {
 
     expect(screen.getByText('owner@example.com')).toBeVisible();
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeVisible();
+    expect(screen.getByText('owner')).toBeVisible();
+    const email = screen.getByText('owner@example.com');
+    const role = screen.getByText('owner');
+    expect(email.getBoundingClientRect().left).toBe(role.getBoundingClientRect().left);
     close.focus();
     await user.tab({ shift: true });
-    expect(screen.getByRole('link', { name: 'Settings' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Sign out' })).toHaveFocus();
     await user.tab();
     expect(close).toHaveFocus();
 

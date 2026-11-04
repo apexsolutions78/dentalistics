@@ -8,7 +8,7 @@
 
 **Last updated:** 2026-11-04 (revision 87)
 
-**Phone navigation, calendar, and tables (revision 87, CONFIRMED executed, not deployed):** One breakpoint, 820px, drives the drawer, the stacked calendar, and the card lists. Under that width the header is the logo plus a Menu button; the account email, role, and sign out live in the drawer. Platform admins do not see the “clinic tools” note, and their links are in the drawer rather than a sideways tab row. Buttons use nowrap so labels such as Activate stay on one line. Wider screens keep the sidebar, week grid, and tables. Not deployed.
+**Phone navigation, calendar, and tables (revision 87, CONFIRMED executed, not deployed):** Production master is still the PR #8 layout. This branch, not yet merged, is what replaces it. One breakpoint, 820px, drives the drawer for every role. Under that width the header is only the logo and a Menu button; the page pill, the account card, and the sideways nav strips are not on the page. Email, role, and sign out are inside the drawer. On a wide screen the account row is a small avatar, the email, and a sign-out icon. The dashboard date fields show the range the page is already using. Not deployed.
 
 **Phone and desktop layout pass (revision 86, CONFIRMED executed, not deployed):** Clinic screens no longer grow wider than the viewport. Wide tables and the week calendar scroll inside their own regions. Buttons, fields, nav links, and calendar days meet a 40px target. The appointment confirmation template has a readable name. A platform administrator who signs in lands on Trials, and the access-denied message no longer talks only about settings. Verified with `npm run verify`, `npm run verify:frontend`, and a Playwright pass against MariaDB 10.11. Not deployed.
 
