@@ -47,9 +47,14 @@ export function createPublicRouter(deps: PublicRouterDeps): Router {
       amountMinor: Number(region.amountMinor),
       placeholder: region.placeholder,
     }));
+    const plans = plansForPublic(published);
+    const full = plans.find((plan) => plan.id === 'full');
+    if (full?.priceUsdCents === null) {
+      deps.logger.warn('usd subscription price is not saved', { region: 'us' });
+    }
     res.setHeader('Cache-Control', 'no-store');
     res.status(200).json({
-      plans: plansForPublic(published),
+      plans,
       regions: published,
     });
   });

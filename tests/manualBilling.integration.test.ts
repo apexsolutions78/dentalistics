@@ -129,12 +129,12 @@ describe.skipIf(testHost === undefined || testHost === '')('regional prices and 
     const usd = regions.find((region) => region.code === 'us');
     const pkr = regions.find((region) => region.code === 'pk');
     expect(plans.headers['cache-control']).toBe('no-store');
-    expect(usd).toMatchObject({ currency: 'USD', amountMinor: 2000, placeholder: false });
+    expect(usd).toMatchObject({ currency: 'USD', placeholder: false });
     expect(pkr).toMatchObject({ currency: 'PKR', placeholder: true });
     const full = (plans.body.plans as Array<{ id: string; priceUsdCents: number }>).find(
       (plan) => plan.id === 'full',
     );
-    expect(full?.priceUsdCents).toBe(2000);
+    expect(full?.priceUsdCents).toBe(usd?.amountMinor);
 
     const saved = await request(app)
       .patch('/api/admin/regional-prices/pk')
@@ -161,8 +161,15 @@ describe.skipIf(testHost === undefined || testHost === '')('regional prices and 
     const restored = await request(app)
       .patch('/api/admin/regional-prices/us')
       .set('Cookie', adminCookie)
-      .send({ amountMinor: 2000, currency: 'USD', label: 'United States' });
+      .send({ amountMinor: usd?.amountMinor, currency: 'USD', label: 'United States' });
     expect(restored.status).toBe(200);
+
+    const notUsd = await request(app)
+      .patch('/api/admin/regional-prices/us')
+      .set('Cookie', adminCookie)
+      .send({ amountMinor: 4500, currency: 'EUR', label: 'United States' });
+    expect(notUsd.status).toBe(400);
+    expect(notUsd.body.error.issues.join(' ')).toMatch(/must stay in USD/);
 
     const ownerDenied = await request(app)
       .patch('/api/admin/regional-prices/pk')

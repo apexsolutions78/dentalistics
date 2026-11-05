@@ -91,7 +91,7 @@ function routeFor(user: SessionUser | null, organization?: SessionOrganization |
           plan: 'trial',
           trialEndsAt: '2099-01-01T00:00:00.000Z',
         },
-        price: { amountUsdCents: 2000, currency: 'USD', interval: 'month', name: 'Full Plan' },
+        price: { amountUsdCents: 4500, currency: 'USD', interval: 'month', name: 'Full Plan' },
         gateway: { enabled: false, provider: 'assanpay', configured: false, reasons: [] },
         payments: [],
       });

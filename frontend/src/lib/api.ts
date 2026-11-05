@@ -47,6 +47,7 @@ export async function apiFetch<T>(path: string, options: ApiRequestOptions = {})
   const init: RequestInit = {
     method,
     credentials: 'same-origin',
+    cache: 'no-store',
     headers: { Accept: 'application/json' },
   };
   if (options.body !== undefined) {

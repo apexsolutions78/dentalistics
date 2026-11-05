@@ -62,7 +62,7 @@ function makeSummary(
       paidUntil: billing.paidUntil,
     },
     billing,
-    price: { amountUsdCents: 2000, currency: 'USD', interval: 'month', name: 'Full Plan' },
+    price: { amountUsdCents: 4500, currency: 'USD', interval: 'month', name: 'Full Plan' },
     gateway: {
       enabled: overrides.gatewayEnabled ?? false,
       provider: 'assanpay',
@@ -76,7 +76,7 @@ function makeSummary(
 const pendingPayment = {
   orderId: 'abc1',
   status: 'pending',
-  amountUsdCents: 2000,
+  amountUsdCents: 4500,
   currency: 'USD',
   provider: 'mock',
   checkoutUrl: null,
@@ -90,10 +90,10 @@ describe('BillingPage', () => {
     stub((url) => (url.includes('/billing') ? jsonResponse(200, makeSummary()) : null));
     renderPage(<BillingPage />);
     expect(await screen.findByRole('heading', { name: 'Billing' })).toBeInTheDocument();
-    expect(await screen.findByText(/— \$20\.00 USD per month/)).toBeInTheDocument();
+    expect(await screen.findByText(/— \$45\.00 USD per month/)).toBeInTheDocument();
     expect(screen.getByText('Online payment unavailable')).toBeInTheDocument();
     expect(screen.getByText('Gateway is switched off')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Upgrade — $20.00/month' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Upgrade — $45.00/month' })).toBeDisabled();
   });
 
   it('starts checkout and follows the gateway link when payments are enabled', async () => {
@@ -103,7 +103,7 @@ describe('BillingPage', () => {
           payment: {
             orderId: 'abc1',
             checkoutUrl: '/billing/mock/abc1',
-            amountUsdCents: 2000,
+            amountUsdCents: 4500,
             currency: 'USD',
             provider: 'mock',
             status: 'pending',
@@ -116,7 +116,7 @@ describe('BillingPage', () => {
       return null;
     });
     renderPage(<BillingPage />);
-    const upgrade = await screen.findByRole('button', { name: 'Upgrade — $20.00/month' });
+    const upgrade = await screen.findByRole('button', { name: 'Upgrade — $45.00/month' });
     expect(upgrade).toBeEnabled();
     expect(screen.getByText('Online payment available')).toBeInTheDocument();
 
@@ -144,7 +144,7 @@ describe('BillingPage', () => {
       return null;
     });
     renderPage(<BillingPage />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Upgrade — $20.00/month' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Upgrade — $45.00/month' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Online payments are switched off.',
     );
@@ -195,7 +195,7 @@ describe('BillingPage', () => {
     renderPage(<BillingPage />);
     const notice = await screen.findByText(/Renewal is due/);
     expect(notice).toHaveTextContent(/2030/);
-    expect(screen.getByRole('button', { name: 'Renew — $20.00/month' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Renew — $45.00/month' })).toBeEnabled();
   });
 
   it('shows an expired notice and still offers renewal', async () => {
@@ -222,6 +222,6 @@ describe('BillingPage', () => {
     const notice = await screen.findByRole('alert');
     expect(notice).toHaveTextContent(/read-only/);
     expect(notice).toHaveTextContent(/2020/);
-    expect(screen.getByRole('button', { name: 'Renew — $20.00/month' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Renew — $45.00/month' })).toBeEnabled();
   });
 });

@@ -38,7 +38,7 @@ export function makePlans(): PublicPlan[] {
       id: 'full',
       name: 'Full Plan',
       headline: 'Full access to every feature, billed monthly',
-      priceUsdCents: 2000,
+      priceUsdCents: null,
       interval: 'month',
       trialDays: null,
     },

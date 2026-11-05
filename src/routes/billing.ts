@@ -48,9 +48,11 @@ export function createBillingRouter(deps: BillingRouterDeps): Router {
       organizationId,
       config,
       gatewayReadiness(config),
+      deps.logger,
     );
     const regions = await listRegionalPrices(deps.db);
     const manualMethods = await listPayableMethods(deps.db);
+    res.setHeader('Cache-Control', 'no-store');
     res.status(200).json({ ...summary, regions, manualMethods });
   });
 

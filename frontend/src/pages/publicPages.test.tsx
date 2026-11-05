@@ -17,7 +17,14 @@ describe('MarketingPage', () => {
       vi.fn((input: RequestInfo | URL) => {
         const url = String(input);
         if (url.includes('/api/public/plans')) {
-          return Promise.resolve(jsonResponse(200, { plans: makePlans() }));
+          return Promise.resolve(
+            jsonResponse(200, {
+              plans: makePlans(),
+              regions: [
+                { code: 'us', label: 'United States', currency: 'USD', amountMinor: 4500, placeholder: false },
+              ],
+            }),
+          );
         }
         return Promise.resolve(
           jsonResponse(404, { error: { code: 'not_found', message: 'Not found' } }),
@@ -34,7 +41,7 @@ describe('MarketingPage', () => {
     expect(screen.getByText('14-day free trial with every feature')).toBeInTheDocument();
     expect(screen.getByText('Full access to every feature, billed monthly')).toBeInTheDocument();
     expect(await screen.findByText('Full Plan')).toBeInTheDocument();
-    expect(screen.getByText('$20')).toBeInTheDocument();
+    expect(screen.getByText('$45')).toBeInTheDocument();
     expect(screen.getByText('/month')).toBeInTheDocument();
     const signInLinks = screen.getAllByRole('link', { name: 'Sign in' });
     expect(signInLinks.length).toBeGreaterThan(0);
@@ -56,7 +63,7 @@ describe('MarketingPage', () => {
           jsonResponse(200, {
             plans: makePlans(),
             regions: [
-              { code: 'us', label: 'United States', currency: 'USD', amountMinor: 2000, placeholder: false },
+              { code: 'us', label: 'United States', currency: 'USD', amountMinor: 4500, placeholder: false },
               { code: 'pk', label: 'Pakistan', currency: 'PKR', amountMinor: 600000, placeholder: true },
             ],
           }),
@@ -78,7 +85,7 @@ describe('MarketingPage', () => {
     Object.defineProperty(window.navigator, 'languages', { configurable: true, value: original });
   });
 
-  it('shows the saved USD price instead of the compiled $20 catalog amount', async () => {
+  it('shows the saved USD price for a visitor whose region is the United States', async () => {
     const original = window.navigator.languages;
     Object.defineProperty(window.navigator, 'languages', { configurable: true, value: ['en-US'] });
     window.localStorage.removeItem('dentalistics.pricingRegion');
@@ -89,9 +96,7 @@ describe('MarketingPage', () => {
         if (url.includes('/api/public/plans')) {
           return Promise.resolve(
             jsonResponse(200, {
-              plans: makePlans().map((plan) =>
-                plan.id === 'full' ? { ...plan, priceUsdCents: 2000 } : plan,
-              ),
+              plans: makePlans(),
               regions: [
                 { code: 'us', label: 'United States', currency: 'USD', amountMinor: 4500, placeholder: false },
                 { code: 'pk', label: 'Pakistan', currency: 'PKR', amountMinor: 700000, placeholder: false },
@@ -109,7 +114,6 @@ describe('MarketingPage', () => {
     );
     expect(await screen.findByLabelText('Price region')).toHaveValue('us');
     expect(screen.getByText('$45')).toBeInTheDocument();
-    expect(screen.queryByText('$20')).not.toBeInTheDocument();
     Object.defineProperty(window.navigator, 'languages', { configurable: true, value: original });
   });
 
@@ -136,7 +140,35 @@ describe('MarketingPage', () => {
       </MemoryRouter>,
     );
     expect(await screen.findByText('$32')).toBeInTheDocument();
-    expect(screen.queryByText('$20')).not.toBeInTheDocument();
+    expect(screen.queryByText('Contact us')).not.toBeInTheDocument();
+  });
+
+  it('says Contact us when no USD price is saved', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes('/api/public/plans')) {
+          return Promise.resolve(
+            jsonResponse(200, {
+              plans: makePlans(),
+              regions: [],
+            }),
+          );
+        }
+        return Promise.resolve(jsonResponse(404, { error: { code: 'not_found', message: 'Not found' } }));
+      }),
+    );
+    const original = window.navigator.languages;
+    Object.defineProperty(window.navigator, 'languages', { configurable: true, value: ['en-US'] });
+    window.localStorage.removeItem('dentalistics.pricingRegion');
+    render(
+      <MemoryRouter>
+        <MarketingPage />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText('Contact us')).toBeInTheDocument();
+    Object.defineProperty(window.navigator, 'languages', { configurable: true, value: original });
   });
 
   it('lists the planned product features', async () => {

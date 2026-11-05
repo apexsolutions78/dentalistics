@@ -107,9 +107,13 @@ describe.skipIf(testHost === undefined || testHost === '')(
       }
     });
 
-    it('serves the two public plans with the owner-defined pricing', async () => {
+    it('serves the two public plans from the saved USD price', async () => {
+      await pool.query(
+        "UPDATE regional_prices SET amount_minor = 4500, currency = 'USD', is_placeholder = 0 WHERE region_code = 'us'",
+      );
       const res = await request(app).get('/api/public/plans');
       expect(res.status).toBe(200);
+      expect(res.headers['cache-control']).toBe('no-store');
       const plans = res.body.plans as Array<Record<string, unknown>>;
       expect(plans).toHaveLength(2);
 
@@ -124,10 +128,13 @@ describe.skipIf(testHost === undefined || testHost === '')(
       const full = plans.find((p) => p.id === 'full');
       expect(full).toMatchObject({
         name: 'Full Plan',
-        priceUsdCents: 2000,
+        priceUsdCents: 4500,
         interval: 'month',
         trialDays: null,
       });
+      await pool.query(
+        "UPDATE regional_prices SET amount_minor = 2000, currency = 'USD', is_placeholder = 0 WHERE region_code = 'us'",
+      );
     });
 
     it('signs up a clinic owner, starts the 14-day trial, and logs them in', async () => {

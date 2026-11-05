@@ -7,19 +7,12 @@ import type { PaymentGatewayConfig } from '../payments/gatewayConfig';
 import type { PaymentGateway } from '../payments/types';
 import { describeBilling } from '../billing/subscription';
 import type { BillingDescription } from '../billing/subscription';
-import { PLANS } from '../plans';
+import { loadSavedUsdPrice } from './regionalPrices';
 
-const FULL_PLAN = PLANS.find((plan) => plan.id === 'full');
-
-if (FULL_PLAN === undefined) {
-  throw new Error('Full plan definition is missing from PLANS');
-}
-
-export const BILLING_PRICE = {
-  amountUsdCents: FULL_PLAN.priceUsdCents,
+export const BILLING_PRICE_SHAPE = {
   currency: 'USD' as const,
   interval: 'month' as const,
-  name: FULL_PLAN.name,
+  name: 'Full Plan',
 };
 
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'expired' | 'cancelled' | 'rejected';
@@ -111,7 +104,12 @@ export interface BillingSummary {
     paidUntil: Date | null;
   };
   billing: BillingDescription;
-  price: typeof BILLING_PRICE;
+  price: {
+    amountUsdCents: number | null;
+    currency: 'USD';
+    interval: 'month';
+    name: string;
+  };
   gateway: { enabled: boolean; provider: string; configured: boolean; reasons: string[] };
   payments: Array<Record<string, unknown>>;
 }
@@ -121,6 +119,7 @@ export async function getBillingSummary(
   organizationId: number,
   config: PaymentGatewayConfig,
   readiness: { configured: boolean; reasons: string[] },
+  logger?: Logger,
 ): Promise<BillingSummary> {
   const org = await loadOrganization(db, organizationId);
   const [payments] = await db.query<PaymentRow[]>(
@@ -141,7 +140,10 @@ export async function getBillingSummary(
       paidUntil: org.paid_until,
     },
     billing,
-    price: BILLING_PRICE,
+    price: {
+      ...BILLING_PRICE_SHAPE,
+      amountUsdCents: (await loadSavedUsdPrice(db, logger))?.amountMinor ?? null,
+    },
     gateway: {
       enabled: config.enabled,
       provider: config.provider,
@@ -187,11 +189,22 @@ export async function createCheckout(
     [input.organizationId],
   );
 
+  const usd = await loadSavedUsdPrice(db, logger);
+  if (usd === null) {
+    throw new AppError(
+      'A USD price has not been saved. Set the United States price before taking payment.',
+      409,
+      'price_not_configured',
+      true,
+    );
+  }
+
   const orderId = createOrderId();
   const [inserted] = await db.query<ResultSetHeader>(
-    `INSERT INTO payments (organization_id, plan, amount_usd_cents, currency, status, provider, order_id)
-     VALUES (?, 'full', ?, 'USD', 'PENDING', ?, ?)`,
-    [input.organizationId, BILLING_PRICE.amountUsdCents, input.config.provider, orderId],
+    `INSERT INTO payments
+       (organization_id, plan, amount_usd_cents, amount_minor, currency, region_code, status, provider, order_id)
+     VALUES (?, 'full', ?, ?, 'USD', 'us', 'PENDING', ?, ?)`,
+    [input.organizationId, usd.amountMinor, usd.amountMinor, input.config.provider, orderId],
   );
   const paymentId = inserted.insertId;
 
@@ -200,7 +213,7 @@ export async function createCheckout(
   try {
     const created = await input.gateway.createPayment({
       orderId,
-      amountUsdCents: BILLING_PRICE.amountUsdCents,
+      amountUsdCents: usd.amountMinor,
       storeName: input.config.storeName !== '' ? input.config.storeName : org.name,
       returnUrl: buildReturnUrl(input.config, orderId),
     });
@@ -227,7 +240,7 @@ export async function createCheckout(
     organizationId: input.organizationId,
     userId: input.actorId,
     action: 'payment_checkout_created',
-    detail: `orderId=${orderId} amountUsdBc=${BILLING_PRICE.amountUsdCents} provider=${input.config.provider}`,
+    detail: `orderId=${orderId} amountUsdCents=${usd.amountMinor} provider=${input.config.provider}`,
   });
 
   const [rows] = await db.query<PaymentRow[]>('SELECT * FROM payments WHERE id = ?', [paymentId]);

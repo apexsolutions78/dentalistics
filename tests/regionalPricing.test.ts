@@ -8,15 +8,15 @@ import { majorToMinor } from '../src/pricing/money';
 import { classifyImportRows, parseCsv, PATIENT_IMPORT_TEMPLATE } from '../src/services/patientImport';
 
 describe('trial length', () => {
-  it('keeps 14 days for new signups and uses $20 only as the fallback catalog price', () => {
+  it('keeps 14 days for new signups and does not compile a full-plan price', () => {
     expect(TRIAL_DAYS).toBe(14);
     const trial = PLANS.find((plan) => plan.id === 'trial');
     const full = PLANS.find((plan) => plan.id === 'full');
     expect(trial?.trialDays).toBe(14);
-    expect(full?.priceUsdCents).toBe(2000);
+    expect(full?.priceUsdCents).toBeNull();
   });
 
-  it('replaces the compiled full-plan price with the saved USD row', () => {
+  it('uses the saved USD row and returns no price when that row is missing', () => {
     const live = plansForPublic([
       { code: 'us', currency: 'USD', amountMinor: 4500 },
       { code: 'pk', currency: 'PKR', amountMinor: 700000 },
@@ -25,10 +25,10 @@ describe('trial length', () => {
     expect(live.find((plan) => plan.id === 'trial')?.priceUsdCents).toBe(0);
 
     const missing = plansForPublic([{ code: 'pk', currency: 'PKR', amountMinor: 700000 }]);
-    expect(missing.find((plan) => plan.id === 'full')?.priceUsdCents).toBe(2000);
+    expect(missing.find((plan) => plan.id === 'full')?.priceUsdCents).toBeNull();
 
     const invalid = plansForPublic([{ code: 'us', currency: 'USD', amountMinor: 0 }]);
-    expect(invalid.find((plan) => plan.id === 'full')?.priceUsdCents).toBe(2000);
+    expect(invalid.find((plan) => plan.id === 'full')?.priceUsdCents).toBeNull();
   });
 
   it('does not rewrite existing trial end dates in the new migration', () => {

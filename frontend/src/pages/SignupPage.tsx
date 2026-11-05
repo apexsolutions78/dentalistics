@@ -7,6 +7,7 @@ import { useDocumentTitle } from '../lib/useDocumentTitle';
 import { FormField } from '../components/FormField';
 import { Flash } from '../components/Flash';
 import { FeaturePlayground } from '../components/playground/FeaturePlayground';
+import { SubscriptionPriceLine } from '../components/SubscriptionPriceLine';
 
 const EMAIL_PATTERN = /^\S+@\S+\.\S+$/;
 
@@ -79,6 +80,7 @@ export function SignupPage() {
           <img className="brand-logo" src={logoBlue} alt="Apex Dentalistics" />
         </h1>
         <div className="sub">Start your free trial - no card required</div>
+        <SubscriptionPriceLine />
         {error ? <Flash kind="error" message={error} onDismiss={() => setError(null)} /> : null}
         <form onSubmit={(e) => void onSubmit(e)} noValidate>
           <FormField label="Clinic name" htmlFor="signup-clinic" error={fieldErrors.clinicName}>
