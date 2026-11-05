@@ -6,7 +6,7 @@ import { runLeadAutomation } from '../automation/leadAutomation';
 import { AppError } from '../errors';
 import { readJsonBody } from '../http/body';
 import type { Logger } from '../logger';
-import { PLANS } from '../plans';
+import { plansForPublic } from '../plans';
 import { listRegionalPrices } from '../services/regionalPrices';
 import type { RateLimiter } from '../security/rateLimit';
 import { createPublicLead } from '../services/leads';
@@ -40,15 +40,17 @@ export function createPublicRouter(deps: PublicRouterDeps): Router {
 
   router.get('/plans', async (_req: Request, res: Response) => {
     const regions = await listRegionalPrices(deps.db);
+    const published = regions.map((region) => ({
+      code: region.code,
+      label: region.label,
+      currency: region.currency,
+      amountMinor: Number(region.amountMinor),
+      placeholder: region.placeholder,
+    }));
+    res.setHeader('Cache-Control', 'no-store');
     res.status(200).json({
-      plans: PLANS,
-      regions: regions.map((region) => ({
-        code: region.code,
-        label: region.label,
-        currency: region.currency,
-        amountMinor: region.amountMinor,
-        placeholder: region.placeholder,
-      })),
+      plans: plansForPublic(published),
+      regions: published,
     });
   });
 

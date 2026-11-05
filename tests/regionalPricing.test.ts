@@ -3,17 +3,32 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createPaymentGateway } from '../src/payments/registry';
 import { DEFAULT_PAYMENT_GATEWAY_CONFIG } from '../src/payments/gatewayConfig';
-import { TRIAL_DAYS, PLANS } from '../src/plans';
+import { TRIAL_DAYS, PLANS, plansForPublic } from '../src/plans';
 import { majorToMinor } from '../src/pricing/money';
 import { classifyImportRows, parseCsv, PATIENT_IMPORT_TEMPLATE } from '../src/services/patientImport';
 
 describe('trial length', () => {
-  it('uses 14 days for new signups and leaves the plan catalog on the USD amount', () => {
+  it('keeps 14 days for new signups and uses $20 only as the fallback catalog price', () => {
     expect(TRIAL_DAYS).toBe(14);
     const trial = PLANS.find((plan) => plan.id === 'trial');
     const full = PLANS.find((plan) => plan.id === 'full');
     expect(trial?.trialDays).toBe(14);
     expect(full?.priceUsdCents).toBe(2000);
+  });
+
+  it('replaces the compiled full-plan price with the saved USD row', () => {
+    const live = plansForPublic([
+      { code: 'us', currency: 'USD', amountMinor: 4500 },
+      { code: 'pk', currency: 'PKR', amountMinor: 700000 },
+    ]);
+    expect(live.find((plan) => plan.id === 'full')?.priceUsdCents).toBe(4500);
+    expect(live.find((plan) => plan.id === 'trial')?.priceUsdCents).toBe(0);
+
+    const missing = plansForPublic([{ code: 'pk', currency: 'PKR', amountMinor: 700000 }]);
+    expect(missing.find((plan) => plan.id === 'full')?.priceUsdCents).toBe(2000);
+
+    const invalid = plansForPublic([{ code: 'us', currency: 'USD', amountMinor: 0 }]);
+    expect(invalid.find((plan) => plan.id === 'full')?.priceUsdCents).toBe(2000);
   });
 
   it('does not rewrite existing trial end dates in the new migration', () => {

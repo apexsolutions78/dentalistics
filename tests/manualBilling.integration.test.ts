@@ -114,6 +114,9 @@ describe.skipIf(testHost === undefined || testHost === '')('regional prices and 
       await pool.query(
         "UPDATE regional_prices SET amount_minor = 600000, is_placeholder = 1, label = 'Pakistan' WHERE region_code = 'pk'",
       );
+      await pool.query(
+        "UPDATE regional_prices SET amount_minor = 2000, is_placeholder = 0, currency = 'USD', label = 'United States' WHERE region_code = 'us'",
+      );
       await pool.end();
     }
     await fs.rm(receiptDir, { recursive: true, force: true });
@@ -125,8 +128,13 @@ describe.skipIf(testHost === undefined || testHost === '')('regional prices and 
     const regions = plans.body.regions as Array<Record<string, unknown>>;
     const usd = regions.find((region) => region.code === 'us');
     const pkr = regions.find((region) => region.code === 'pk');
+    expect(plans.headers['cache-control']).toBe('no-store');
     expect(usd).toMatchObject({ currency: 'USD', amountMinor: 2000, placeholder: false });
     expect(pkr).toMatchObject({ currency: 'PKR', placeholder: true });
+    const full = (plans.body.plans as Array<{ id: string; priceUsdCents: number }>).find(
+      (plan) => plan.id === 'full',
+    );
+    expect(full?.priceUsdCents).toBe(2000);
 
     const saved = await request(app)
       .patch('/api/admin/regional-prices/pk')
@@ -134,6 +142,27 @@ describe.skipIf(testHost === undefined || testHost === '')('regional prices and 
       .send({ amountMinor: 550000, currency: 'PKR', label: 'Pakistan' });
     expect(saved.status).toBe(200);
     expect(saved.body.region).toMatchObject({ amountMinor: 550000, placeholder: false });
+
+    const repriced = await request(app)
+      .patch('/api/admin/regional-prices/us')
+      .set('Cookie', adminCookie)
+      .send({ amountMinor: 4500, currency: 'USD', label: 'United States' });
+    expect(repriced.status).toBe(200);
+    const live = await request(app).get('/api/public/plans');
+    expect(live.headers['cache-control']).toBe('no-store');
+    const liveFull = (live.body.plans as Array<{ id: string; priceUsdCents: number }>).find(
+      (plan) => plan.id === 'full',
+    );
+    const liveUsd = (live.body.regions as Array<{ code: string; amountMinor: number }>).find(
+      (region) => region.code === 'us',
+    );
+    expect(liveFull?.priceUsdCents).toBe(4500);
+    expect(liveUsd?.amountMinor).toBe(4500);
+    const restored = await request(app)
+      .patch('/api/admin/regional-prices/us')
+      .set('Cookie', adminCookie)
+      .send({ amountMinor: 2000, currency: 'USD', label: 'United States' });
+    expect(restored.status).toBe(200);
 
     const ownerDenied = await request(app)
       .patch('/api/admin/regional-prices/pk')

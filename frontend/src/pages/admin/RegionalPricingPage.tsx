@@ -169,8 +169,8 @@ export function RegionalPricingPage() {
             </table>
           </div>
           <p className="text-muted">
-            Enter the amount in major units, such as 20 or 20.50. USD $20 is the current Full Plan price.
-            Other seeded amounts are placeholders, not exchange rates.
+            Enter the amount in major units, such as 20 or 20.50. The United States row is the
+            default price on the public page. Other seeded amounts start as placeholders, not exchange rates.
           </p>
         </section>
       ) : null}

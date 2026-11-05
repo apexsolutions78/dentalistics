@@ -13,10 +13,11 @@ import type { PublicPlan, RegionalPrice } from '../lib/types';
 import { LoadingState } from '../components/states';
 import { FeatureGrid, FeaturePlayground, VisitorWelcome } from '../components/playground/FeaturePlayground';
 
-function priceLabel(plan: PublicPlan): string {
-  const dollars = plan.priceUsdCents / 100;
-  const value = Number.isInteger(dollars) ? String(dollars) : dollars.toFixed(2);
-  return `$${value}`;
+function planPrice(plan: PublicPlan, region: RegionalPrice | null): string {
+  if (plan.id === 'full' && region !== null) {
+    return formatMinor(Number(region.amountMinor), region.currency);
+  }
+  return formatMinor(plan.priceUsdCents, 'USD');
 }
 
 const DIFFERENTIATORS: Array<{ title: string; body: string; image: string; alt: string }> = [
@@ -218,7 +219,7 @@ export function MarketingPage() {
                   <div className="card marketing-plan" key={plan.id}>
                     <div className="card-title">{plan.name}</div>
                     <div className="marketing-price">
-                      {local ? formatMinor(selected.amountMinor, selected.currency) : priceLabel(plan)}
+                      {planPrice(plan, local ? selected : null)}
                       {plan.interval === 'month' ? <span>/month</span> : null}
                     </div>
                     <p className="sub">{plan.headline}</p>

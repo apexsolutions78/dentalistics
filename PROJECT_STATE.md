@@ -6,7 +6,9 @@
 
 **Governing protocol:** `CLAUDE.md` — MASTER_AI_RELIABILITY_PROTOCOL v1.0. This document is structured to its `<PROJECT_STATE>` durable-state categories.
 
-**Last updated:** 2026-11-05 (revision 88)
+**Last updated:** 2026-11-05 (revision 89)
+
+**Public pricing source (revision 89, CONFIRMED executed, not deployed):** The landing page Full Plan amount is no longer the compiled `priceUsdCents: 2000` catalog constant. `GET /api/public/plans` reads `regional_prices` and sends `Cache-Control: no-store`. The page shows the visitor’s region (existing locale logic, default United States / USD). If that row is missing, the response falls back to the compiled $20. Not deployed.
 
 **Account profile (revision 88, CONFIRMED executed, not deployed):** The menu shows the person's name and the clinic name, with the role as a small badge. A platform administrator with no clinic sees "Platform admin". If no name is saved, the email local-part is used. `/profile` is new: there was no personal account page (clinic settings remain at `/settings/clinic` for owners). Any signed-in user can update their own name, email, and phone, and can change their password. An email change requires the current password and stays unique. A password change still requires the current password and signs every session out. Clinic owners can also edit the clinic name, phone, email, and address; receptionists and platform administrators cannot. A read-only clinic can still save personal details, and clinic fields stay unchanged. Migration `0026_user_profile.sql` adds nullable `users.display_name` and `users.phone`. Not deployed.
 
