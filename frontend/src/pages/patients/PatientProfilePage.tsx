@@ -9,6 +9,7 @@ import { CommunicationTimeline } from '../../components/CommunicationTimeline';
 import { StatusBadge, ErrorState, LoadingState, EmptyState, type BadgeTone } from '../../components/states';
 import { SampleLine } from '../../components/SampleLine';
 import { DentalChart } from './DentalChart';
+import { PatientTimeline } from './PatientTimeline';
 
 function appointmentTone(status: string): BadgeTone {
   if (status === 'CONFIRMED' || status === 'COMPLETED') return 'success';
@@ -153,6 +154,10 @@ export function PatientProfilePage() {
           </Link>
         </div>
       </section>
+
+      {orgId !== null ? (
+        <PatientTimeline path={`/api/organizations/${orgId}/patients/${patient.id}/timeline`} />
+      ) : null}
 
       {orgId !== null ? (
         <DentalChart organizationId={orgId} patientId={patient.id} canEdit={canEditChart} />
