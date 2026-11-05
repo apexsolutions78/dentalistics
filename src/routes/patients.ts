@@ -9,6 +9,7 @@ import { requireAuth } from '../middleware/auth';
 import { assertCanManageMembers, assertOrgExists } from '../middleware/tenant';
 import { PATIENT_IMPORT_TEMPLATE } from '../services/patientImport';
 import { commitPatientImport, previewPatientImport } from '../services/patientImportCommit';
+import { listPatientTimeline } from '../services/patientTimeline';
 import { createPatient, deletePatient, getPatient, listPatients, updatePatient } from '../services/patients';
 import { parsePathId } from '../validate';
 
@@ -69,6 +70,20 @@ export function createPatientsRouter(deps: PatientsRouterDeps): Router {
       body,
     });
     res.status(201).json(created);
+  });
+
+  router.get('/:orgId/patients/:patientId/timeline', async (req: Request, res: Response) => {
+    const organizationId = parsePathId(req.params.orgId);
+    const actor = req.user as SessionUser;
+    assertOrgExists(actor, organizationId);
+    const patientId = parsePathId(req.params.patientId);
+    const result = await listPatientTimeline(deps.db, {
+      organizationId,
+      patientId,
+      role: actor.role,
+      query: req.query as unknown as Record<string, unknown>,
+    });
+    res.status(200).json(result);
   });
 
   router.get('/:orgId/patients/:patientId', async (req: Request, res: Response) => {
