@@ -5,6 +5,8 @@ export interface SessionUser {
   email: string;
   role: Role;
   organizationId: number | null;
+  displayName?: string | null;
+  phone?: string | null;
 }
 
 export type BillingPhase =

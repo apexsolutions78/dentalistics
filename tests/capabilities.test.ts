@@ -5,7 +5,14 @@ import { AppError } from '../src/errors';
 import { requireCapability } from '../src/middleware/auth';
 
 function sessionUser(role: SessionUser['role']): SessionUser {
-  return { id: 1, email: `${role}@apextest.local`, role, organizationId: 1 };
+  return {
+    id: 1,
+    email: `${role}@apextest.local`,
+    role,
+    organizationId: 1,
+    displayName: null,
+    phone: null,
+  };
 }
 
 function run(user: SessionUser | undefined, capability: string): unknown {

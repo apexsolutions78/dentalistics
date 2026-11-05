@@ -26,6 +26,7 @@ import { createOrganizationsRouter } from './routes/organizations';
 import { createObservabilityRouter } from './routes/observability';
 import { createPatientBillingRouter } from './routes/patientBilling';
 import { createPatientsRouter } from './routes/patients';
+import { createProfileRouter } from './routes/profile';
 import { createPublicRouter } from './routes/public';
 import { createRecallsRouter } from './routes/recalls';
 import { recordErrorEvent } from './services/observability';
@@ -189,6 +190,7 @@ export function createApp(deps: AppDeps = {}): Express {
         resetBaseUrl: deps.resetBaseUrl ?? process.env.RESET_BASE_URL ?? '',
       }),
     );
+    app.use('/api/profile', createProfileRouter({ db, logger }));
     app.use('/api/admin', createAdminRouter({ db, logger }));
     app.use('/api/organizations', createOrganizationsRouter({ db, logger }));
     app.use('/api/organizations', createLeadsRouter({ db, logger }));

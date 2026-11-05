@@ -5,7 +5,7 @@ import { AppError } from '../errors';
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
-const EXEMPT_PREFIXES = ['/api/auth', '/api/public', '/api/webhooks'];
+const EXEMPT_PREFIXES = ['/api/auth', '/api/profile', '/api/public', '/api/webhooks'];
 
 const BILLING_PATH = /^\/api\/organizations\/\d+\/billing(\/|$)/;
 

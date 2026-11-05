@@ -53,6 +53,7 @@ import { AppointmentSettingsPage } from '../pages/settings/AppointmentSettingsPa
 import { RecallSettingsPage } from '../pages/settings/RecallSettingsPage';
 import { ReviewSettingsPage } from '../pages/settings/ReviewSettingsPage';
 import { AutomationSettingsPage } from '../pages/settings/AutomationSettingsPage';
+import { ProfilePage } from '../pages/profile/ProfilePage';
 
 export function AppRouter() {
   return (
@@ -68,6 +69,7 @@ export function AppRouter() {
         <Route index element={<LandingPage />} />
         <Route element={<RequireAuth />}>
           <Route element={<AppShell />}>
+            <Route path="profile" element={<ProfilePage />} />
             <Route element={<RequireClinic />}>
               <Route element={<RequireOnboarding />}>
                 <Route path="unauthorized" element={<UnauthorizedPage />} />

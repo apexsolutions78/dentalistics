@@ -22,6 +22,7 @@ const SECTION_TITLES: Record<string, string> = {
   automations: 'Automations',
   billing: 'Billing',
   settings: 'Settings',
+  profile: 'Profile',
   unauthorized: 'Access denied',
 };
 
