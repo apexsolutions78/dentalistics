@@ -28,6 +28,8 @@ import { createPatientBillingRouter } from './routes/patientBilling';
 import { createPatientsRouter } from './routes/patients';
 import { createProfileRouter } from './routes/profile';
 import { createPublicRouter } from './routes/public';
+import { createPublicBookingRouter } from './routes/publicBooking';
+import { createBookingSettingsRouter } from './routes/bookingSettings';
 import { createRecallsRouter } from './routes/recalls';
 import { recordErrorEvent } from './services/observability';
 import { createSettingsRouter } from './routes/settings';
@@ -36,6 +38,8 @@ import { createWhatsAppWebhookRouter } from './routes/whatsappWebhook';
 import { createWorkspaceRouter } from './routes/workspace';
 import { createPasswordResetMailerFromEnv } from './mail/passwordResetMailer';
 import type { PasswordResetMailer } from './mail/passwordResetMailer';
+import { createBookingMailerFromEnv } from './mail/bookingMailer';
+import type { BookingMailer } from './mail/bookingMailer';
 import {
   createRateLimiter,
   LOGIN_RATE_LIMIT,
@@ -45,6 +49,10 @@ import {
   PASSWORD_RESET_SUBMIT_LIMIT,
   PUBLIC_ACTIVITY_IP_LIMIT,
   PUBLIC_ACTIVITY_RATE_WINDOW_MS,
+  PUBLIC_BOOKING_READ_IP_LIMIT,
+  PUBLIC_BOOKING_RATE_WINDOW_MS,
+  PUBLIC_BOOKING_WRITE_IP_LIMIT,
+  PUBLIC_BOOKING_WRITE_KEY_LIMIT,
   PUBLIC_LEAD_IP_LIMIT,
   PUBLIC_LEAD_KEY_LIMIT,
   PUBLIC_LEAD_RATE_WINDOW_MS,
@@ -67,6 +75,8 @@ export interface AppDeps {
   uiDistDir?: string | null;
   passwordResetMailer?: PasswordResetMailer;
   resetBaseUrl?: string;
+  bookingMailer?: BookingMailer;
+  publicBookingRate?: { readPerIp?: number; writePerIp?: number; writePerKey?: number; windowMs?: number };
 }
 
 function silentLogger(): Logger {
@@ -202,6 +212,7 @@ export function createApp(deps: AppDeps = {}): Express {
     app.use('/api/organizations', createDashboardRouter({ db, logger }));
     app.use('/api/organizations', createWorkspaceRouter({ db, logger }));
     app.use('/api/organizations', createSettingsRouter({ db, logger }));
+    app.use('/api/organizations', createBookingSettingsRouter({ db, logger }));
     app.use('/api/organizations', createBillingRouter({ db, logger }));
     app.use('/api/organizations', createObservabilityRouter({ db, logger }));
     app.use('/api/organizations', createRecallsRouter({ db, logger }));
@@ -209,6 +220,25 @@ export function createApp(deps: AppDeps = {}): Express {
 
     const publicRate = deps.publicLeadRate;
     const activityRate = deps.publicActivity;
+    const bookingRate = deps.publicBookingRate;
+    const bookingWindow = bookingRate?.windowMs ?? PUBLIC_BOOKING_RATE_WINDOW_MS;
+    app.use(
+      '/api/public',
+      createPublicBookingRouter({
+        db,
+        logger,
+        readLimiter: createRateLimiter(bookingRate?.readPerIp ?? PUBLIC_BOOKING_READ_IP_LIMIT, bookingWindow),
+        writeIpLimiter: createRateLimiter(
+          bookingRate?.writePerIp ?? PUBLIC_BOOKING_WRITE_IP_LIMIT,
+          bookingWindow,
+        ),
+        writeKeyLimiter: createRateLimiter(
+          bookingRate?.writePerKey ?? PUBLIC_BOOKING_WRITE_KEY_LIMIT,
+          bookingWindow,
+        ),
+        mailer: deps.bookingMailer ?? createBookingMailerFromEnv(logger),
+      }),
+    );
     app.use(
       '/api/public',
       createPublicRouter({

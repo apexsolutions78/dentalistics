@@ -251,7 +251,7 @@ export type LeadStatus =
   | 'LOST'
   | 'CLOSED';
 
-export type LeadSource = 'WEBSITE' | 'MISSED_CALL' | 'MANUAL' | 'OTHER';
+export type LeadSource = 'WEBSITE' | 'MISSED_CALL' | 'MANUAL' | 'OTHER' | 'ONLINE_BOOKING';
 
 export type UrgencyLevel = 'LOW' | 'MEDIUM' | 'HIGH';
 

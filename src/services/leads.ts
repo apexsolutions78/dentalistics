@@ -25,7 +25,9 @@ export const LEAD_STATUSES = [
   'CLOSED',
 ] as const;
 
-export const LEAD_SOURCES = ['WEBSITE', 'MISSED_CALL', 'MANUAL', 'OTHER'] as const;
+export const LEAD_SOURCES = ['WEBSITE', 'MISSED_CALL', 'MANUAL', 'OTHER', 'ONLINE_BOOKING'] as const;
+
+const MANUAL_LEAD_SOURCES = ['WEBSITE', 'MISSED_CALL', 'MANUAL', 'OTHER'] as const;
 
 export const ACTIVE_STATUSES = ['NEW', 'CONTACTED', 'QUALIFIED', 'APPOINTMENT_BOOKED'] as const;
 
@@ -258,7 +260,7 @@ export async function createLead(db: Pool, logger: Logger, input: CreateLeadInpu
   const phone = normalizePhone(body.phone);
   const email = optionalEmail(body.email);
   const requestedService = optionalText(body.requestedService, 'requestedService', 120);
-  const source = requireChoice(body.source, LEAD_SOURCES, 'source');
+  const source = requireChoice(body.source, MANUAL_LEAD_SOURCES, 'source');
   const status =
     body.status === undefined ? 'NEW' : requireChoice(body.status, LEAD_STATUSES, 'status');
   const notes = optionalText(body.notes, 'notes', 5000);

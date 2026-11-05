@@ -1,4 +1,6 @@
 import type { Pool, RowDataPacket } from 'mysql2/promise';
+
+type DbQueryable = Pick<Pool, 'query'>;
 import { describeBilling } from './subscription';
 import type { BillingDescription, PlanId } from './subscription';
 
@@ -9,7 +11,7 @@ interface BillingRow extends RowDataPacket {
 }
 
 export async function organizationAccess(
-  db: Pool,
+  db: DbQueryable,
   organizationId: number,
   now = new Date(),
 ): Promise<BillingDescription | null> {
@@ -29,7 +31,7 @@ export async function organizationAccess(
   });
 }
 
-export async function clinicMaySend(db: Pool, organizationId: number, now = new Date()): Promise<boolean> {
+export async function clinicMaySend(db: DbQueryable, organizationId: number, now = new Date()): Promise<boolean> {
   const access = await organizationAccess(db, organizationId, now);
   return access !== null && !access.readOnly;
 }
