@@ -216,7 +216,7 @@ describe('route access', () => {
 
   it('shows the public pricing page to anonymous visitors at "/"', async () => {
     await renderAt('/', null);
-    expect(await screen.findByRole('heading', { name: 'Run your dental clinic from one place' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Every front-desk task, solved in one simple workspace.' })).toBeInTheDocument();
     expect(await screen.findByText('Free Plan')).toBeInTheDocument();
     expect(await screen.findByText('Full Plan')).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: /Start free trial/i }).length).toBeGreaterThan(0);

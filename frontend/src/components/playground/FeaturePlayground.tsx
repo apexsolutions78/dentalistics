@@ -188,7 +188,7 @@ export function FeaturePlayground({ compact = false }: { compact?: boolean }) {
 export function FeatureGrid({
   features,
 }: {
-  features: Array<{ title: string; description: string }>;
+  features: Array<{ title: string; description: string; kicker?: string; image?: string; imageAlt?: string }>;
 }) {
   const [found, setFound] = useState(() => readExplored().length);
   return (
@@ -206,6 +206,9 @@ export function FeatureGrid({
             <FeatureCard
               key={feature.title}
               title={feature.title}
+              kicker={feature.kicker}
+              image={feature.image}
+              imageAlt={feature.imageAlt}
               description={feature.description}
               play={play}
               found={found}
@@ -220,12 +223,18 @@ export function FeatureGrid({
 
 function FeatureCard({
   title,
+  kicker,
+  image,
+  imageAlt,
   description,
   play,
   found,
   onPlayed,
 }: {
   title: string;
+  kicker?: string;
+  image?: string;
+  imageAlt?: string;
   description: string;
   play: { prompt: string; action: string; result: string } | undefined;
   found: number;
@@ -235,7 +244,10 @@ function FeatureCard({
   const [played, setPlayed] = useState(false);
   return (
     <article className={open ? 'card marketing-feature is-open' : 'card marketing-feature'}>
-      <div className="card-title">{title}</div>
+      {image !== undefined ? (
+        <img className="marketing-feature-shot" src={image} alt={imageAlt ?? ''} loading="lazy" decoding="async" />
+      ) : null}
+      <div className="card-title">{kicker ?? title}</div>
       <p className="sub">{description}</p>
       {play !== undefined ? (
         <div className="feature-peek">
