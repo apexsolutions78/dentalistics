@@ -12,17 +12,27 @@ export function SubscriptionPriceLine() {
     apiFetch<{ plans: PublicPlan[]; regions?: RegionalPrice[] }>('/api/public/plans')
       .then((res) => {
         if (cancelled) return;
+        const trial = res.plans.find((plan) => plan.id === 'trial');
         const usd = savedUsdRegion(res.regions ?? []);
         const cents = res.plans.find((plan) => plan.id === 'full')?.priceUsdCents ?? null;
-        if (usd !== null) {
-          setText(`${formatMinor(Number(usd.amountMinor), usd.currency)} per month after the trial`);
+        const price =
+          usd !== null
+            ? formatMinor(Number(usd.amountMinor), usd.currency)
+            : cents !== null && cents > 0
+              ? formatMinor(cents, 'USD')
+              : null;
+        const days = trial?.trialDays ?? null;
+        if (days !== null && price !== null) {
+          setText(
+            `${days}-day trial, then ${price} per month. ${trial?.limitations ?? ''}`.trim(),
+          );
           return;
         }
-        if (cents !== null && cents > 0) {
-          setText(`${formatMinor(cents, 'USD')} per month after the trial`);
+        if (days !== null) {
+          setText(`${days}-day trial. Contact us for monthly pricing.`);
           return;
         }
-        setText('Contact us for monthly pricing.');
+        setText('Contact us for the trial and monthly price.');
       })
       .catch(() => {
         if (!cancelled) setText('Contact us for monthly pricing.');

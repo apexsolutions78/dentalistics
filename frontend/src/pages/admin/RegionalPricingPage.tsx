@@ -3,7 +3,7 @@ import { apiFetch } from '../../lib/api';
 import { useApi } from '../../lib/useApi';
 import { useSubmit } from '../../lib/useAsync';
 import { majorTextToMinor, minorToMajorInput } from '../../lib/money';
-import type { RegionalPrice } from '../../lib/types';
+import type { PlanOffer, RegionalPrice } from '../../lib/types';
 import { PageHeader } from '../../components/PageHeader';
 import { FormField } from '../../components/FormField';
 import { Flash } from '../../components/Flash';
@@ -15,6 +15,8 @@ interface PriceResponse {
 
 export function RegionalPricingPage() {
   const { status, data, error, reload } = useApi<PriceResponse>('/api/admin/regional-prices');
+  const offerApi = useApi<{ offer: PlanOffer }>('/api/admin/plan-offer');
+  const [offerDraft, setOfferDraft] = useState<PlanOffer | null>(null);
   const { submit, saving, error: actionError, saved, clearFeedback } = useSubmit();
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [currencies, setCurrencies] = useState<Record<string, string>>({});
@@ -25,6 +27,36 @@ export function RegionalPricingPage() {
   const [formError, setFormError] = useState<string | null>(null);
 
   const regions = data?.regions ?? [];
+  const offer = offerDraft ?? offerApi.data?.offer ?? null;
+
+  function updateOffer(patch: Partial<PlanOffer>): void {
+    if (offer === null) return;
+    setOfferDraft({ ...offer, ...patch });
+    setFormError(null);
+  }
+
+  async function saveOffer(): Promise<void> {
+    if (offer === null) return;
+    if (!Number.isInteger(offer.trialDays) || offer.trialDays < 1 || offer.trialDays > 90) {
+      setFormError('Trial length must be a whole number from 1 to 90.');
+      return;
+    }
+    const payload = {
+      ...offer,
+      freeBullets: offer.freeBullets.map((line) => line.trim()).filter((line) => line !== ''),
+      fullBullets: offer.fullBullets.map((line) => line.trim()).filter((line) => line !== ''),
+    };
+    const res = await submit(() =>
+      apiFetch<{ offer: PlanOffer }>('/api/admin/plan-offer', {
+        method: 'PATCH',
+        body: payload,
+      }),
+    );
+    if (res !== null) {
+      setOfferDraft(null);
+      offerApi.reload();
+    }
+  }
 
   function amountDraft(region: RegionalPrice): string {
     return drafts[region.code] ?? minorToMajorInput(region.amountMinor);
@@ -91,8 +123,73 @@ export function RegionalPricingPage() {
     <div>
       <PageHeader
         title="Regional prices"
-        subtitle="Amounts the public pricing page and the bank-transfer form show. Placeholder rows are stand-ins for you to replace."
+        subtitle="The free-trial offer and the amounts the public pricing page and bank-transfer form show."
       />
+      {offer !== null ? (
+        <section className="card" style={{ marginBottom: 'var(--space-4)' }}>
+          <h2 className="card-title">Free trial and plan cards</h2>
+          <p className="text-muted">
+            New signups use this length. Clinics that already have a trial end date keep it. Use {'{days}'} in a
+            headline where the number of days should appear. The only enforced limit is that length: during the
+            trial every feature is included, and afterwards the clinic is read-only.
+          </p>
+          <FormField label="Free trial length (days)" htmlFor="offer-days" hint="Whole number from 1 to 90.">
+            <input
+              className="input"
+              id="offer-days"
+              inputMode="numeric"
+              value={String(offer.trialDays)}
+              onChange={(event) => updateOffer({ trialDays: Number(event.target.value) })}
+            />
+          </FormField>
+          <FormField label="Free trial limitations" htmlFor="offer-limits">
+            <textarea
+              className="input"
+              id="offer-limits"
+              rows={3}
+              value={offer.trialLimitations}
+              onChange={(event) => updateOffer({ trialLimitations: event.target.value })}
+            />
+          </FormField>
+          <FormField label="Free Plan headline" htmlFor="offer-free-headline">
+            <input
+              className="input"
+              id="offer-free-headline"
+              value={offer.freeHeadline}
+              onChange={(event) => updateOffer({ freeHeadline: event.target.value })}
+            />
+          </FormField>
+          <FormField label="Free Plan bullets" htmlFor="offer-free-bullets" hint="One short line each, up to 8.">
+            <textarea
+              className="input"
+              id="offer-free-bullets"
+              rows={4}
+              value={offer.freeBullets.join('\n')}
+              onChange={(event) => updateOffer({ freeBullets: event.target.value.split('\n') })}
+            />
+          </FormField>
+          <FormField label="Full Plan headline" htmlFor="offer-full-headline">
+            <input
+              className="input"
+              id="offer-full-headline"
+              value={offer.fullHeadline}
+              onChange={(event) => updateOffer({ fullHeadline: event.target.value })}
+            />
+          </FormField>
+          <FormField label="Full Plan bullets" htmlFor="offer-full-bullets" hint="One short line each, up to 8.">
+            <textarea
+              className="input"
+              id="offer-full-bullets"
+              rows={4}
+              value={offer.fullBullets.join('\n')}
+              onChange={(event) => updateOffer({ fullBullets: event.target.value.split('\n') })}
+            />
+          </FormField>
+          <button type="button" className="btn btn-primary" disabled={saving} onClick={() => void saveOffer()}>
+            {saving ? 'Saving…' : 'Save trial offer'}
+          </button>
+        </section>
+      ) : null}
       {saved ? <Flash kind="success" message="Price saved." onDismiss={clearFeedback} /> : null}
       {formError !== null ? <Flash kind="error" message={formError} onDismiss={() => setFormError(null)} /> : null}
       {actionError !== null ? <Flash kind="error" message={actionError} onDismiss={clearFeedback} /> : null}

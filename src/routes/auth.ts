@@ -17,7 +17,7 @@ import { buildClearCookie, buildSessionCookie, SESSION_TTL_HOURS } from '../http
 import type { Logger } from '../logger';
 import type { PasswordResetMailer } from '../mail/passwordResetMailer';
 import { requireAuth } from '../middleware/auth';
-import { TRIAL_DAYS } from '../plans';
+import { loadPlanOffer } from '../services/planOffer';
 import type { RateLimiter } from '../security/rateLimit';
 import { normalizeEmail, requirePassword, requireString } from '../validate';
 
@@ -207,10 +207,11 @@ export function createAuthRouter(deps: AuthRouterDeps): Router {
     }
 
     const passwordHash = await hashPassword(password);
+    const offer = await loadPlanOffer(deps.db, deps.logger);
     const [orgResult] = await deps.db.query<ResultSetHeader>(
       `INSERT INTO organizations (name, plan, trial_ends_at)
        VALUES (?, 'trial', DATE_ADD(UTC_TIMESTAMP(), INTERVAL ? DAY))`,
-      [clinicName, TRIAL_DAYS],
+      [clinicName, offer.trialDays],
     );
     const organizationId = orgResult.insertId;
 

@@ -16,6 +16,7 @@ import {
   updateRegionalPrice,
 } from '../services/regionalPrices';
 import { listManualPaymentMethods, updateManualPaymentMethod } from '../services/manualPayments';
+import { loadPlanOffer, savePlanOffer } from '../services/planOffer';
 import { closeSetupHelp, listSetupHelp } from '../services/setupHelp';
 import { parsePathId, requireString } from '../validate';
 
@@ -33,6 +34,24 @@ interface ReceiptRow extends RowDataPacket {
 
 export function createPlatformAdminRouter(deps: PlatformAdminDeps): Router {
   const router = Router();
+
+  router.get('/plan-offer', async (_req: Request, res: Response) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.status(200).json({ offer: await loadPlanOffer(deps.db, deps.logger) });
+  });
+
+  router.patch('/plan-offer', async (req: Request, res: Response) => {
+    const offer = await savePlanOffer(deps.db, readJsonBody(req));
+    const actor = req.user as SessionUser;
+    await recordAudit(deps.db, deps.logger, {
+      organizationId: null,
+      userId: actor.id,
+      action: 'plan_offer_updated',
+      detail: `trialDays=${offer.trialDays}`,
+    });
+    res.setHeader('Cache-Control', 'no-store');
+    res.status(200).json({ offer });
+  });
 
   router.get('/regional-prices', async (_req: Request, res: Response) => {
     res.status(200).json({ regions: await listRegionalPrices(deps.db) });

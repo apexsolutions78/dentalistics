@@ -38,7 +38,7 @@ describe('MarketingPage', () => {
     );
     expect(await screen.findByText('Free Plan')).toBeInTheDocument();
     expect(screen.getByText('$0')).toBeInTheDocument();
-    expect(screen.getByText('14-day free trial with every feature')).toBeInTheDocument();
+    expect(screen.getByText('12-day free trial with every feature')).toBeInTheDocument();
     expect(screen.getByText('Full access to every feature, billed monthly')).toBeInTheDocument();
     expect(await screen.findByText('Full Plan')).toBeInTheDocument();
     expect(screen.getByText('$45')).toBeInTheDocument();

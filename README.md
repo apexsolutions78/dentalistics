@@ -125,7 +125,7 @@ was already writing UTC. Details are in `src/db/localTimestamps.ts`.
 
 Subscription grace defaults to 3 days (`BILLING_GRACE_DAYS`). Renewal
 notices start 7 days before `paid_until` (`BILLING_RENEWAL_NOTICE_DAYS`).
-New signups get a 14-day trial (`TRIAL_DAYS`). Clinics that already have
+New signups get the trial length saved under Platform → Pricing. The seed is 8 days. Clinics that already have
 a trial end date keep it. Every displayed and charged Full Plan amount
 comes from the saved regional prices (Platform → Pricing). The United
 States row, in USD, is required and is the default. If that row is

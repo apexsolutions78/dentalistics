@@ -99,6 +99,7 @@ export const LOCAL_WALL_CLOCK_COLUMNS: readonly TimestampColumn[] = [
   { table: 'patient_tooth_history', column: 'created_at' },
   { table: 'treatment_plan_items', column: 'created_at' },
   { table: 'treatment_plan_items', column: 'updated_at' },
+  { table: 'plan_offer', column: 'updated_at' },
 ];
 
 export const EQUAL_CREATED_AT_COLUMNS: readonly TimestampColumn[] = [

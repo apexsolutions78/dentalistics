@@ -6,7 +6,9 @@
 
 **Governing protocol:** `CLAUDE.md` — MASTER_AI_RELIABILITY_PROTOCOL v1.0. This document is structured to its `<PROJECT_STATE>` durable-state categories.
 
-**Last updated:** 2026-11-05 (revision 89)
+**Last updated:** 2026-11-05 (revision 90)
+
+**Trial offer (revision 90, CONFIRMED executed, not deployed):** Platform → Pricing stores the free-trial length (seed 8, allowed 1–90), the limitation text, and the Free Plan and Full Plan headlines and bullets. New signups and the public plans response read that row. Existing `organizations.trial_ends_at` values are not rewritten. Migration `0027_plan_offer.sql`. Not deployed.
 
 **Public pricing source (revision 89, CONFIRMED executed, not deployed):** Saved regional prices are the only subscription amount. The United States USD row is required and is the default. Landing, signup, onboarding, billing, bank transfer, and card checkout read it. `GET /api/public/plans` and the billing summary send `Cache-Control: no-store`, and the browser fetch uses `cache: 'no-store'`. If that USD row is missing, pages say Contact us, a warning is logged, and checkout is refused. Not deployed.
 

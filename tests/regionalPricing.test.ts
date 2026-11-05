@@ -1,34 +1,65 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { ValidationError } from '../src/errors';
 import { createPaymentGateway } from '../src/payments/registry';
 import { DEFAULT_PAYMENT_GATEWAY_CONFIG } from '../src/payments/gatewayConfig';
-import { TRIAL_DAYS, PLANS, plansForPublic } from '../src/plans';
+import { PLANS, plansForPublic } from '../src/plans';
+import { parseTrialDays } from '../src/services/planOffer';
 import { majorToMinor } from '../src/pricing/money';
 import { classifyImportRows, parseCsv, PATIENT_IMPORT_TEMPLATE } from '../src/services/patientImport';
 
+const sampleOffer = {
+  trialDays: 12,
+  trialLimitations: 'Read-only after the trial ends.',
+  freeHeadline: '{days}-day free trial with every feature',
+  freeBullets: ['Every feature'],
+  fullHeadline: 'Full access, billed monthly',
+  fullBullets: ['Paid monthly'],
+};
+
 describe('trial length', () => {
-  it('keeps 14 days for new signups and does not compile a full-plan price', () => {
-    expect(TRIAL_DAYS).toBe(14);
+  it('does not compile a trial length or a full-plan price', () => {
     const trial = PLANS.find((plan) => plan.id === 'trial');
     const full = PLANS.find((plan) => plan.id === 'full');
-    expect(trial?.trialDays).toBe(14);
+    expect(trial?.trialDays).toBeNull();
+    expect(trial?.headline).toBe('');
     expect(full?.priceUsdCents).toBeNull();
   });
 
-  it('uses the saved USD row and returns no price when that row is missing', () => {
-    const live = plansForPublic([
-      { code: 'us', currency: 'USD', amountMinor: 4500 },
-      { code: 'pk', currency: 'PKR', amountMinor: 700000 },
-    ]);
+  it('builds the public cards from the saved offer and the saved USD price', () => {
+    const live = plansForPublic(
+      [
+        { code: 'us', currency: 'USD', amountMinor: 4500 },
+        { code: 'pk', currency: 'PKR', amountMinor: 700000 },
+      ],
+      sampleOffer,
+    );
     expect(live.find((plan) => plan.id === 'full')?.priceUsdCents).toBe(4500);
-    expect(live.find((plan) => plan.id === 'trial')?.priceUsdCents).toBe(0);
+    expect(live.find((plan) => plan.id === 'trial')).toMatchObject({
+      trialDays: 12,
+      headline: '12-day free trial with every feature',
+      limitations: 'Read-only after the trial ends.',
+    });
 
-    const missing = plansForPublic([{ code: 'pk', currency: 'PKR', amountMinor: 700000 }]);
+    const missing = plansForPublic([{ code: 'pk', currency: 'PKR', amountMinor: 700000 }], sampleOffer);
     expect(missing.find((plan) => plan.id === 'full')?.priceUsdCents).toBeNull();
 
-    const invalid = plansForPublic([{ code: 'us', currency: 'USD', amountMinor: 0 }]);
+    const invalid = plansForPublic([{ code: 'us', currency: 'USD', amountMinor: 0 }], sampleOffer);
     expect(invalid.find((plan) => plan.id === 'full')?.priceUsdCents).toBeNull();
+  });
+
+  it('accepts a trial length from 1 to 90 days', () => {
+    expect(parseTrialDays(1)).toBe(1);
+    expect(parseTrialDays(90)).toBe(90);
+    expect(() => parseTrialDays(0)).toThrow(ValidationError);
+    expect(() => parseTrialDays(91)).toThrow(ValidationError);
+  });
+
+  it('does not rewrite existing trial end dates when saving the plan offer', () => {
+    const sql = fs.readFileSync(path.join(process.cwd(), 'migrations', '0027_plan_offer.sql'), 'utf8');
+    expect(sql).not.toMatch(/UPDATE\s+organizations/i);
+    expect(sql).not.toMatch(/INSERT\s+INTO\s+organizations/i);
   });
 
   it('does not rewrite existing trial end dates in the new migration', () => {

@@ -44,6 +44,17 @@ export interface PublicPlan {
   priceUsdCents: number | null;
   interval: 'trial' | 'month';
   trialDays: number | null;
+  limitations?: string | null;
+  bullets?: string[];
+}
+
+export interface PlanOffer {
+  trialDays: number;
+  trialLimitations: string;
+  freeHeadline: string;
+  freeBullets: string[];
+  fullHeadline: string;
+  fullBullets: string[];
 }
 
 export interface RegionalPrice {
