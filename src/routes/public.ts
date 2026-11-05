@@ -7,6 +7,7 @@ import { AppError } from '../errors';
 import { readJsonBody } from '../http/body';
 import type { Logger } from '../logger';
 import { plansForPublic } from '../plans';
+import { loadPlanOffer } from '../services/planOffer';
 import { listRegionalPrices } from '../services/regionalPrices';
 import type { RateLimiter } from '../security/rateLimit';
 import { createPublicLead } from '../services/leads';
@@ -47,7 +48,8 @@ export function createPublicRouter(deps: PublicRouterDeps): Router {
       amountMinor: Number(region.amountMinor),
       placeholder: region.placeholder,
     }));
-    const plans = plansForPublic(published);
+    const offer = await loadPlanOffer(deps.db, deps.logger);
+    const plans = plansForPublic(published, offer);
     const full = plans.find((plan) => plan.id === 'full');
     if (full?.priceUsdCents === null) {
       deps.logger.warn('usd subscription price is not saved', { region: 'us' });

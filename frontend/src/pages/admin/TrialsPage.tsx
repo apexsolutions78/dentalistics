@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { apiFetch, errorMessage } from '../../lib/api';
 import { useApi } from '../../lib/useApi';
 import { formatDate } from '../../lib/format';
-import type { TrialRow } from '../../lib/types';
+import type { PlanOffer, TrialRow } from '../../lib/types';
 import { PageHeader } from '../../components/PageHeader';
 import { ErrorState, LoadingState, EmptyState, StatusBadge } from '../../components/states';
 
@@ -14,6 +14,7 @@ function isExpired(row: TrialRow): boolean {
 
 export function TrialsPage() {
   const { status, data, error, reload } = useApi<{ trials: TrialRow[] }>('/api/admin/trials');
+  const offer = useApi<{ offer: PlanOffer }>('/api/admin/plan-offer');
   const trials = data?.trials ?? [];
   const [activating, setActivating] = useState<number | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -38,7 +39,11 @@ export function TrialsPage() {
     <div>
       <PageHeader
         title="Trial clinics"
-        subtitle="Self-serve signups on the free plan and their activation state"
+        subtitle={
+          offer.data?.offer
+            ? `New signups get ${offer.data.offer.trialDays} days. ${offer.data.offer.trialLimitations}`
+            : 'Self-serve signups on the free plan and their activation state'
+        }
         actions={
           <button type="button" className="btn btn-secondary" onClick={reload}>
             Refresh

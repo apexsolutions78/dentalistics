@@ -122,7 +122,7 @@ describe.skipIf(testHost === undefined || testHost === '')(
         name: 'Free Plan',
         priceUsdCents: 0,
         interval: 'trial',
-        trialDays: 14,
+        trialDays: 8,
       });
 
       const full = plans.find((p) => p.id === 'full');
@@ -137,7 +137,88 @@ describe.skipIf(testHost === undefined || testHost === '')(
       );
     });
 
-    it('signs up a clinic owner, starts the 14-day trial, and logs them in', async () => {
+    it('applies a saved trial length to the landing page and the next signup only', async () => {
+      const adminPassword = 'OfferAdminPassw0rd!26';
+      const adminHash = await hashPassword(adminPassword);
+      await pool.query(
+        'INSERT INTO users (organization_id, email, password_hash, role) VALUES (NULL, ?, ?, ?)',
+        ['offer.admin@apextest.local', adminHash, 'admin'],
+      );
+      const [kept] = await pool.query<mysql.ResultSetHeader>(
+        `INSERT INTO organizations (name, plan, trial_ends_at)
+         VALUES ('Signup Test Kept', 'trial', '2030-01-15 00:00:00')`,
+      );
+      const adminLogin = await request(app).post('/api/auth/login').send({
+        email: 'offer.admin@apextest.local',
+        password: adminPassword,
+      });
+      expect(adminLogin.status).toBe(200);
+      const adminCookie = `sid=${sidFrom(adminLogin)}`;
+      const current = await request(app).get('/api/admin/plan-offer').set('Cookie', adminCookie);
+      expect(current.status).toBe(200);
+      const original = current.body.offer as Record<string, unknown>;
+
+      const ownerLogin = await request(app).post('/api/auth/login').send({
+        email: duplicateEmail,
+        password: signupPassword,
+      });
+      expect(ownerLogin.status).toBe(200);
+      const denied = await request(app)
+        .patch('/api/admin/plan-offer')
+        .set('Cookie', `sid=${sidFrom(ownerLogin)}`)
+        .send({ ...original, trialDays: 21 });
+      expect(denied.status).toBe(403);
+
+      const saved = await request(app)
+        .patch('/api/admin/plan-offer')
+        .set('Cookie', adminCookie)
+        .send({
+          ...original,
+          trialDays: 21,
+          trialLimitations: 'Sample limitation for the offer test.',
+        });
+      expect(saved.status).toBe(200);
+
+      try {
+        const plans = await request(app).get('/api/public/plans');
+        expect(plans.headers['cache-control']).toBe('no-store');
+        const trial = (plans.body.plans as Array<Record<string, unknown>>).find((plan) => plan.id === 'trial');
+        expect(trial).toMatchObject({
+          trialDays: 21,
+          headline: '21-day free trial with every feature',
+          limitations: 'Sample limitation for the offer test.',
+        });
+
+        const signup = await request(app).post('/api/auth/signup').send({
+          clinicName: 'Signup Test Offer',
+          email: 'owner.offer.signup@apextest.local',
+          password: signupPassword,
+        });
+        expect(signup.status).toBe(201);
+        const [created] = await pool.query<mysql.RowDataPacket[]>(
+          `SELECT TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), trial_ends_at) AS trial_secs
+           FROM organizations WHERE id = ?`,
+          [signup.body.user.organizationId],
+        );
+        expect(created[0]?.trial_secs).toBeGreaterThan(21 * 86400 - 3600);
+        expect(created[0]?.trial_secs).toBeLessThan(21 * 86400 + 3600);
+
+        const [keptRows] = await pool.query<mysql.RowDataPacket[]>(
+          `SELECT DATE_FORMAT(trial_ends_at, '%Y-%m-%d %H:%i:%s') AS trial_ends_at
+           FROM organizations WHERE id = ?`,
+          [kept.insertId],
+        );
+        expect(keptRows[0]?.trial_ends_at).toBe('2030-01-15 00:00:00');
+      } finally {
+        await request(app).patch('/api/admin/plan-offer').set('Cookie', adminCookie).send(original);
+        await pool.query('DELETE FROM sessions WHERE user_id IN (SELECT id FROM users WHERE email = ?)', [
+          'offer.admin@apextest.local',
+        ]);
+        await pool.query('DELETE FROM users WHERE email = ?', ['offer.admin@apextest.local']);
+      }
+    });
+
+    it('signs up a clinic owner, starts the 8-day trial, and logs them in', async () => {
       const res = await request(app).post('/api/auth/signup').send({
         clinicName: 'Signup Test Dental',
         email: signupEmail,
@@ -165,8 +246,8 @@ describe.skipIf(testHost === undefined || testHost === '')(
       );
       const org = orgRows[0];
       expect(org?.plan).toBe('trial');
-      expect(org?.trial_secs).toBeGreaterThan(14 * 86400 - 3600);
-      expect(org?.trial_secs).toBeLessThan(14 * 86400 + 3600);
+      expect(org?.trial_secs).toBeGreaterThan(8 * 86400 - 3600);
+      expect(org?.trial_secs).toBeLessThan(8 * 86400 + 3600);
 
       const [userRows] = await pool.query<mysql.RowDataPacket[]>(
         `SELECT role, organization_id, last_login_at FROM users WHERE email = ?`,

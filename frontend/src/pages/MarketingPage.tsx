@@ -217,6 +217,14 @@ export function MarketingPage() {
                       {plan.interval === 'month' && amount !== 'Contact us' ? <span>/month</span> : null}
                     </div>
                     <p className="sub">{plan.headline}</p>
+                    {plan.limitations ? <p className="sub">{plan.limitations}</p> : null}
+                    {plan.bullets !== undefined && plan.bullets.length > 0 ? (
+                      <ul>
+                        {plan.bullets.map((bullet) => (
+                          <li key={bullet}>{bullet}</li>
+                        ))}
+                      </ul>
+                    ) : null}
                     {shown?.placeholder ? (
                       <p className="placeholder-note">
                         Placeholder amount — the operator still needs to set this price.

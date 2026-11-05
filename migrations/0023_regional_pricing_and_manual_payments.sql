@@ -1,6 +1,6 @@
 -- Regional prices, manual payment review, patient import, and setup-help requests.
 --
--- Trial length for new signups is TRIAL_DAYS in src/plans.ts (14).
+-- Trial length for new signups is the saved plan_offer row, not this file.
 -- This migration does not read or write organizations.trial_ends_at.
 -- Clinics that already have a trial end date keep that date.
 --

@@ -1,5 +1,4 @@
 /** New signups only. Existing organizations.trial_ends_at values are not rewritten. */
-export const TRIAL_DAYS = 14;
 
 export interface PublicPlan {
   id: 'trial' | 'full';
@@ -9,6 +8,17 @@ export interface PublicPlan {
   priceUsdCents: number | null;
   interval: 'trial' | 'month';
   trialDays: number | null;
+  limitations: string | null;
+  bullets: string[];
+}
+
+export interface PublicPlanOffer {
+  trialDays: number;
+  trialLimitations: string;
+  freeHeadline: string;
+  freeBullets: string[];
+  fullHeadline: string;
+  fullBullets: string[];
 }
 
 export const DEFAULT_PRICE_REGION = 'us';
@@ -18,20 +28,28 @@ export const PLANS: readonly PublicPlan[] = [
   {
     id: 'trial',
     name: 'Free Plan',
-    headline: '14-day free trial with every feature',
+    headline: '',
     priceUsdCents: 0,
     interval: 'trial',
-    trialDays: TRIAL_DAYS,
+    trialDays: null,
+    limitations: null,
+    bullets: [],
   },
   {
     id: 'full',
     name: 'Full Plan',
-    headline: 'Full access to every feature, billed monthly',
+    headline: '',
     priceUsdCents: null,
     interval: 'month',
     trialDays: null,
+    limitations: null,
+    bullets: [],
   },
 ] as const;
+
+export function renderPlanHeadline(template: string, trialDays: number): string {
+  return template.replaceAll('{days}', String(trialDays));
+}
 
 export function savedUsdMinor(
   regions: readonly { code: string; currency: string; amountMinor: number }[],
@@ -48,9 +66,24 @@ export function savedUsdMinor(
 
 export function plansForPublic(
   regions: readonly { code: string; currency: string; amountMinor: number }[],
+  offer: PublicPlanOffer,
 ): PublicPlan[] {
   const priceUsdCents = savedUsdMinor(regions);
-  return PLANS.map((plan) =>
-    plan.id === 'full' ? { ...plan, priceUsdCents } : { ...plan },
-  );
+  return PLANS.map((plan) => {
+    if (plan.id === 'trial') {
+      return {
+        ...plan,
+        headline: renderPlanHeadline(offer.freeHeadline, offer.trialDays),
+        trialDays: offer.trialDays,
+        limitations: offer.trialLimitations,
+        bullets: [...offer.freeBullets],
+      };
+    }
+    return {
+      ...plan,
+      headline: offer.fullHeadline,
+      priceUsdCents,
+      bullets: [...offer.fullBullets],
+    };
+  });
 }
