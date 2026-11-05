@@ -6,7 +6,9 @@
 
 **Governing protocol:** `CLAUDE.md` — MASTER_AI_RELIABILITY_PROTOCOL v1.0. This document is structured to its `<PROJECT_STATE>` durable-state categories.
 
-**Last updated:** 2026-11-05 (revision 90)
+**Last updated:** 2026-11-05 (revision 91)
+
+**Appearance (revision 91, CONFIRMED executed, not deployed):** The header and `/profile` offer Light, Dark, or System. The choice is stored in `localStorage` (`dentalistics.theme`) and on `users.theme`. Migration `0028_user_theme.sql` adds that column with default `system`. Another branch may take 0028 first; renumber at merge if so. Dark mode uses the existing CSS variables, including tables, forms, dialogs, the drawer, and the tooth chart. Text pairs in both themes meet WCAG AA (4.5:1). The public landing page keeps its light colors. Not deployed.
 
 **Trial offer (revision 90, CONFIRMED executed, not deployed):** Platform → Pricing stores the free-trial length (seed 8, allowed 1–90), the limitation text, and the Free Plan and Full Plan headlines and bullets. New signups and the public plans response read that row. Existing `organizations.trial_ends_at` values are not rewritten. Migration `0027_plan_offer.sql`. Not deployed.
 

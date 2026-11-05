@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import type { Pool, RowDataPacket } from 'mysql2/promise';
 import { SESSION_TTL_HOURS } from '../http/cookies';
+import type { ThemeChoice } from '../theme';
 
 export interface SessionUser {
   id: number;
@@ -9,6 +10,7 @@ export interface SessionUser {
   organizationId: number | null;
   displayName: string | null;
   phone: string | null;
+  theme: ThemeChoice;
 }
 
 interface SessionRow extends RowDataPacket {
@@ -16,6 +18,7 @@ interface SessionRow extends RowDataPacket {
   email: string;
   display_name: string | null;
   phone: string | null;
+  theme: ThemeChoice;
   role: SessionUser['role'];
   organization_id: number | null;
   user_status: 'active' | 'disabled';
@@ -42,7 +45,7 @@ export async function getSessionUser(db: Pool, token: string): Promise<SessionUs
     return null;
   }
   const [rows] = await db.query<SessionRow[]>(
-    `SELECT s.user_id, s.expires_at, u.email, u.display_name, u.phone, u.role, u.organization_id, u.status AS user_status
+    `SELECT s.user_id, s.expires_at, u.email, u.display_name, u.phone, u.theme, u.role, u.organization_id, u.status AS user_status
      FROM sessions s
      JOIN users u ON u.id = s.user_id
      WHERE s.token_hash = ?`,
@@ -66,6 +69,7 @@ export async function getSessionUser(db: Pool, token: string): Promise<SessionUs
     organizationId: row.organization_id,
     displayName: row.display_name,
     phone: row.phone,
+    theme: row.theme,
   };
 }
 

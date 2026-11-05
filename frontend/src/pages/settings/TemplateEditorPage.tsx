@@ -214,7 +214,7 @@ export function TemplateEditorPage() {
                   <div className="preview-box">{preview.rendered || '(empty)'}</div>
                   {preview.unknownVariables.length > 0 ? (
                     <div style={{ marginTop: 'var(--space-3)' }}>
-                      <div className="hint" style={{ color: 'var(--color-danger)', marginBottom: 'var(--space-1)' }}>
+                      <div className="hint" style={{ color: 'var(--color-danger-text)', marginBottom: 'var(--space-1)' }}>
                         Unknown variables (not replaced when sent):
                       </div>
                       <div className="var-list">

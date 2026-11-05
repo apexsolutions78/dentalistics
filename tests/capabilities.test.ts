@@ -12,6 +12,7 @@ function sessionUser(role: SessionUser['role']): SessionUser {
     organizationId: 1,
     displayName: null,
     phone: null,
+    theme: 'system',
   };
 }
 

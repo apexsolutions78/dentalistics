@@ -7,6 +7,7 @@ export interface SessionUser {
   organizationId: number | null;
   displayName?: string | null;
   phone?: string | null;
+  theme?: 'light' | 'dark' | 'system';
 }
 
 export type BillingPhase =

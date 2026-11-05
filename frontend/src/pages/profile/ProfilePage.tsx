@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Flash } from '../../components/Flash';
+import { ThemePicker } from '../../components/ThemePicker';
 import { FormField } from '../../components/FormField';
 import { PageHeader } from '../../components/PageHeader';
 import { LoadingState } from '../../components/states';
@@ -177,6 +178,11 @@ export function ProfilePage() {
       />
       {loadError !== null ? <Flash kind="error" message={loadError} onDismiss={() => setLoadError(null)} /> : null}
       {profile === null && loadError === null ? <LoadingState label="Loading your profile…" /> : null}
+      <section className="card">
+        <h2 className="card-title">Appearance</h2>
+        <p className="page-subtitle">Light, dark, or match this device. Saved on this browser and on your account.</p>
+        <ThemePicker />
+      </section>
       {account !== null ? (
         <section className="card">
           <h2 className="card-title">Your account</h2>
