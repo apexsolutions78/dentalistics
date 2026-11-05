@@ -478,6 +478,10 @@ a {
   gap: var(--space-3);
 }
 
+.automation-flow-grid > .card {
+  margin-bottom: 0;
+}
+
 .category-card {
   display: block;
   padding: var(--space-3);
