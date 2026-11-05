@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import logoBlue from '../assets/apex-logo-blue.png';
+import heroClinic from '../assets/marketing/hero-clinic.webp';
 import leadsShot from '../assets/marketing/leads.png';
 import recallShot from '../assets/marketing/recall.png';
 import automationsShot from '../assets/marketing/automations.png';
@@ -13,30 +14,34 @@ import type { PublicPlan, RegionalPrice } from '../lib/types';
 import { LoadingState } from '../components/states';
 import { FeatureGrid, FeaturePlayground, VisitorWelcome } from '../components/playground/FeaturePlayground';
 
-const DIFFERENTIATORS: Array<{ title: string; body: string; image: string; alt: string }> = [
+const SHOWCASE: Array<{ title: string; kicker: string; description: string; image: string; imageAlt: string }> = [
   {
-    title: 'Leads',
-    body: 'Website enquiries, missed calls, and walk-ins land in one list, with urgency and the next open slot beside the name.',
+    title: 'Lead capture',
+    kicker: 'Leads',
+    description: 'Website enquiries, manual calls, and patient messages.',
     image: leadsShot,
-    alt: 'Leads page in Dentalistics showing sample enquiries',
+    imageAlt: 'Leads page in Dentalistics showing sample enquiries',
   },
   {
-    title: 'Recall',
-    body: 'Hygiene and treatment follow-ups open on their own after a completed visit and stay visible until the patient rebooks.',
+    title: 'Recall automation',
+    kicker: 'Recall',
+    description: 'Hygiene and treatment follow-ups open on their own after a visit.',
     image: recallShot,
-    alt: 'Recall page in Dentalistics showing a sample hygiene recall',
+    imageAlt: 'Recall page in Dentalistics showing a sample hygiene recall',
   },
   {
-    title: 'Automations',
-    body: 'Reminders, no-show recovery, recall, and review requests run on the clinic’s schedule. Staff see what was sent.',
+    title: 'Appointment reminders',
+    kicker: 'Automations',
+    description: 'Reminders, no-show recovery, recall requests and reviewing.',
     image: automationsShot,
-    alt: 'Automations page in Dentalistics showing reminder, recall, and review jobs',
+    imageAlt: 'Automations page in Dentalistics showing reminder, recall, and review jobs',
   },
   {
-    title: 'Reviews',
-    body: 'Every eligible patient gets the same review request. There is no filter that sends the link only to happy patients.',
+    title: 'Review requests',
+    kicker: 'Reviews',
+    description: 'Every eligible patient gets the same review request, no filter to happy patients.',
     image: reviewsShot,
-    alt: 'Review settings in Dentalistics for the post-visit review request',
+    imageAlt: 'Review settings in Dentalistics for the post-visit review request',
   },
 ];
 
@@ -135,10 +140,10 @@ export function MarketingPage() {
       <header className="marketing-header">
         <img className="brand-logo" src={logoBlue} alt="Apex Dentalistics" />
         <nav className="marketing-nav">
-          <Link to="/login" className="btn btn-ghost">
+          <Link to="/login" className="marketing-signin">
             Sign in
           </Link>
-          <Link to="/signup" className="btn btn-primary">
+          <Link to="/signup" className="btn marketing-cta">
             Start free trial
           </Link>
         </nav>
@@ -147,41 +152,50 @@ export function MarketingPage() {
       <section className="marketing-hero">
         <VisitorWelcome />
         <div className="hero-copy">
-          <h1>Run your dental clinic from one place</h1>
+          <h1>Every front-desk task, solved in one simple workspace.</h1>
           <p className="sub">
-            Leads, appointments, recalls, and patient messages in a single workspace built for
-            dental practices.
+            Connect instant automatic replies, appointment booking, and recall reminders into one
+            effortless dashboard.
           </p>
-          <Link to="/signup" className="btn btn-primary">
+          <Link to="/signup" className="btn marketing-cta">
             Start your free trial
           </Link>
         </div>
-        <FeaturePlayground />
-      </section>
-
-      <section className="marketing-features" aria-label="Features">
-        <h2>Everything your clinic needs</h2>
-        <FeatureGrid features={FEATURES} />
-      </section>
-
-      <section className="marketing-diff" aria-label="What sets Dentalistics apart">
-        <h2>What sets Dentalistics apart</h2>
-        <p className="sub">
-          Leads, recall, automations, and reviews are the parts clinics usually bolt on later. They are
-          in the product from the first day. These are screens from the app, filled with sample records.
-        </p>
-        <div className="marketing-diff-grid">
-          {DIFFERENTIATORS.map((item) => (
-            <article className="card marketing-diff-card" key={item.title}>
-              <img src={item.image} alt={item.alt} />
-              <h3>{item.title}</h3>
-              <p>{item.body}</p>
-            </article>
-          ))}
+        <div className="hero-visual">
+          <img
+            className="hero-photo"
+            src={heroClinic}
+            alt="A dentist and a dental assistant reviewing a tablet together in a bright clinic"
+            width={1280}
+            height={720}
+            sizes="(max-width: 860px) 100vw, 58vw"
+            fetchPriority="high"
+            decoding="async"
+          />
+          <div className="hero-preview">
+            <span className="hero-float hero-float-calendar" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2" /><path d="M8 3.5V7M16 3.5V7M4 10h16" /></svg>
+            </span>
+            <span className="hero-float hero-float-tooth" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M12 3c2.2 0 3.4 1.6 3.6 3.2.2 1.4-.2 2.4.4 3.6.7 1.4 2 2.2 2 4.2 0 2.6-1.6 6-3.2 6-.9 0-1.4-1.2-2.8-1.2S9.1 20 8.2 20C6.6 20 5 16.6 5 14c0-2 1.3-2.8 2-4.2.6-1.2.2-2.2.4-3.6C7.6 4.6 8.8 3 12 3z" /></svg>
+            </span>
+            <span className="hero-float hero-float-chat" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M5 6h14v9H8l-3 3z" /></svg>
+            </span>
+            <span className="hero-float hero-float-note" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M6 4h9l4 4v12H6z" /><path d="M14 4v5h5" /></svg>
+            </span>
+            <FeaturePlayground />
+          </div>
         </div>
       </section>
 
-      <section className="marketing-pricing" aria-label="Pricing">
+      <section className="marketing-showcase" aria-label="What sets Dentalistics apart">
+        <div className="marketing-diff">
+          <h2>What sets Dentalistics apart</h2>
+          <FeatureGrid features={SHOWCASE} />
+        </div>
+        <section className="marketing-pricing" aria-label="Pricing">
         <h2>Simple pricing</h2>
         {plansFailed ? (
           <p className="sub">Pricing is unavailable right now. Please try again later.</p>
@@ -210,7 +224,7 @@ export function MarketingPage() {
                 const shown = plan.id === 'full' ? priceForVisitor(regions, selected?.code ?? regionCode) : null;
                 const amount = fullPlanAmount(plan, regions, selected?.code ?? regionCode);
                 return (
-                  <div className="card marketing-plan" key={plan.id}>
+                  <div className={plan.id === 'full' ? 'card marketing-plan is-featured' : 'card marketing-plan'} key={plan.id}>
                     <div className="card-title">{plan.name}</div>
                     <div className="marketing-price">
                       {amount}
@@ -230,7 +244,7 @@ export function MarketingPage() {
                         Placeholder amount — the operator still needs to set this price.
                       </p>
                     ) : null}
-                    <Link to="/signup" className="btn btn-primary" style={{ width: '100%' }}>
+                    <Link to="/signup" className="btn marketing-cta">
                       Start free trial
                     </Link>
                   </div>
@@ -239,6 +253,12 @@ export function MarketingPage() {
             </div>
           </>
         )}
+        </section>
+      </section>
+
+      <section className="marketing-features" aria-label="Features">
+        <h2>Everything your clinic needs</h2>
+        <FeatureGrid features={FEATURES} />
       </section>
 
       <footer className="marketing-footer">

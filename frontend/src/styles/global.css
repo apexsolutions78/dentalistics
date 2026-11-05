@@ -1569,7 +1569,34 @@ button:focus-visible,
   min-height: 100%;
   display: flex;
   flex-direction: column;
-  background: var(--color-bg);
+  background: #f7f4ef;
+  color: #2c0438;
+  overflow-x: clip;
+}
+
+.marketing-cta {
+  background: #0f9d8a;
+  color: #fff;
+  border: 0;
+  border-radius: 999px;
+  box-shadow: 0 8px 18px rgba(15, 157, 138, 0.22);
+}
+
+.marketing-cta:hover:not(:disabled) {
+  background: #0c8574;
+}
+
+.marketing-nav .marketing-cta {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 13px;
+}
+
+.marketing-signin {
+  color: #2c0438;
+  font-weight: 700;
+  text-decoration: none;
+  padding: 8px 10px;
 }
 
 .marketing-header {
@@ -1611,16 +1638,135 @@ button:focus-visible,
 }
 
 .marketing-hero {
+  position: relative;
   text-align: left;
-  padding: var(--space-6) var(--space-4);
-  max-width: 1100px;
+  padding: 28px 20px 56px;
+  max-width: 1180px;
   margin: 0 auto;
   width: 100%;
   display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(280px, 0.95fr);
-  gap: var(--space-5);
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 480px);
+  gap: 20px;
   align-items: center;
-  animation: fade-rise var(--dur-2) var(--ease) both;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.hero-visual {
+  position: relative;
+  min-width: 0;
+}
+
+.hero-photo {
+  width: 100%;
+  height: auto;
+  max-height: 440px;
+  display: block;
+  object-fit: cover;
+  border-radius: 20px;
+}
+
+.hero-visual::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 20px;
+  background: linear-gradient(90deg, #f7f4ef 0%, rgba(247, 244, 239, 0.55) 22%, rgba(247, 244, 239, 0) 48%);
+  pointer-events: none;
+}
+
+.hero-preview {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 400px);
+  margin-top: -64px;
+  margin-left: 6%;
+}
+
+.hero-preview .feature-playground {
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(15, 157, 138, 0.28);
+  border-radius: 20px;
+  box-shadow: 0 18px 40px rgba(44, 4, 56, 0.12);
+  backdrop-filter: blur(12px);
+}
+
+.hero-float {
+  position: absolute;
+  z-index: 2;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: #fff;
+  color: #0f9d8a;
+  box-shadow: 0 8px 18px rgba(44, 4, 56, 0.12);
+}
+
+.hero-float svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.hero-float-calendar { top: -16px; right: 28px; }
+.hero-float-tooth { top: 28px; right: -14px; }
+.hero-float-chat { bottom: 18px; right: -8px; }
+.hero-float-note { top: 8px; left: -16px; }
+
+.marketing-showcase {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 8px 20px 40px;
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(240px, 0.72fr);
+  gap: 24px;
+  align-items: start;
+  min-width: 0;
+}
+
+.marketing-showcase .marketing-diff {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
+.marketing-showcase .marketing-feature-grid {
+  grid-template-columns: 1fr 1fr;
+}
+
+.marketing-showcase .marketing-pricing {
+  max-width: none;
+  margin: 0;
+  padding: 18px;
+  text-align: left;
+  background: #fff;
+  border-radius: 20px;
+  box-shadow: 0 12px 32px rgba(44, 4, 56, 0.08);
+}
+
+.marketing-showcase .marketing-plans {
+  grid-template-columns: 1fr 1fr;
+}
+
+.marketing-feature-shot {
+  width: 100%;
+  height: 88px;
+  object-fit: cover;
+  object-position: top;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+}
+
+.marketing-plan.is-featured {
+  border: 2px solid #0f9d8a;
+  background: #f3fbf9;
 }
 
 .marketing-hero h1 {
@@ -2131,15 +2277,17 @@ button:focus-visible,
 }
 
 .visitor-welcome {
-  grid-column: 1 / -1;
+  grid-column: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-card);
-  background: var(--color-ink);
-  color: #fff;
+  border-radius: 16px;
+  background: #fff;
+  color: #2c0438;
+  border: 1px solid rgba(44, 4, 56, 0.08);
+  box-shadow: 0 8px 20px rgba(44, 4, 56, 0.06);
   animation: pop-in var(--dur-2) var(--ease-bounce) both;
 }
 
@@ -2349,9 +2497,38 @@ button:focus-visible,
 
 @media (max-width: 860px) {
   .marketing-hero,
+  .marketing-showcase,
   .auth-stage,
   .signup-layout {
     grid-template-columns: 1fr;
+  }
+
+  .hero-preview {
+    width: 100%;
+    margin-left: 0;
+    margin-top: 16px;
+  }
+
+  .hero-float-tooth,
+  .hero-float-chat,
+  .hero-float-note {
+    display: none;
+  }
+
+  .marketing-showcase .marketing-feature-grid,
+  .marketing-showcase .marketing-plans {
+    grid-template-columns: 1fr;
+  }
+
+  .marketing-header {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .marketing-header .brand-logo,
+  .marketing-nav {
+    grid-column: auto;
   }
 
   .login-aside {
