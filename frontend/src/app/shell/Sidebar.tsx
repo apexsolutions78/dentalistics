@@ -125,6 +125,13 @@ function GlyphShape({ label }: { label: string }) {
       );
     case 'Trials':
       return <path d="M6 4h12v16l-6-3-6 3z" />;
+    case 'Profile':
+      return (
+        <>
+          <circle cx="12" cy="8" r="3" />
+          <path d="M5.5 19c1-3.2 3.2-4.8 6.5-4.8s5.5 1.6 6.5 4.8" />
+        </>
+      );
     default:
       return <circle cx="12" cy="12" r="3" />;
   }
@@ -231,7 +238,7 @@ export function Sidebar({
           </button>
         </div>
       ) : null}
-      <AccountMenu placement="drawer" />
+      <AccountMenu />
       <div className="sidebar-scroll">
       {hasClinic ? (
       <div className="nav-group">
@@ -284,6 +291,11 @@ export function Sidebar({
           </ul>
         </div>
       ) : null}
+      <div className="nav-group">
+        <ul className="nav-list" aria-label="Account">
+          <NavLinkItem link={{ to: '/profile', label: 'Profile' }} />
+        </ul>
+      </div>
       </div>
       <DrawerSignOut />
     </nav>

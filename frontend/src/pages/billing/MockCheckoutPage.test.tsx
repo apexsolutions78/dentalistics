@@ -45,7 +45,7 @@ const statusResult = {
   payment: {
     orderId: 'abc123',
     status: 'paid',
-    amountUsdCents: 2000,
+    amountUsdCents: 4500,
     currency: 'USD',
     provider: 'mock',
     checkoutUrl: null,

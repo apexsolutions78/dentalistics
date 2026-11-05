@@ -191,12 +191,32 @@ a {
   border: 0;
   border-radius: 0;
   min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.drawer-account:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+}
+
+.drawer-account:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+  border-radius: 8px;
 }
 
 .drawer-account-text {
   display: grid;
   min-width: 0;
-  flex: 1;
+  gap: 1px;
+}
+
+.drawer-name-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
 }
 
 .drawer-account .avatar {
@@ -204,17 +224,45 @@ a {
   height: 28px;
 }
 
-.drawer-account .account-email {
-  display: block;
+.account-name,
+.drawer-clinic {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-name {
   color: #fff;
   font-weight: 700;
 }
 
-.drawer-role {
+.drawer-clinic {
   color: var(--color-sidebar-text-dim);
   font-size: var(--fs-small);
   line-height: 1.3;
+}
+
+.drawer-role {
+  flex: none;
+  padding: 0 6px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--color-sidebar-text);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
   text-transform: capitalize;
+}
+
+.profile-page {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.profile-page .card {
+  min-width: 0;
 }
 
 .drawer-scroll {

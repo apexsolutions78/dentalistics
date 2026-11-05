@@ -6,18 +6,12 @@ import recallShot from '../assets/marketing/recall.png';
 import automationsShot from '../assets/marketing/automations.png';
 import reviewsShot from '../assets/marketing/reviews.png';
 import { apiFetch } from '../lib/api';
-import { formatMinor } from '../lib/money';
+import { fullPlanAmount, priceForVisitor } from '../lib/subscriptionPrice';
 import { browserLanguages, pickRegion, readStoredRegion, storeRegion } from '../lib/region';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
 import type { PublicPlan, RegionalPrice } from '../lib/types';
 import { LoadingState } from '../components/states';
 import { FeatureGrid, FeaturePlayground, VisitorWelcome } from '../components/playground/FeaturePlayground';
-
-function priceLabel(plan: PublicPlan): string {
-  const dollars = plan.priceUsdCents / 100;
-  const value = Number.isInteger(dollars) ? String(dollars) : dollars.toFixed(2);
-  return `$${value}`;
-}
 
 const DIFFERENTIATORS: Array<{ title: string; body: string; image: string; alt: string }> = [
   {
@@ -213,16 +207,17 @@ export function MarketingPage() {
             ) : null}
             <div className="card-grid marketing-plans">
               {plans.map((plan) => {
-                const local = plan.id === 'full' && selected !== null;
+                const shown = plan.id === 'full' ? priceForVisitor(regions, selected?.code ?? regionCode) : null;
+                const amount = fullPlanAmount(plan, regions, selected?.code ?? regionCode);
                 return (
                   <div className="card marketing-plan" key={plan.id}>
                     <div className="card-title">{plan.name}</div>
                     <div className="marketing-price">
-                      {local ? formatMinor(selected.amountMinor, selected.currency) : priceLabel(plan)}
-                      {plan.interval === 'month' ? <span>/month</span> : null}
+                      {amount}
+                      {plan.interval === 'month' && amount !== 'Contact us' ? <span>/month</span> : null}
                     </div>
                     <p className="sub">{plan.headline}</p>
-                    {local && selected.placeholder ? (
+                    {shown?.placeholder ? (
                       <p className="placeholder-note">
                         Placeholder amount — the operator still needs to set this price.
                       </p>

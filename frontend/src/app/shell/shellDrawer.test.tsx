@@ -63,10 +63,12 @@ function renderShell(user: SessionUser): void {
 describe('clinic navigation drawer', () => {
   it('keeps the sidebar in the page on a desktop width', async () => {
     mockDrawer(false);
-    renderShell(makeUser({ role: 'owner' }));
+    renderShell(makeUser({ role: 'owner', displayName: 'Avery Owner' }));
     expect(await screen.findByRole('link', { name: 'Patients' })).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Menu' })).not.toBeInTheDocument();
-    expect(screen.getByText('owner@example.com')).toBeVisible();
+    expect(screen.getByText('Avery Owner')).toBeVisible();
+    expect(screen.getByText('Test Clinic')).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Profile' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeVisible();
     expect(document.querySelector('header .account-menu')).toBeNull();
     expect(document.querySelector('#app-nav .drawer-account')).not.toBeNull();
@@ -75,10 +77,10 @@ describe('clinic navigation drawer', () => {
   it('opens a focus-trapped menu for an owner and closes it', async () => {
     mockDrawer(true);
     const user = userEvent.setup();
-    renderShell(makeUser({ role: 'owner' }));
+    renderShell(makeUser({ role: 'owner', displayName: 'Avery Owner' }));
     const toggle = await screen.findByRole('button', { name: 'Menu' });
     expect(screen.queryByRole('link', { name: 'Patients' })).not.toBeInTheDocument();
-    expect(screen.getByText('owner@example.com').closest('nav')).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByText('Avery Owner').closest('nav')).toHaveAttribute('aria-hidden', 'true');
     expect(screen.queryByText('Home')).not.toBeInTheDocument();
     expect(document.querySelector('header .account-menu')).toBeNull();
     expect(document.querySelector('header .shell-crumb')).toBeNull();
@@ -88,12 +90,14 @@ describe('clinic navigation drawer', () => {
     const close = screen.getByRole('button', { name: 'Close menu' });
     await waitFor(() => expect(close).toHaveFocus());
 
-    expect(screen.getByText('owner@example.com')).toBeVisible();
+    expect(screen.getByText('Avery Owner')).toBeVisible();
+    expect(screen.getByText('Test Clinic')).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Profile' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeVisible();
     expect(screen.getByText('owner')).toBeVisible();
-    const email = screen.getByText('owner@example.com');
-    const role = screen.getByText('owner');
-    expect(email.getBoundingClientRect().left).toBe(role.getBoundingClientRect().left);
+    const name = screen.getByText('Avery Owner');
+    const clinic = screen.getByText('Test Clinic');
+    expect(name.getBoundingClientRect().left).toBe(clinic.getBoundingClientRect().left);
     close.focus();
     await user.tab({ shift: true });
     expect(screen.getByRole('button', { name: 'Sign out' })).toHaveFocus();
@@ -124,6 +128,9 @@ describe('clinic navigation drawer', () => {
     expect(screen.getByRole('link', { name: 'Recall' })).toBeVisible();
     expect(screen.queryByRole('link', { name: 'Dashboard' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Settings' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Profile' })).toBeVisible();
+    expect(screen.getByText('desk')).toBeVisible();
+    expect(screen.getByText('Test Clinic')).toBeVisible();
   });
 
   it('shows platform links for an administrator without a clinic', async () => {
@@ -136,7 +143,9 @@ describe('clinic navigation drawer', () => {
     expect(screen.queryByRole('link', { name: 'Patients' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Workspace' })).not.toBeInTheDocument();
     expect(screen.queryByText(/Clinic tools appear/)).not.toBeInTheDocument();
-    expect(screen.getByText('platform@example.com')).toBeVisible();
+    expect(screen.getByText('platform')).toBeVisible();
+    expect(screen.getByText('Platform admin')).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Profile' })).toBeVisible();
     expect(screen.getByRole('link', { name: 'Payments' })).toBeVisible();
     expect(screen.getByRole('link', { name: 'Manual payments' })).toBeVisible();
     expect(screen.getByRole('link', { name: 'Setup help' })).toBeVisible();

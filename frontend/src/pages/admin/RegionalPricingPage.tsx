@@ -22,6 +22,7 @@ export function RegionalPricingPage() {
   const [newLabel, setNewLabel] = useState('');
   const [newCurrency, setNewCurrency] = useState('USD');
   const [newAmount, setNewAmount] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
 
   const regions = data?.regions ?? [];
 
@@ -31,10 +32,16 @@ export function RegionalPricingPage() {
 
   async function save(region: RegionalPrice): Promise<void> {
     const amountMinor = majorTextToMinor(amountDraft(region));
+    const currency = region.code === 'us' ? 'USD' : (currencies[region.code] ?? region.currency).toUpperCase();
     if (amountMinor === null) {
+      setFormError(
+        region.code === 'us'
+          ? 'Enter a USD amount. The United States price is required.'
+          : 'Enter an amount with at most 2 decimal places.',
+      );
       return;
     }
-    const currency = (currencies[region.code] ?? region.currency).toUpperCase();
+    setFormError(null);
     const res = await submit(() =>
       apiFetch<{ region: RegionalPrice }>(`/api/admin/regional-prices/${region.code}`, {
         method: 'PATCH',
@@ -87,6 +94,7 @@ export function RegionalPricingPage() {
         subtitle="Amounts the public pricing page and the bank-transfer form show. Placeholder rows are stand-ins for you to replace."
       />
       {saved ? <Flash kind="success" message="Price saved." onDismiss={clearFeedback} /> : null}
+      {formError !== null ? <Flash kind="error" message={formError} onDismiss={() => setFormError(null)} /> : null}
       {actionError !== null ? <Flash kind="error" message={actionError} onDismiss={clearFeedback} /> : null}
       {status === 'loading' ? <LoadingState label="Loading prices…" /> : null}
       {status === 'error' ? <ErrorState message={error ?? 'Prices could not be loaded.'} onRetry={reload} /> : null}
@@ -116,7 +124,8 @@ export function RegionalPricingPage() {
                       <input
                         className="input"
                         aria-label={`${region.label} currency`}
-                        value={currencies[region.code] ?? region.currency}
+                        value={region.code === 'us' ? 'USD' : (currencies[region.code] ?? region.currency)}
+                        disabled={region.code === 'us'}
                         onChange={(event) =>
                           setCurrencies((prev) => ({ ...prev, [region.code]: event.target.value.toUpperCase() }))
                         }
@@ -169,8 +178,9 @@ export function RegionalPricingPage() {
             </table>
           </div>
           <p className="text-muted">
-            Enter the amount in major units, such as 20 or 20.50. USD $20 is the current Full Plan price.
-            Other seeded amounts are placeholders, not exchange rates.
+            Enter the amount in major units, such as 35 or 35.50. The United States row is required
+            and must stay in USD. It is the default price on the public page, signup, billing, and
+            card checkout. Other saved rows are used when a visitor’s region matches.
           </p>
         </section>
       ) : null}

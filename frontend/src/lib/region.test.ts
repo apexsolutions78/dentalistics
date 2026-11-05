@@ -24,7 +24,7 @@ describe('region from browser locale', () => {
 
 describe('money formatting', () => {
   it('formats minor units and parses major text', () => {
-    expect(formatMinor(2000, 'USD')).toBe('$20');
+    expect(formatMinor(4500, 'USD')).toBe('$45');
     expect(majorTextToMinor('20.50')).toBe(2050);
     expect(majorTextToMinor('20.555')).toBeNull();
   });

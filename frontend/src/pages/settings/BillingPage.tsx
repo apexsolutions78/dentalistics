@@ -16,7 +16,10 @@ import type { BillingPhase, BillingState, ManualPaymentMethod, RegionalPrice } f
 const POLL_INTERVAL_MS = 3000;
 const POLL_ATTEMPTS = 5;
 
-function formatUsd(amountUsdCents: number): string {
+function formatUsd(amountUsdCents: number | null): string {
+  if (amountUsdCents === null || !Number.isInteger(amountUsdCents) || amountUsdCents < 1) {
+    return 'Contact us';
+  }
   return `$${(amountUsdCents / 100).toFixed(2)}`;
 }
 
@@ -286,14 +289,16 @@ export function BillingPage() {
                 <button
                   type="button"
                   className="btn btn-primary"
-                  disabled={saving || !summary.gateway.enabled}
+                  disabled={saving || !summary.gateway.enabled || summary.price.amountUsdCents === null}
                   onClick={() => {
                     void startCheckout();
                   }}
                 >
                   {saving
                     ? 'Redirecting…'
-                    : `${showRenew && !showUpgrade ? 'Renew' : 'Upgrade'} — ${formatUsd(summary.price.amountUsdCents)}/${summary.price.interval}`}
+                    : summary.price.amountUsdCents === null
+                      ? 'Contact us'
+                      : `${showRenew && !showUpgrade ? 'Renew' : 'Upgrade'} — ${formatUsd(summary.price.amountUsdCents)}/${summary.price.interval}`}
                 </button>
               </div>
             ) : null}
@@ -342,7 +347,9 @@ export function BillingPage() {
                 </strong>
                 {selectedRegion.placeholder ? ' (placeholder amount until the operator sets it)' : ''}
               </p>
-            ) : null}
+            ) : (
+              <p>Contact us for a bank-transfer price. No regional price is saved.</p>
+            )}
             {methods.length === 0 ? (
               <p>Payment instructions for this region have not been published yet.</p>
             ) : (

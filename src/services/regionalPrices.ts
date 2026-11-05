@@ -1,5 +1,7 @@
 import type { Pool, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
-import { AppError } from '../errors';
+import { AppError, ValidationError } from '../errors';
+import type { Logger } from '../logger';
+import { DEFAULT_PRICE_CURRENCY, DEFAULT_PRICE_REGION, savedUsdMinor } from '../plans';
 import { parseAmountMinor, parseCurrency, parseRegionCode } from '../pricing/money';
 import { requireString } from '../validate';
 
@@ -90,6 +92,18 @@ export async function updateRegionalPrice(
   const label = body.label === undefined ? current.label : requireString(body.label, 'label', { min: 2, max: 80 });
   const currency = body.currency === undefined ? current.currency : parseCurrency(body.currency);
   const amountMinor = body.amountMinor === undefined ? current.amountMinor : parseAmountMinor(body.amountMinor);
+  if (current.code === DEFAULT_PRICE_REGION) {
+    if (currency !== DEFAULT_PRICE_CURRENCY) {
+      throw new ValidationError('Invalid input', [
+        'The United States price must stay in USD. It is the required default price.',
+      ]);
+    }
+    if (!Number.isInteger(amountMinor) || amountMinor < 1) {
+      throw new ValidationError('Invalid input', [
+        'A USD amount is required. Enter the United States price before saving.',
+      ]);
+    }
+  }
   await db.query(
     `UPDATE regional_prices
      SET label = ?, currency = ?, amount_minor = ?, is_placeholder = 0
@@ -116,4 +130,17 @@ export async function deleteRegionalPrice(db: Pool, code: string): Promise<void>
   if (result.affectedRows === 0) {
     throw new AppError('Region not found', 404, 'not_found', true);
   }
+}
+
+export async function loadSavedUsdPrice(
+  db: Pool,
+  logger?: Logger,
+): Promise<{ amountMinor: number; currency: 'USD'; regionCode: 'us' } | null> {
+  const regions = await listRegionalPrices(db);
+  const amountMinor = savedUsdMinor(regions);
+  if (amountMinor === null) {
+    logger?.warn('usd subscription price is not saved', { region: DEFAULT_PRICE_REGION });
+    return null;
+  }
+  return { amountMinor, currency: 'USD', regionCode: 'us' };
 }

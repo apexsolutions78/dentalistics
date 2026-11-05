@@ -160,6 +160,9 @@ describe.skipIf(testHost === undefined || testHost === '')('Phase B: payments an
 
   afterAll(async () => {
     if (pool !== undefined) {
+      await pool.query(
+        "UPDATE regional_prices SET amount_minor = 2000, currency = 'USD', is_placeholder = 0 WHERE region_code = 'us'",
+      );
       await pool.end();
     }
   });
@@ -177,8 +180,14 @@ describe.skipIf(testHost === undefined || testHost === '')('Phase B: payments an
     const res = await request(app).get(billingPath(orgAId)).set('Cookie', ownerCookie);
     expect(res.status).toBe(200);
     expect(res.body.organization).toMatchObject({ id: orgAId, plan: 'trial' });
-    expect(res.body.price).toEqual({
-      amountUsdCents: 2000,
+    await pool.query(
+      "UPDATE regional_prices SET amount_minor = 4500, currency = 'USD', is_placeholder = 0 WHERE region_code = 'us'",
+    );
+    const repriced = await request(app).get(billingPath(orgAId)).set('Cookie', ownerCookie);
+    expect(repriced.status).toBe(200);
+    expect(repriced.headers['cache-control']).toBe('no-store');
+    expect(repriced.body.price).toEqual({
+      amountUsdCents: 4500,
       currency: 'USD',
       interval: 'month',
       name: 'Full Plan',
@@ -261,7 +270,7 @@ describe.skipIf(testHost === undefined || testHost === '')('Phase B: payments an
     const payment = res.body.payment as Record<string, unknown>;
     orgAOrder = payment.orderId as string;
     expect(payment).toMatchObject({
-      amountUsdCents: 2000,
+      amountUsdCents: 4500,
       currency: 'USD',
       provider: 'mock',
       status: 'pending',

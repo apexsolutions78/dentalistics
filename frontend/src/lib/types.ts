@@ -5,6 +5,8 @@ export interface SessionUser {
   email: string;
   role: Role;
   organizationId: number | null;
+  displayName?: string | null;
+  phone?: string | null;
 }
 
 export type BillingPhase =
@@ -39,7 +41,7 @@ export interface PublicPlan {
   id: 'trial' | 'full';
   name: string;
   headline: string;
-  priceUsdCents: number;
+  priceUsdCents: number | null;
   interval: 'trial' | 'month';
   trialDays: number | null;
 }
@@ -508,7 +510,7 @@ export interface BillingSummary {
   };
   billing?: BillingState;
   price: {
-    amountUsdCents: number;
+    amountUsdCents: number | null;
     currency: string;
     interval: string;
     name: string;

@@ -91,7 +91,7 @@ function routeFor(user: SessionUser | null, organization?: SessionOrganization |
           plan: 'trial',
           trialEndsAt: '2099-01-01T00:00:00.000Z',
         },
-        price: { amountUsdCents: 2000, currency: 'USD', interval: 'month', name: 'Full Plan' },
+        price: { amountUsdCents: 4500, currency: 'USD', interval: 'month', name: 'Full Plan' },
         gateway: { enabled: false, provider: 'assanpay', configured: false, reasons: [] },
         payments: [],
       });
@@ -112,6 +112,22 @@ function routeFor(user: SessionUser | null, organization?: SessionOrganization |
     }
     if (url.includes('/api/admin/trials')) {
       return jsonResponse(200, { trials: [] });
+    }
+    if (url.includes('/api/profile')) {
+      return jsonResponse(200, {
+        user: {
+          id: user?.id ?? 1,
+          email: user?.email ?? '',
+          role: user?.role ?? 'owner',
+          organizationId: user?.organizationId ?? null,
+          displayName: user?.displayName ?? 'Avery Owner',
+          phone: null,
+        },
+        clinic:
+          user?.role === 'owner'
+            ? { name: 'Test Clinic', phone: null, email: null, address: null }
+            : null,
+      });
     }
     return jsonResponse(404, { error: { code: 'not_found', message: 'Not found' } });
   };
@@ -137,6 +153,25 @@ describe('route access', () => {
     await renderAt('/settings', makeUser({ role: 'owner' }));
     expect(await screen.findByRole('heading', { name: 'Settings' })).toBeInTheDocument();
     expect(await screen.findByText('Clinic profile')).toBeInTheDocument();
+  });
+
+  it('opens the profile page for an owner, including clinic contact details', async () => {
+    await renderAt('/profile', makeUser({ role: 'owner', displayName: 'Avery Owner' }));
+    expect(await screen.findByRole('heading', { name: 'Profile' })).toBeInTheDocument();
+    expect(await screen.findByLabelText(/Clinic name/)).toBeInTheDocument();
+  });
+
+  it('opens a personal profile for a receptionist without clinic fields', async () => {
+    await renderAt('/profile', makeUser({ role: 'receptionist', email: 'desk@example.com', displayName: 'Dana Desk' }));
+    expect(await screen.findByDisplayValue('Dana Desk')).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Clinic name/)).not.toBeInTheDocument();
+  });
+
+  it('opens a personal profile for a platform administrator', async () => {
+    await renderAt('/profile', makeUser({ role: 'admin', email: 'platform@example.com', organizationId: null, displayName: 'Pat Admin' }));
+    expect(await screen.findByDisplayValue('Pat Admin')).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Clinic name/)).not.toBeInTheDocument();
+    expect(screen.queryByText('No clinic linked to this account')).not.toBeInTheDocument();
   });
 
   it('denies a receptionist access to settings', async () => {

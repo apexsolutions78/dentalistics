@@ -7,6 +7,7 @@ import { FormField } from '../components/FormField';
 import { Flash } from '../components/Flash';
 import type { BusinessHours, Settings } from '../lib/types';
 import { PatientImportStep } from './PatientImportStep';
+import { SubscriptionPriceLine } from '../components/SubscriptionPriceLine';
 
 const EMAIL_PATTERN = /^\S+@\S+\.\S+$/;
 
@@ -370,6 +371,7 @@ export function OnboardingPage() {
         {step === 4 ? (
           <div>
             <p className="sub">Review your clinic details. You can change everything later in Settings.</p>
+            <SubscriptionPriceLine />
             <dl className="onboarding-review">
               <dt>Clinic name</dt>
               <dd>{name.trim()}</dd>
