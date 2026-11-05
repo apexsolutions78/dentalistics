@@ -76,12 +76,16 @@ export function DashboardPage() {
 
   const m = data.metrics;
   const defs = data.definitions.metrics;
+  const windowFrom = data.window.from.slice(0, 10);
+  const windowTo = data.window.to.slice(0, 10);
+  const shownFrom = from !== '' ? from : windowFrom;
+  const shownTo = to !== '' ? to : windowTo;
 
   return (
     <div>
       <PageHeader
         title="Dashboard"
-        subtitle={`Showing ${formatDate(data.window.from)} – ${formatDate(data.window.to)}`}
+        subtitle={`Showing ${formatDate(shownFrom)} – ${formatDate(shownTo)}`}
       />
       <form
         className="card"
@@ -95,8 +99,8 @@ export function DashboardPage() {
             <input
               className="input"
               type="date"
-              value={from}
-              max={to !== '' ? to : undefined}
+              value={shownFrom}
+              max={shownTo}
               onChange={(e) => setFrom(e.target.value)}
             />
           </FormField>
@@ -104,8 +108,8 @@ export function DashboardPage() {
             <input
               className="input"
               type="date"
-              value={to}
-              min={from !== '' ? from : undefined}
+              value={shownTo}
+              min={shownFrom}
               onChange={(e) => setTo(e.target.value)}
             />
           </FormField>

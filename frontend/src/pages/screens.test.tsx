@@ -310,6 +310,31 @@ describe('AppointmentDetailPage', () => {
 });
 
 describe('DashboardPage', () => {
+  it('fills the date fields with the range the page is showing', async () => {
+    stub((url) =>
+      url.includes('/dashboard')
+        ? jsonResponse(200, {
+            window: { from: '2026-10-06', to: '2026-11-04', basis: '30d' },
+            metrics: {
+              leads: { new: 1, contacted: 0, converted: 0, responseRate: null },
+              leadResponses: 0,
+              appointments: { booked: 0, scheduled: 0, confirmed: 0, completed: 0, noShows: 0, rebooked: 0 },
+              recall: { due: 0, contacted: 0, booked: 0 },
+              messages: { sent: 0, patientReplies: 0 },
+              delivery: { delivered: 0, deliveredRate: null },
+              failures: { failed: 0, failedRate: null },
+            },
+            definitions: { metrics: {}, planMetrics: {} },
+            trends: { daily: [] },
+          })
+        : null,
+    );
+    renderPage(<DashboardPage />, '/dashboard');
+    expect(await screen.findByLabelText('From')).toHaveValue('2026-10-06');
+    expect(screen.getByLabelText('To')).toHaveValue('2026-11-04');
+    expect(screen.getByText(/Oct 6, 2026/)).toBeInTheDocument();
+  });
+
   it('shows a retryable error state when the dashboard API fails', async () => {
     stub(() => jsonResponse(403, { error: { code: 'forbidden', message: 'Forbidden' } }));
     renderPage(<DashboardPage />, '/dashboard');

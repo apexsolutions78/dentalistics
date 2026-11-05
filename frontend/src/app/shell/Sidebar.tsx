@@ -2,7 +2,7 @@ import type { KeyboardEvent as ReactKeyboardEvent, RefObject } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../../lib/auth';
 import { can } from '../../lib/capabilities';
-import { AccountMenu } from './AccountMenu';
+import { AccountMenu, DrawerSignOut } from './AccountMenu';
 
 const PRIMARY_LINKS: Array<{ to: string; label: string; end?: boolean }> = [
   { to: '/workspace', label: 'Workspace', end: true },
@@ -224,12 +224,15 @@ export function Sidebar({
       {drawer ? (
         <div className="nav-drawer-bar">
           <p className="nav-label">Menu</p>
-          <button type="button" className="nav-drawer-close" onClick={onClose}>
-            Close menu
+          <button type="button" className="nav-drawer-close" aria-label="Close menu" onClick={onClose}>
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
           </button>
         </div>
       ) : null}
-      {drawer ? <AccountMenu placement="drawer" /> : null}
+      <AccountMenu placement="drawer" />
+      <div className="sidebar-scroll">
       {hasClinic ? (
       <div className="nav-group">
         <p className="nav-label">Today</p>
@@ -281,6 +284,8 @@ export function Sidebar({
           </ul>
         </div>
       ) : null}
+      </div>
+      <DrawerSignOut />
     </nav>
   );
 }

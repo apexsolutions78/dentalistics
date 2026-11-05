@@ -7,7 +7,6 @@ import { stampCardTables } from '../../lib/cardTables';
 import { useMediaQuery } from '../../lib/useMediaQuery';
 import { GuidedTour } from '../../components/tour/GuidedTour';
 import { Sidebar } from './Sidebar';
-import { AccountMenu } from './AccountMenu';
 import { TrialLockBanner } from './TrialLockBanner';
 
 const SECTION_TITLES: Record<string, string> = {
@@ -109,9 +108,7 @@ export function AppShell() {
             </svg>
             <span className="sr-only">Menu</span>
           </button>
-        ) : (
-          <AccountMenu />
-        )}
+        ) : null}
       </header>
       <TrialLockBanner />
       {drawer && open ? (
