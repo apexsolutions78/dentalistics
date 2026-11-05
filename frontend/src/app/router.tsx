@@ -54,10 +54,13 @@ import { RecallSettingsPage } from '../pages/settings/RecallSettingsPage';
 import { ReviewSettingsPage } from '../pages/settings/ReviewSettingsPage';
 import { AutomationSettingsPage } from '../pages/settings/AutomationSettingsPage';
 import { ProfilePage } from '../pages/profile/ProfilePage';
+import { BookingPage } from '../pages/book/BookingPage';
+import { OnlineBookingSettingsPage } from '../pages/settings/OnlineBookingSettingsPage';
 
 export function AppRouter() {
   return (
     <Routes>
+      <Route path="/book/:siteKey" element={<BookingPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignupPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
@@ -124,6 +127,7 @@ export function AppRouter() {
                 <Route path="settings" element={<RequireCapability capability="settings.view" />}>
                   <Route index element={<SettingsOverviewPage />} />
                   <Route path="clinic" element={<ClinicSettingsPage />} />
+                  <Route path="booking" element={<OnlineBookingSettingsPage />} />
                   <Route path="users" element={<UsersRolesPage />} />
                   <Route path="communication" element={<CommunicationSettingsPage />} />
                   <Route path="templates" element={<TemplatesPage />} />

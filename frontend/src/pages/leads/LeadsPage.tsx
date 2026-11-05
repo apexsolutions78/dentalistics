@@ -174,7 +174,7 @@ export function LeadsPage() {
                 value={form.source}
                 onChange={(e) => setForm({ ...form, source: e.target.value })}
               >
-                {options(LEAD_SOURCES).map((opt) => (
+                {options(LEAD_SOURCES.filter((source) => source !== 'ONLINE_BOOKING')).map((opt) => (
                   <option key={opt.value} value={opt.value}>
                     {opt.label}
                   </option>

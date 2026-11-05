@@ -14,6 +14,7 @@ interface CategoryCard {
 
 const CATEGORIES: CategoryCard[] = [
   { to: '/settings/clinic', title: 'Clinic profile', description: 'Name, contact details, hours, timezone' },
+  { to: '/settings/booking', title: 'Online booking', description: 'Public link, hours, and confirmation' },
   { to: '/settings/users', title: 'Users & roles', description: 'Invite, review, and disable clinic users' },
   { to: '/settings/communication', title: 'Communication', description: 'Telephony and WhatsApp providers' },
   { to: '/settings/templates', title: 'Templates', description: 'Message content for every automation' },

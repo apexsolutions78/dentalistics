@@ -6,7 +6,9 @@
 
 **Governing protocol:** `CLAUDE.md` — MASTER_AI_RELIABILITY_PROTOCOL v1.0. This document is structured to its `<PROJECT_STATE>` durable-state categories.
 
-**Last updated:** 2026-11-05 (revision 90)
+**Last updated:** 2026-11-05 (revision 91)
+
+**Online booking (revision 91, CONFIRMED executed, not deployed):** Each clinic has a public page at `/book/<site_key>` using the existing 64-character site key from migration 0005. The owner turns it on under Settings → Online booking, copies the link, and sees a QR code drawn in the browser. Patients choose a reason (there is no service catalog), a doctor or any doctor, and an open time, then leave name, phone, email, notes, and consent. The visit is saved as a lead with source `ONLINE_BOOKING` and an appointment that is `SCHEDULED` until the clinic approves it, or `CONFIRMED` when auto-confirm is on. A new patient is created, or an existing patient in that clinic is matched by phone, then by email. Open times use the clinic timezone, opening hours, each doctor's working hours, the slot length, the buffer, the minimum notice, and how many days ahead booking is allowed. A trial that has ended, or a lapsed subscription, shows "Online booking is not available." A confirmation email is sent only when SMTP is already configured. Migration `0028_online_booking.sql`. Verified with backend `npm test` 491/491 and frontend lint, vitest 232/232, and the production build. Not deployed.
 
 **Trial offer (revision 90, CONFIRMED executed, not deployed):** Platform → Pricing stores the free-trial length (seed 8, allowed 1–90), the limitation text, and the Free Plan and Full Plan headlines and bullets. New signups and the public plans response read that row. Existing `organizations.trial_ends_at` values are not rewritten. Migration `0027_plan_offer.sql`. Not deployed.
 

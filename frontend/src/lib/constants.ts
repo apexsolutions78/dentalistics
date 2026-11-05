@@ -7,7 +7,7 @@ export const LEAD_STATUSES = [
   'CLOSED',
 ] as const;
 
-export const LEAD_SOURCES = ['WEBSITE', 'MISSED_CALL', 'MANUAL', 'OTHER'] as const;
+export const LEAD_SOURCES = ['WEBSITE', 'MISSED_CALL', 'MANUAL', 'OTHER', 'ONLINE_BOOKING'] as const;
 
 export const APPOINTMENT_STATUSES = [
   'SCHEDULED',
