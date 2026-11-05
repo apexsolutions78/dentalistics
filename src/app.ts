@@ -13,6 +13,7 @@ import { attachSession } from './middleware/auth';
 import { createTrialLock } from './middleware/trialLock';
 import { createAdminRouter } from './routes/admin';
 import { createAppointmentsRouter } from './routes/appointments';
+import { createAutomationFlowsRouter } from './routes/automationFlows';
 import { createAuthRouter } from './routes/auth';
 import { createBillingRouter } from './routes/billing';
 import { createCallEventsRouter } from './routes/callEvents';
@@ -198,6 +199,7 @@ export function createApp(deps: AppDeps = {}): Express {
     app.use('/api/organizations', createPatientsRouter({ db, logger }));
     app.use('/api/organizations', createChartRouter({ db, logger }));
     app.use('/api/organizations', createPatientBillingRouter({ db, logger }));
+    app.use('/api/organizations', createAutomationFlowsRouter({ db }));
     app.use('/api/organizations', createAppointmentsRouter({ db, logger }));
     app.use('/api/organizations', createDashboardRouter({ db, logger }));
     app.use('/api/organizations', createWorkspaceRouter({ db, logger }));

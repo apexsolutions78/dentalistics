@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { apiFetch } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { useApi } from '../../lib/useApi';
+import { useSubmit } from '../../lib/useAsync';
 import type { Paged, Settings } from '../../lib/types';
 import { AUTOMATION_KINDS, options } from '../../lib/constants';
 import { formatDateTime } from '../../lib/format';
@@ -47,6 +49,16 @@ function jobTone(status: string): BadgeTone {
   return 'default';
 }
 
+interface AutomationFlowCard {
+  key: string;
+  name: string;
+  description: string;
+  trigger: string;
+  enabled: boolean;
+  lastRunAt: string | null;
+  runsLast30Days: number;
+}
+
 interface AutomationLogRow {
   id: number;
   kind: string;
@@ -83,6 +95,21 @@ export function AutomationsPage() {
   const logs = logsQuery.data?.logs ?? [];
 
   const automations = settingsQuery.data?.automations ?? null;
+  const canToggle = user?.role === 'owner';
+  const flowsPath = orgId === null ? null : `/api/organizations/${orgId}/automation-flows`;
+  const flowsQuery = useApi<{ flows: AutomationFlowCard[] }>(flowsPath);
+  const { submit, saving, error: toggleError } = useSubmit();
+
+  async function toggle(flow: AutomationFlowCard): Promise<void> {
+    if (orgId === null || !canToggle) return;
+    const saved = await submit(() =>
+      apiFetch<{ flow: AutomationFlowCard }>(`/api/organizations/${orgId}/automation-flows/${flow.key}`, {
+        method: 'PATCH',
+        body: { enabled: !flow.enabled },
+      }),
+    );
+    if (saved !== null) flowsQuery.reload();
+  }
 
   return (
     <div>
@@ -100,6 +127,46 @@ export function AutomationsPage() {
           </div>
         }
       />
+
+      <section className="card" aria-label="Automated flows">
+        <h2 className="card-title">Flows</h2>
+        <p className="sub">
+          {canToggle
+            ? 'Turning a flow off stops it for this clinic. Other settings stay as they are.'
+            : 'Only the clinic owner can turn a flow on or off.'}
+        </p>
+        {flowsQuery.status === 'loading' && flowsQuery.data === null ? (
+          <LoadingState label="Loading flows…" />
+        ) : null}
+        {flowsQuery.status === 'error' && flowsQuery.data === null ? (
+          <ErrorState message={flowsQuery.error ?? 'Flows could not be loaded.'} onRetry={flowsQuery.reload} />
+        ) : null}
+        {toggleError !== null ? <p role="alert">{toggleError}</p> : null}
+        <div className="card-grid automation-flow-grid">
+          {(flowsQuery.data?.flows ?? []).map((flow) => (
+            <article className="card" key={flow.key}>
+              <h3 className="card-title">{flow.name}</h3>
+              <p>{flow.description}</p>
+              <p className="sub">Trigger: {flow.trigger}</p>
+              <p className="sub">
+                Last run: {flow.lastRunAt === null ? 'Never' : formatDateTime(flow.lastRunAt)} · {flow.runsLast30Days}{' '}
+                in the last 30 days
+              </p>
+              <label className="checkbox-row">
+                <input
+                  type="checkbox"
+                  role="switch"
+                  checked={flow.enabled}
+                  disabled={!canToggle || saving}
+                  aria-label={`${flow.name} enabled`}
+                  onChange={() => void toggle(flow)}
+                />
+                {flow.enabled ? 'On' : 'Off'}
+              </label>
+            </article>
+          ))}
+        </div>
+      </section>
 
       <section className="card">
         <h2 className="card-title">Automation overview</h2>

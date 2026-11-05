@@ -6,7 +6,9 @@
 
 **Governing protocol:** `CLAUDE.md` — MASTER_AI_RELIABILITY_PROTOCOL v1.0. This document is structured to its `<PROJECT_STATE>` durable-state categories.
 
-**Last updated:** 2026-11-05 (revision 90)
+**Last updated:** 2026-11-05 (revision 91)
+
+**Automation switches (revision 91, CONFIRMED executed, not deployed):** `/automations` lists the seven flows the server actually runs: new enquiry acknowledgement, missed-call response, appointment reminders, no-show recovery, recall, review requests, and lead automation. Each card shows the trigger, the last run, and the count from the last 30 days. The clinic owner can turn a flow on or off. That writes the existing `enabled` field in `organization_settings` and leaves the rest of that flow's settings in place. The acknowledgement, reminder, no-show, recall, review, missed-call, and lead-automation runners already stop when `enabled` is false. Receptionists and platform administrators can read the page where their role already allows it, and the switch stays disabled. No migration. Not deployed.
 
 **Trial offer (revision 90, CONFIRMED executed, not deployed):** Platform → Pricing stores the free-trial length (seed 8, allowed 1–90), the limitation text, and the Free Plan and Full Plan headlines and bullets. New signups and the public plans response read that row. Existing `organizations.trial_ends_at` values are not rewritten. Migration `0027_plan_offer.sql`. Not deployed.
 
