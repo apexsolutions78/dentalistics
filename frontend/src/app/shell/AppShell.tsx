@@ -5,6 +5,7 @@ import { useAuth } from '../../lib/auth';
 import { DRAWER_QUERY } from '../../lib/breakpoints';
 import { stampCardTables } from '../../lib/cardTables';
 import { useMediaQuery } from '../../lib/useMediaQuery';
+import { ThemePicker } from '../../components/ThemePicker';
 import { GuidedTour } from '../../components/tour/GuidedTour';
 import { Sidebar } from './Sidebar';
 import { TrialLockBanner } from './TrialLockBanner';
@@ -95,21 +96,24 @@ export function AppShell() {
         ) : (
           <span className="shell-crumb">{title}</span>
         )}
-        {drawer ? (
-          <button
-            ref={toggleRef}
-            type="button"
-            className="nav-toggle"
-            aria-expanded={open}
-            aria-controls="app-nav"
-            onClick={() => setOpen((value) => !value)}
-          >
-            <svg className="nav-toggle-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-              <path d="M4 7h16M4 12h16M4 17h16" />
-            </svg>
-            <span className="sr-only">Menu</span>
-          </button>
-        ) : null}
+        <div className="header-tools">
+          <ThemePicker />
+          {drawer ? (
+            <button
+              ref={toggleRef}
+              type="button"
+              className="nav-toggle"
+              aria-expanded={open}
+              aria-controls="app-nav"
+              onClick={() => setOpen((value) => !value)}
+            >
+              <svg className="nav-toggle-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M4 7h16M4 12h16M4 17h16" />
+              </svg>
+              <span className="sr-only">Menu</span>
+            </button>
+          ) : null}
+        </div>
       </header>
       <TrialLockBanner />
       {drawer && open ? (

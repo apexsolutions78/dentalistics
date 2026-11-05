@@ -9,6 +9,7 @@ import {
 } from 'react';
 import type { ReactNode } from 'react';
 import { apiFetch, onUnauthorized } from './api';
+import { isThemeChoice, setThemeChoice } from './theme';
 import type { SessionOrganization, SessionUser } from './types';
 
 export type AuthStatus = 'loading' | 'authenticated' | 'anonymous';
@@ -38,6 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>('loading');
   const [sessionExpired, setSessionExpired] = useState(false);
   const hadSessionRef = useRef(false);
+  const themeSyncedFor = useRef<number | null>(null);
 
   useEffect(() => {
     return onUnauthorized(() => {
@@ -68,6 +70,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void checkSession();
   }, [checkSession]);
+
+  useEffect(() => {
+    if (user === null) {
+      themeSyncedFor.current = null;
+      return;
+    }
+    if (themeSyncedFor.current === user.id || !isThemeChoice(user.theme)) return;
+    themeSyncedFor.current = user.id;
+    setThemeChoice(user.theme);
+  }, [user]);
 
   const login = useCallback(async (email: string, password: string): Promise<void> => {
     const res = await apiFetch<SessionResponse>('/api/auth/login', {

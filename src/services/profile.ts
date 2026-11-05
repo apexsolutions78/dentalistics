@@ -1,6 +1,8 @@
 import type { Pool, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { verifyPassword } from '../auth/password';
 import type { SessionUser } from '../auth/sessions';
+import { isThemeChoice } from '../theme';
+import type { ThemeChoice } from '../theme';
 import { recordAudit } from '../audit';
 import { organizationAccess } from '../billing/entitlement';
 import { AppError, ValidationError } from '../errors';
@@ -14,6 +16,7 @@ export interface ProfileUser {
   organizationId: number | null;
   displayName: string | null;
   phone: string | null;
+  theme: ThemeChoice;
 }
 
 export interface ProfileClinic {
@@ -35,6 +38,7 @@ interface ProfileRow extends RowDataPacket {
   organization_id: number | null;
   display_name: string | null;
   phone: string | null;
+  theme: ThemeChoice;
   password_hash: string;
   clinic_name: string | null;
   clinic_phone: string | null;
@@ -42,7 +46,7 @@ interface ProfileRow extends RowDataPacket {
   clinic_address: string | null;
 }
 
-const USER_FIELDS = new Set(['displayName', 'phone', 'email', 'currentPassword']);
+const USER_FIELDS = new Set(['displayName', 'phone', 'email', 'currentPassword', 'theme']);
 const CLINIC_FIELDS = new Set(['name', 'phone', 'email', 'address']);
 
 function asObject(value: unknown, name: string): Record<string, unknown> {
@@ -50,6 +54,13 @@ function asObject(value: unknown, name: string): Record<string, unknown> {
     throw new ValidationError('Invalid input', [`${name} must be an object`]);
   }
   return value as Record<string, unknown>;
+}
+
+function requireTheme(value: unknown): ThemeChoice {
+  if (!isThemeChoice(value)) {
+    throw new ValidationError('Invalid input', ['theme must be light, dark, or system']);
+  }
+  return value;
 }
 
 function optionalDisplayName(value: unknown): string | null {
@@ -84,6 +95,7 @@ function toUser(row: ProfileRow): ProfileUser {
     organizationId: row.organization_id,
     displayName: row.display_name,
     phone: row.phone,
+    theme: row.theme,
   };
 }
 
@@ -101,7 +113,7 @@ function toClinic(row: ProfileRow): ProfileClinic | null {
 
 async function loadProfile(db: Pool, userId: number): Promise<ProfileRow> {
   const [rows] = await db.query<ProfileRow[]>(
-    `SELECT u.id, u.email, u.role, u.organization_id, u.display_name, u.phone, u.password_hash,
+    `SELECT u.id, u.email, u.role, u.organization_id, u.display_name, u.phone, u.theme, u.password_hash,
             o.name AS clinic_name, o.phone AS clinic_phone, o.email AS clinic_email, o.address AS clinic_address
      FROM users u
      LEFT JOIN organizations o ON o.id = u.organization_id
@@ -177,6 +189,7 @@ export async function updateProfile(
     throw new AppError('Forbidden', 403, 'forbidden', true);
   }
 
+  const theme = body.theme === undefined ? undefined : requireTheme(body.theme);
   const displayName = body.displayName === undefined ? undefined : optionalDisplayName(body.displayName);
   const phone = body.phone === undefined ? undefined : optionalPhone(body.phone, 'phone');
   let nextEmail: string | undefined;
@@ -224,6 +237,11 @@ export async function updateProfile(
   const userSets: string[] = [];
   const userParams: unknown[] = [];
   const changed: string[] = [];
+  if (theme !== undefined) {
+    userSets.push('theme = ?');
+    userParams.push(theme);
+    changed.push('theme');
+  }
   if (displayName !== undefined) {
     userSets.push('display_name = ?');
     userParams.push(displayName);

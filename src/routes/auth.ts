@@ -14,6 +14,7 @@ import type { SessionUser } from '../auth/sessions';
 import { AppError, ValidationError } from '../errors';
 import { readJsonBody } from '../http/body';
 import { buildClearCookie, buildSessionCookie, SESSION_TTL_HOURS } from '../http/cookies';
+import type { ThemeChoice } from '../theme';
 import type { Logger } from '../logger';
 import type { PasswordResetMailer } from '../mail/passwordResetMailer';
 import { requireAuth } from '../middleware/auth';
@@ -37,6 +38,7 @@ interface UserAuthRow extends RowDataPacket {
   email: string;
   display_name: string | null;
   phone: string | null;
+  theme: ThemeChoice;
   password_hash: string;
   role: SessionUser['role'];
   organization_id: number | null;
@@ -54,6 +56,7 @@ function userDto(user: SessionUser): Record<string, unknown> {
     email: user.email,
     displayName: user.displayName,
     phone: user.phone,
+    theme: user.theme,
     role: user.role,
     organizationId: user.organizationId,
   };
@@ -121,7 +124,7 @@ export function createAuthRouter(deps: AuthRouterDeps): Router {
     }
 
     const [rows] = await deps.db.query<UserAuthRow[]>(
-      `SELECT u.id, u.email, u.display_name, u.phone, u.password_hash, u.role, u.organization_id, u.status, o.status AS org_status
+      `SELECT u.id, u.email, u.display_name, u.phone, u.theme, u.password_hash, u.role, u.organization_id, u.status, o.status AS org_status
        FROM users u
        LEFT JOIN organizations o ON o.id = u.organization_id
        WHERE u.email = ?`,
@@ -172,6 +175,7 @@ export function createAuthRouter(deps: AuthRouterDeps): Router {
       email: row.email,
       displayName: row.display_name,
       phone: row.phone,
+      theme: row.theme,
       role: row.role,
       organizationId: row.organization_id,
     };
@@ -250,7 +254,7 @@ export function createAuthRouter(deps: AuthRouterDeps): Router {
     );
     const organization = await loadSessionOrganization(deps.db, organizationId);
     res.status(201).json({
-      user: { id: userId, email, displayName: null, phone: null, role: 'owner', organizationId },
+      user: { id: userId, email, displayName: null, phone: null, theme: 'system', role: 'owner', organizationId },
       organization,
     });
   });
